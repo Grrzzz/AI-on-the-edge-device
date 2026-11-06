@@ -24,25 +24,161 @@
 
   <style>
     .container-content-view {
-      display: none;
+      display: block;
+    }
+
+    /* Section navigation + one section at a time */
+    .cfg-layout {
+      display: grid;
+      grid-template-columns: 230px minmax(0, 1fr);
+      gap: var(--card-gap);
+      align-items: start;
+    }
+
+    .cfg-nav {
+      position: sticky;
+      top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 10px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--card-radius);
+      box-shadow: var(--shadow);
+    }
+
+    .cfg-nav-group {
+      padding: 10px 10px 4px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+    }
+
+    .cfg-nav-group:first-child {
+      padding-top: 4px;
+    }
+
+    .cfg-nav button {
+      display: block;
+      width: 100%;
+      padding: 8px 12px;
+      border: 0;
+      border-radius: 0.6rem;
+      background: none;
+      color: var(--text-main);
+      font: inherit;
+      font-weight: 500;
+      text-align: left;
+      cursor: pointer;
+      transition: background var(--transition-speed), color var(--transition-speed);
+    }
+
+    .cfg-nav button:hover {
+      background: var(--surface);
+    }
+
+    .cfg-nav button.active {
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .cfg-panels {
       display: flex;
       flex-direction: column;
       gap: var(--card-gap);
+      min-width: 0;
     }
 
+    .cfg-panels > .card {
+      display: none;
+    }
+
+    .cfg-panels > .card.active {
+      display: block;
+    }
+
+    #apply-buttons {
+      position: sticky;
+      bottom: 12px;
+      display: flex;
+      gap: 8px;
+      padding: 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--card-radius);
+      box-shadow: var(--shadow);
+    }
+
+    #apply-buttons .button {
+      width: 100%;
+    }
+
+    @media screen and (max-width: 900px) {
+      .cfg-layout {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .cfg-nav {
+        position: static;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        gap: 6px;
+      }
+
+      .cfg-nav-group {
+        display: none;
+      }
+
+      .cfg-nav button {
+        width: auto;
+        flex: none;
+        white-space: nowrap;
+        background: var(--surface);
+      }
+    }
+
+    /* Narrow screens: parameter tables scroll sideways inside their card */
+    @media screen and (max-width: 720px) {
+      .cfg-panels > .card .card-body {
+        overflow-x: auto;
+      }
+
+      .cfg-panels > .card .table {
+        min-width: 560px;
+      }
+
+      .cfg-panels > .card .table col {
+        width: auto !important;
+      }
+    }
+
+    /* Parameter tables */
     .table {
-      border: 0pt;
+      border: 0;
       border-collapse: collapse;
       table-layout: fixed;
       width: 100%;
     }
 
+    .table tr + tr td {
+      border-top: 1px solid var(--border);
+    }
+
     th {
       vertical-align: middle;
       text-align: left;
-      font-size: inherit;
-      background-color: var(--bg-header);
-      padding: 7px;
+      padding: 16px 16px 6px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      background: transparent;
     }
 
     .section {
@@ -50,74 +186,54 @@
     }
 
     td {
-      padding: 10px;
+      padding: 10px 14px;
       vertical-align: middle;
     }
 
+    td:first-child {
+      color: var(--text-secondary);
+    }
+
     input[type='number'] {
-      width: 60px;
-      min-width: 60px;
-      max-width: 60px;
-      margin-right: 10px;
-      padding: 3px 5px;
-      display: inline-block;
-      border: 1px solid var(--border);
-      font-size: inherit;
-      vertical-align: middle;
-      border-radius: var(--input-radius);
+      width: 72px;
+      min-width: 72px;
+      max-width: 72px;
+      margin-right: 8px;
     }
 
     input[type='text'],
     input[type='password'] {
-      width: 96%;
-      min-width: 240px;
-      max-width: 96%;
-      margin-right: 10px;
-      padding: 3px 5px;
-      display: inline-block;
-      border: 1px solid var(--border);
-      font-size: inherit;
-      vertical-align: middle;
-      border-radius: var(--input-radius);
+      width: 100%;
+      min-width: 200px;
+      max-width: 380px;
+      margin-right: 8px;
     }
 
     select {
       min-width: 72px;
       max-width: 100%;
-      padding: 3px 5px;
-      display: inline-block;
-      border: 1px solid var(--border);
-      font-size: inherit;
-      margin-right: 10px;
-      vertical-align: middle;
-      border-radius: var(--input-radius);
+      margin-right: 8px;
     }
 
     .select_large {
       width: 100%;
       min-width: 250px;
       max-width: 100%;
-      padding: 3px 5px;
-      display: inline-block;
-      border: 1px solid var(--border);
-      font-size: inherit;
-      margin-right: 10px;
-      vertical-align: middle;
-      border-radius: var(--input-radius);
+      margin-right: 8px;
     }
 
     .description {
-      color: black;
+      color: var(--text-secondary);
       font-size: 80%;
     }
 
     .indent1 {
-      padding-left: 25px;
+      padding-left: 28px !important;
       font-size: inherit;
     }
 
     .indent2 {
-      padding-left: 50px;
+      padding-left: 52px !important;
       font-size: inherit;
     }
 
@@ -130,23 +246,22 @@
     }
 
     dialog {
-      background: var(--bg-tooltip);
-      border: var(--border);
+      background: var(--bg-card);
+      color: var(--text-main);
+      border: 1px solid var(--border);
       border-radius: var(--card-radius);
       box-shadow: var(--shadow);
       padding: 1.2rem;
       max-width: 400px;
     }
 
-    a {
-      color: var(--text-main);
-      font-weight: bold;
-      text-decoration: underline;
+    dialog::backdrop {
+      background: rgba(10, 15, 28, 0.5);
     }
 
-    a:hover {
-      color: var(--surface-hover);
-      text-decoration: underline;
+    a {
+      color: var(--primary);
+      font-weight: 600;
     }
 
     .q {
@@ -216,9 +331,6 @@
       }
     }
 
-    .hidden {
-      display: none;
-    }
   </style>
 
   <link href="firework.css?v=$COMMIT_HASH" rel="stylesheet" />
@@ -230,12 +342,10 @@
 <body>
   <div class="container">
     <div class="container-header">
-      <div class="container-title">
-        <span>⚙️</span>
-        Configuration
-      </div>
+      <div class="container-title">Configuration</div>
+      <div class="page-sub">Device, recognition and integration settings.</div>
       <details id="desc_details">
-        <summary id="desc_details_summary">CLICK HERE for usage info</summary>
+        <summary id="desc_details_summary">How it works</summary>
         <div class="info-box">
           <p>
             This page lists all device configuration parameters. To view a description,
@@ -2767,6 +2877,60 @@
       }
     }
 
+    // Section navigation: one section (card) at a time
+    const CONFIG_SECTIONS = [
+      { group: 'Device', items: [['Operation', 0], ['Network', 9], ['System', 10], ['WebUI', 11], ['Log', 8], ['GPIO', 7]] },
+      { group: 'Recognition', items: [['Image capturing', 1], ['Image alignment', 2], ['Digit ROIs', 3], ['Analog ROIs', 4], ['Post-processing', 5]] },
+      { group: 'Integrations', items: [['MQTT', 6]] },
+    ];
+
+    function buildSectionNav() {
+      const content = document.getElementById('divcontent');
+      if (!content || content.classList.contains('cfg-layout')) return;
+
+      const cards = [...content.querySelectorAll(':scope > .card')];
+      const apply = document.getElementById('apply-buttons');
+      if (cards.length !== 12 || !apply) return; // unexpected structure: keep the plain list
+
+      const panels = document.createElement('div');
+      panels.className = 'cfg-panels';
+      cards.forEach((c) => panels.append(c));
+      panels.append(apply);
+
+      const nav = document.createElement('nav');
+      nav.className = 'cfg-nav';
+      nav.setAttribute('aria-label', 'Configuration sections');
+
+      const show = (idx) => {
+        cards.forEach((c, i) => c.classList.toggle('active', i === idx));
+        nav.querySelectorAll('button').forEach((b) => b.classList.toggle('active', Number(b.dataset.idx) === idx));
+        try { sessionStorage.setItem('cfgSection', String(idx)); } catch (e) { }
+      };
+
+      for (const g of CONFIG_SECTIONS) {
+        const label = document.createElement('div');
+        label.className = 'cfg-nav-group';
+        label.textContent = g.group;
+        nav.append(label);
+        for (const [text, idx] of g.items) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.textContent = text;
+          b.dataset.idx = idx;
+          b.onclick = () => show(idx);
+          nav.append(b);
+        }
+      }
+
+      content.classList.add('cfg-layout');
+      content.prepend(nav);
+      content.append(panels);
+
+      let start = 0;
+      try { start = parseInt(sessionStorage.getItem('cfgSection') ?? '0', 10) || 0; } catch (e) { }
+      show(start >= 0 && start < cards.length ? start : 0);
+    }
+
     function loadConfigData(modelFileListObj, certFileListObj) {
       fillModelSelectionOptions(modelFileListObj);
       fillCertSelectionOptions(certFileListObj);
@@ -2792,6 +2956,7 @@
       setElVisibility(button_saveConfigAndReboot, false);
       setVariableInputLimits();
       $('#divloading').hide(); // Hide loading indicator
+      buildSectionNav();
       $('#divcontent').show(); // Show parameter content
     }
 
