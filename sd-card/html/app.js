@@ -2645,6 +2645,245 @@ const App = (() => {
   });
 
   /* ======================================================================== */
+  /* Import of backups from firmware v16 (config.ini)                         */
+  /* ======================================================================== */
+
+  /**
+   * Firmware v16 stored the configuration in config/config.ini, firmware v17 and newer use config/config.json.
+   * This converter turns the ini file of a v16 backup into a configuration delta for POST /config.
+   * Not converted (the device keeps its values): network / WLAN, hostname, GPIO, log levels, InfluxDB, Webhook.
+   */
+  const LegacyImport = (() => {
+    const METER_TYPES = { water_m3: 1, water_l: 2, water_gal: 3, water_ft3: 4, gas_m3: 5 }; // see mqtt.homeassistant.metertype
+
+    const basename = (p) => String(p || '').trim().split('/').pop();
+    const bool = (v) => String(v).trim().toLowerCase() === 'true';
+    const num = (v) => {
+      if (v === undefined || v === null || String(v).trim() === '') return null;
+      const n = Number(String(v).trim());
+      return Number.isFinite(n) ? n : null;
+    };
+
+    // Sections -> { values: { key: [value, ...] }, lines: [[token, ...]] }. Commented lines (;) are ignored,
+    // a commented section header (";[Analog]") means the section is switched off.
+    function parseIni(text) {
+      const sections = {};
+      let cur = null;
+      for (const raw of String(text).replace(/\r/g, '').split('\n')) {
+        const line = raw.trim();
+        if (!line || line.startsWith(';')) continue;
+        const header = /^\[(.+)\]$/.exec(line);
+        if (header) {
+          cur = sections[header[1]] = { values: {}, lines: [] };
+          continue;
+        }
+        if (!cur) continue;
+        const eq = line.indexOf('=');
+        const first = line.split(/\s+/)[0];
+        if (eq > 0 && !/\s/.test(line.slice(0, eq).trim())) {
+          const key = line.slice(0, eq).trim().toLowerCase();
+          (cur.values[key] ||= []).push(line.slice(eq + 1).trim());
+        } else if (first) {
+          cur.lines.push(line.split(/\s+/));
+        }
+      }
+      return sections;
+    }
+
+    const first = (sec, key) => sec?.values[key.toLowerCase()]?.[0];
+
+    // The Digits section of some backups contains the analog model key (commented analog header): take the model by its prefix
+    const modelOf = (sec, prefix) => (sec?.values.model || []).map(basename).find((m) => m.toLowerCase().startsWith(prefix));
+
+    /**
+     * @param {string} iniText content of config.ini
+     * @param {string} [prevalueText] content of prevalue.ini
+     * @returns {{delta:object, markers:Array<{x:number,y:number}>, models:string[], fallback:{sequence:string,value:string}|null, notes:string[]}}
+     */
+    function convert(iniText, prevalueText = '') {
+      const ini = parseIni(iniText);
+      const notes = [];
+      const delta = {};
+      const set = (path, value) => {
+        if (value === undefined || value === null || value === '') return;
+        const keys = path.split('.');
+        let o = delta;
+        keys.slice(0, -1).forEach((k) => (o = o[k] ||= {}));
+        o[keys[keys.length - 1]] = value;
+      };
+
+      // ---- operation
+      const timer = ini.AutoTimer;
+      if (timer && num(first(timer, 'Interval')) > 0) {
+        set('operationmode.opmode', 1);
+        set('operationmode.automaticprocessinterval', num(first(timer, 'Interval')).toFixed(2));
+      }
+      const demo = first(ini.TakeImage, 'Demo');
+      if (demo !== undefined) set('operationmode.usedemoimages', bool(demo));
+
+      // ---- camera and flash
+      const t = ini.TakeImage;
+      if (t) {
+        const wait = num(first(t, 'WaitBeforeTakingPicture'));
+        if (wait !== null) set('takeimage.flashlight.flashtime', Math.round(wait * 1000));
+        const led = num(first(t, 'LEDIntensity'));
+        if (led !== null) set('takeimage.flashlight.flashintensity', led);
+        for (const [key, name] of [['CamBrightness', 'brightness'], ['CamContrast', 'contrast'], ['CamSaturation', 'saturation'], ['CamSharpness', 'sharpness']]) {
+          const v = num(first(t, key));
+          if (v !== null) set('takeimage.camera.' + name, v);
+        }
+        const quality = num(first(t, 'CamQuality'));
+        if (quality !== null) set('takeimage.camera.imagequality', quality);
+        if (first(t, 'CamHmirror') !== undefined) set('takeimage.camera.mirrorimage', bool(first(t, 'CamHmirror')));
+        if (first(t, 'CamVflip') !== undefined) set('takeimage.camera.flipimage', bool(first(t, 'CamVflip')));
+        if (first(t, 'CamAec') !== undefined) {
+          const auto = bool(first(t, 'CamAec'));
+          set('takeimage.camera.exposurecontrolmode', auto ? 1 : 0);
+          if (auto) set('takeimage.camera.autoexposurelevel', num(first(t, 'CamAeLevel')) ?? 0);
+          else set('takeimage.camera.manualexposurevalue', num(first(t, 'CamAecValue')) ?? 300);
+        }
+        if (first(t, 'CamAgc') !== undefined) {
+          const auto = bool(first(t, 'CamAgc'));
+          set('takeimage.camera.gaincontrolmode', auto ? 1 : 0);
+          if (!auto) set('takeimage.camera.manualgainvalue', num(first(t, 'CamAgcGain')) ?? 0);
+        }
+        if (bool(first(t, 'CamZoom') ?? 'false')) notes.push('Digital zoom of v16 is not converted. Set the zoom under Setup > Image.');
+      }
+
+      // ---- alignment
+      const a = ini.Alignment;
+      const markers = [];
+      if (a) {
+        set('imagealignment.imagerotation', (num(first(a, 'InitialRotate')) ?? 0).toFixed(1));
+        set('imagealignment.searchfield.x', num(first(a, 'SearchFieldX')));
+        set('imagealignment.searchfield.y', num(first(a, 'SearchFieldY')));
+        set('imagealignment.alignmentalgo', 0); // v16 "default" = rotate + align, red channel
+        for (const tokens of a.lines) {
+          if (/ref\d\.jpg$/i.test(tokens[0])) {
+            markers.push({ x: Number(tokens[1]), y: Number(tokens[2]) });
+          }
+        }
+        if (markers.length === 2 && markers.every((m) => Number.isFinite(m.x) && Number.isFinite(m.y))) {
+          set('imagealignment.marker', markers);
+        } else {
+          notes.push('Alignment markers not found in config.ini. Set them under Setup > Markers.');
+        }
+      }
+
+      // ---- digit / analog ROIs
+      const models = [];
+      const parseRois = (sec, kind) => {
+        const bySequence = {};
+        for (const tok of sec?.lines || []) {
+          const m = /^([^.]+)\.(dig|ana)\d+$/i.exec(tok[0]);
+          if (!m || m[2].toLowerCase() !== kind) continue;
+          const [x, y, dx, dy] = tok.slice(1, 5).map(Number);
+          if (![x, y, dx, dy].every(Number.isFinite)) continue;
+          const roi = { x, y, dx, dy };
+          if (kind === 'ana') roi.ccw = bool(tok[5] ?? 'false');
+          (bySequence[m[1]] ||= []).push(roi);
+        }
+        return bySequence;
+      };
+      const sequenceBlocks = (bySequence) => {
+        const names = Object.keys(bySequence);
+        if (names.length > 1) notes.push(`Only the first number sequence ("${names[0]}") is imported, found: ${names.join(', ')}.`);
+        return names.slice(0, 1).map((name, i) => ({ sequenceid: i, sequencename: name, roi: bySequence[name] }));
+      };
+
+      const digits = parseRois(ini.Digits, 'dig');
+      const analog = parseRois(ini.Analog, 'ana');
+      set('digit.enabled', Object.keys(digits).length > 0);
+      set('analog.enabled', !!ini.Analog && Object.keys(analog).length > 0);
+
+      const digitModel = modelOf(ini.Digits, 'dig');
+      if (digitModel) {
+        set('digit.model', digitModel);
+        models.push(digitModel);
+      }
+      set('digit.cnngoodthreshold', num(first(ini.Digits, 'CNNGoodThreshold'))?.toFixed(2));
+      if (Object.keys(digits).length) set('digit.sequence', sequenceBlocks(digits));
+
+      if (ini.Analog && Object.keys(analog).length) {
+        const analogModel = modelOf(ini.Analog, 'ana');
+        if (analogModel) {
+          set('analog.model', analogModel);
+          models.push(analogModel);
+        }
+        set('analog.sequence', sequenceBlocks(analog));
+      }
+
+      // ---- post-processing (first sequence)
+      const p = ini.PostProcessing;
+      const seqName = Object.keys(digits)[0] || Object.keys(analog)[0] || 'main';
+      if (p) {
+        const key = (name) => first(p, `${seqName}.${name}`);
+        const post = { sequencename: seqName };
+        if (num(key('DecimalShift')) !== null) post.decimalshift = num(key('DecimalShift'));
+        if (key('ExtendedResolution') !== undefined) post.extendedresolution = bool(key('ExtendedResolution'));
+        if (key('IgnoreLeadingNaN') !== undefined) post.ignoreleadingnan = bool(key('IgnoreLeadingNaN'));
+        if (key('CheckDigitIncreaseConsistency') !== undefined) post.checkdigitincreaseconsistency = bool(key('CheckDigitIncreaseConsistency'));
+        if (key('AllowNegativeRates') !== undefined) post.allownegativerate = bool(key('AllowNegativeRates'));
+        if (num(key('MaxRateValue')) !== null) {
+          post.maxrate = num(key('MaxRateValue')).toFixed(3);
+          // v16 "AbsoluteChange" (default) = limit per interval, "RateChange" = per minute
+          post.maxratechecktype = /^ratechange$/i.test(key('MaxRateType') || '') ? 1 : 2;
+        }
+        if (first(p, 'PreValueUse') !== undefined) post.usefallbackvalue = bool(first(p, 'PreValueUse'));
+        if (num(first(p, 'PreValueAgeStartup')) !== null) post.fallbackvalueagestartup = num(first(p, 'PreValueAgeStartup'));
+        delta.postprocessing = { sequence: { 0: post } };
+      }
+
+      // ---- MQTT
+      const m = ini.MQTT;
+      if (m && first(m, 'Uri')) {
+        set('mqtt.enabled', true);
+        set('mqtt.uri', first(m, 'Uri'));
+        set('mqtt.maintopic', first(m, 'MainTopic'));
+        set('mqtt.clientid', first(m, 'ClientID'));
+        set('mqtt.authmode', first(m, 'user') ? 1 : 0);
+        set('mqtt.username', first(m, 'user'));
+        set('mqtt.processdatanotation', 1); // v16 published single topics
+        if (first(m, 'RetainMessages') !== undefined) set('mqtt.retainprocessdata', bool(first(m, 'RetainMessages')));
+        if (first(m, 'ValidateServerCert') !== undefined) set('mqtt.tls.servercertverification', bool(first(m, 'ValidateServerCert')) ? 2 : 0);
+        set('mqtt.tls.cacert', basename(first(m, 'CACert')));
+        set('mqtt.tls.clientcert', basename(first(m, 'ClientCert')));
+        set('mqtt.tls.clientkey', basename(first(m, 'ClientKey')));
+        if (first(m, 'HomeassistantDiscovery') !== undefined) set('mqtt.homeassistant.discoveryenabled', bool(first(m, 'HomeassistantDiscovery')));
+        const type = String(first(m, 'MeterType') || '').toLowerCase();
+        if (type in METER_TYPES) set('mqtt.homeassistant.metertype', METER_TYPES[type]);
+        else if (type) notes.push(`Home Assistant meter type "${type}" is not converted. Set it under Configuration > MQTT.`);
+        if (first(m, 'user')) notes.push('The MQTT password is not part of the backup. Enter it under Configuration > MQTT.');
+      }
+
+      // ---- system and logging
+      set('system.cpufrequency', num(first(ini.System, 'CPUFrequency')));
+      set('network.time.timezone', first(ini.System, 'TimeZone'));
+      if (first(ini.DataLogging, 'DataLogActive') !== undefined) set('log.data.enabled', bool(first(ini.DataLogging, 'DataLogActive')));
+      set('log.data.datafilesretention', num(first(ini.DataLogging, 'DataFilesRetention')));
+      set('log.debug.logfilesretention', num(first(ini.Debug, 'LogfilesRetention')));
+
+      // ---- last valid value (prevalue.ini: "<sequence> <timestamp> <value>")
+      let fallback = null;
+      const pv = String(prevalueText).replace(/\r/g, '').split('\n').map((l) => l.trim().split(/\s+/)).find((tok) => tok.length >= 3);
+      if (pv && num(pv[pv.length - 1]) !== null) fallback = { sequence: pv[0], value: pv[pv.length - 1] };
+
+      return { delta, markers, models: [...new Set(models)], fallback, notes };
+    }
+
+    // Looks into an unzipped backup: { ini, prevalue, file(name) } or null if it is no v16 backup
+    function detect(zip) {
+      const find = (name) => zip[name] || zip['config/' + name];
+      const ini = find('config.ini');
+      if (!ini || zip['meta.json']) return null;
+      const dec = (u8) => (u8 ? new TextDecoder().decode(u8) : '');
+      return { ini: dec(ini), prevalue: dec(find('prevalue.ini')), file: (name) => find(name) || null };
+    }
+
+    return { convert, detect, parseIni };
+  })();
+
+  /* ======================================================================== */
   /* View: system-backup                                                      */
   /* ======================================================================== */
 
@@ -2681,6 +2920,7 @@ const App = (() => {
               <div class="card-pad">
                 <div class="lead">
                   Restores a backup created here. The existing configuration is replaced and the device restarts.
+                  Backups of firmware v16 (with a config.ini) are converted and imported.
                 </div>
                 ${pickerHtml({
                   title: 'Drop a backup here',
@@ -2817,8 +3057,11 @@ const App = (() => {
       };
 
       // ---------------------------------------------------------------- restore
+      let legacy = null; // unzipped v16 backup (config.ini), imported instead of restored
+
       const validateFile = async () => {
         r.startRestore.disabled = true;
+        legacy = null;
 
         const file = picker.file();
         if (!file) {
@@ -2838,6 +3081,12 @@ const App = (() => {
           await loadScript('/fflate.min.js');
           const zip = fflate.unzipSync(new Uint8Array(await file.arrayBuffer()));
 
+          legacy = LegacyImport.detect(zip);
+          if (legacy) {
+            picker.show(file, 'v16 backup, will be converted', 'badge-warning');
+            r.startRestore.disabled = false;
+            return;
+          }
           if (!zip['meta.json']) return bad('Not a backup (meta.json missing)');
           const meta = JSON.parse(new TextDecoder().decode(zip['meta.json']));
           if (!meta.app || meta.app.toLowerCase() !== BACKUP_APP_NAME.toLowerCase()) return bad('Backup of another application');
@@ -2861,8 +3110,77 @@ const App = (() => {
         r.loadedBytes.textContent = '';
       };
 
+      const runLegacyImport = async () => {
+        const c = LegacyImport.convert(legacy.ini, legacy.prevalue);
+        const notes = [...c.notes];
+        const setStatus = (text) => { r.status.textContent = 'Status: ' + text; };
+
+        // 1. images and models
+        const uploads = [];
+        const add = (path, name) => {
+          const data = legacy.file(name);
+          if (data) uploads.push([path, data]);
+          else notes.push(`File ${name} is missing in the backup.`);
+        };
+        add('/config/reference.jpg', 'reference.jpg');
+        add('/config/marker1.jpg', 'ref0.jpg');
+        add('/config/marker2.jpg', 'ref1.jpg');
+        c.models.forEach((m) => add('/config/models/' + m, m));
+
+        for (let i = 0; i < uploads.length; i++) {
+          const [path, data] = uploads[i];
+          setStatus(`Uploading ${path.split('/').pop()} (${i + 1}/${uploads.length}) ...`);
+          r.restoreBar.value = Math.round((i / (uploads.length + 2)) * 100);
+          const res = await Api.files.upload(path, data);
+          if (!res.ok) return restoreFailed(`${path}: ${res.message}`);
+        }
+
+        // 2. configuration
+        setStatus('Saving the configuration ...');
+        r.restoreBar.value = Math.round((uploads.length / (uploads.length + 2)) * 100);
+        try {
+          await Api.config.save(c.delta, true);
+        } catch (e) {
+          return restoreFailed('Configuration could not be saved: ' + e.message);
+        }
+
+        // 3. last valid value, once the process is initialized
+        if (c.fallback) {
+          setStatus('Setting the last valid value ...');
+          let done = false;
+          for (let attempt = 0; attempt < 24 && alive && !done; attempt++) {
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+            const res = await apiCall('/api/fallback', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sequence: c.fallback.sequence, value: c.fallback.value }),
+            });
+            done = res.ok;
+          }
+          if (!done) notes.push(`The last valid value (${c.fallback.value}) could not be set. Set it on the dashboard.`);
+        }
+
+        r.restoreBar.value = 100;
+        setStatus('Import completed');
+        picker.setBusy(false);
+        firework.launch('Backup of firmware v16 imported', 'success', 5000);
+        notes.push('Check the result under Setup (markers, regions) and Configuration.');
+        await confirmDialog({ title: 'Import finished', text: notes.join('\n'), okLabel: 'OK', cancelLabel: 'Close' });
+      };
+
       const startRestore = async () => {
         const file = picker.file();
+        if (file && legacy) {
+          if (!(await confirmDialog({
+            title: 'Import this v16 backup?',
+            text: 'The settings of config.ini are converted and written to the device. Images and models are copied, network settings stay as they are.',
+            okLabel: 'Import',
+          }))) return;
+          r.startRestore.disabled = true;
+          picker.setBusy(true);
+          await runLegacyImport();
+          return;
+        }
         if (!file || !(await confirmDialog({
           title: 'Restore this backup?',
           text: 'The existing configuration is overwritten by the selected backup and the device restarts.',
