@@ -4593,8 +4593,7 @@ const App = (() => {
         ref.img.hidden = on;
         if (on) {
           ref.stage.innerHTML =
-            '<div class="dash-stage-rings"><span></span><span></span><span></span></div>' +
-            `<div class="dash-stage-icon">${scanIconHtml(150)}</div>` +
+            `<div class="dash-stage-icon"><div class="dash-stage-rings"><span></span><span></span><span></span></div>${scanIconHtml(150)}</div>` +
             '<div class="dash-stage-title">Taking image ...</div>' +
             '<div class="dash-stage-sub">The camera captures the picture</div>';
         } else {

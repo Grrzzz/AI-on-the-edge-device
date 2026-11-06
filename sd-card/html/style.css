@@ -3272,7 +3272,7 @@ a .rst-content .admonition-title {
 .dash .dash-stage-rings span {
   position: absolute;
   left: 50%;
-  top: 40%;
+  top: 50%;
   width: 190px;
   height: 190px;
   margin: -95px 0 0 -95px;
@@ -3292,7 +3292,13 @@ a .rst-content .admonition-title {
 
 .dash .dash-stage-icon {
   position: relative;
+  width: 150px;
+  height: 150px;
   line-height: 0;
+}
+
+.dash .dash-stage-icon .scan-icon {
+  position: relative; /* above the rings */
 }
 
 .dash .dash-stage-title {
