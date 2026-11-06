@@ -734,27 +734,27 @@ esp_err_t handler_process_data(httpd_req_t *req)
 // Helper for rendering a single ROI list (Digit or Analog)
 static std::string recognitionDetailsRoiSection(const std::string &title, const auto &roiList, bool enabled)
 {
-    std::string html = "<div><div style=\"color:var(--text-secondary); margin-bottom:8px; border-bottom:1px solid #eee;\">" + title +
-                       "</div>";
-    html += "<div style=\"display:flex; flex-wrap:wrap; gap:10px;\">";
+    std::string html = "<div class=\"roi-block\"><div class=\"roi-title\">" + title + "</div>";
 
     if (enabled && !roiList.empty()) {
+        html += "<div class=\"roi-grid\">";
         for (const auto &roi : roiList) {
-            html += "<div style=\"flex: 0 1 100px; text-align:center;\">";
+            html += "<div class=\"roi-tile\">";
             if (roi->CNNResult > -1) {
-                html += "<div style=\"font-weight:bold;\">" + roi->sCNNResult + "</div>";
-                html += "<img src=\"/img_tmp/" + roi->param->roiName + "_org.jpg\" style=\"width:100%; border:1px solid var(--border);\">";
+                html += "<div class=\"roi-value\">" + roi->sCNNResult + "</div>";
+                html += "<img class=\"roi-img\" src=\"/img_tmp/" + roi->param->roiName + "_org.jpg\">";
             }
             else {
-                html += "<div style=\"color:var(--error);\">N/A</div><p style=\"font-size:0.75rem;\">No Image</p>";
+                html += "<div class=\"roi-value na\">N/A</div><div class=\"roi-noimg\">No image</div>";
             }
             html += "</div>";
         }
+        html += "</div>";
     }
     else {
-        html += "<span style=\"font-style:italic; color:var(--text-secondary);\">Disabled</span>";
+        html += "<div class=\"roi-disabled\">Disabled</div>";
     }
-    html += "</div></div>";
+    html += "</div>";
     return html;
 }
 
@@ -813,27 +813,18 @@ esp_err_t handler_recognition_details(httpd_req_t *req)
         </head><body>)";
 
     txt += R"(<div class="container"><div class="container-header">
-        <div class="container-title"><span>🔍</span>Recognition Details</div>
-        <details id="desc_details">
-            <summary><strong>CLICK HERE</strong> for more information</summary>
-            <div class="info-box">
-                <p>Visualizing the last fully completed image evaluation cycle.</p>
-                <p><strong>Raw Value:</strong> Uncorrected result<br>
-                <strong>Actual Value:</strong> Post-processed result<br>
-                <strong>ROI Sections:</strong> Single ROI results<br>
-                <strong>Processed Image:</strong> Full image with overlays</p>
-            </div>
-        </details></div><div class="container-content">)";
+        <div class="container-title">Recognition</div>
+        <div class="page-sub">Result of the last completed recognition cycle.</div>
+        </div><div class="container-content">)";
 
     // Not initialized state
     if (taskAutoFlowState < 3 || taskAutoFlowState == FLOW_TASK_STATE_IMG_PROCESSING || cycleCounter == 0) {
-        txt += "<div class=\"warning-box\" style=\"text-align:center; padding:20px;\">";
-        txt += "<div style=\"margin-top:0;\">Progressing...</div>";
-        txt += "<p>Image recognition details are accessible once the device is initialized and cycle is completed</p>";
-        txt += "<p style=\"color:var(--text-secondary);\">Current state: <strong>" + flowctrl.getActualProcessState() + "</strong></p>";
-        txt += "<div style=\"margin-top:20px;\"><button class=\"button btn-action btn-wide\" "
-               "onclick=\"window.location.reload();\">Refresh</button></div>";
-        txt += "</div></div></div></body></html>";
+        txt += "<div class=\"card\"><div class=\"notice\">";
+        txt += "<div class=\"notice-title\">Waiting for the first completed cycle</div>";
+        txt += "<div>Details are available once the device is initialized and a cycle has finished.</div>";
+        txt += "<div class=\"notice-state\">Current state: <strong>" + flowctrl.getActualProcessState() + "</strong></div>";
+        txt += "<div><button class=\"button btn-action\" onclick=\"window.location.reload();\">Refresh</button></div>";
+        txt += "</div></div></div></div></body></html>";
         httpd_resp_sendstr(req, txt.c_str());
         return ESP_OK;
     }
@@ -843,31 +834,29 @@ esp_err_t handler_recognition_details(httpd_req_t *req)
 
     for (const auto &sequence : flowctrl.getSequenceData()) {
         txt = "<div class=\"card\">";
-        txt += "<div class=\"card-header\">SEQUENCE: " + sequence->sequenceName + "</div>";
-        txt += "<div class=\"card-body\" style=\"padding:15px; display:flex; flex-direction:column; gap:20px;\">";
+        txt += "<div class=\"card-header\">Sequence &middot; " + sequence->sequenceName + "</div>";
+        txt += "<div class=\"card-body recog-body\">";
 
-        // Results Table
-        txt += "<div><div style=\"color:var(--text-secondary); margin-bottom:8px; border-bottom:1px solid #eee;\">RESULTS</div>";
-        txt += "<table style=\"width:100%; border-collapse:collapse; table-layout:fixed;\">";
-        txt += "<tr style=\"background-color:var(--bg-light); font-size:0.8rem;\"><td style=\"padding:5px 8px; border:1px solid "
-               "var(--border);\">Raw Value</td><td style=\"padding:5px 8px; border:1px solid var(--border);\">Actual Value</td></tr>";
-        txt += "<tr><td style=\"padding:8px; border:1px solid var(--border);\">" + sequence->sRawValue + "</td>";
-        txt += "<td style=\"padding:8px; border:1px solid var(--border); font-weight:bold;\">" + sequence->sActualValue +
-               "</td></tr></table></div>";
+        // Results
+        txt += "<div class=\"recog-values\">";
+        txt += "<div class=\"stat\"><div class=\"stat-label\">Raw value</div><div class=\"stat-value\">" + sequence->sRawValue + "</div></div>";
+        txt += "<div class=\"stat\"><div class=\"stat-label\">Actual value</div><div class=\"stat-value\">" + sequence->sActualValue +
+               "</div></div>";
+        txt += "</div>";
 
         // Digit & Analog ROIs using helper
         bool digitEnabled = ConfigClass::getInstance()->get()->sectionDigit.enabled;
         bool analogEnabled = ConfigClass::getInstance()->get()->sectionAnalog.enabled;
-        txt += recognitionDetailsRoiSection("DIGIT ROI", sequence->digitRoi, digitEnabled);
-        txt += recognitionDetailsRoiSection("ANALOG ROI", sequence->analogRoi, analogEnabled);
+        txt += recognitionDetailsRoiSection("Digit ROIs", sequence->digitRoi, digitEnabled);
+        txt += recognitionDetailsRoiSection("Analog ROIs", sequence->analogRoi, analogEnabled);
 
         txt += "</div></div>";
         httpd_resp_sendstr_chunk(req, txt.c_str());
     }
 
     // Full Image Card & Closing tags
-    txt = "<div class=\"card\"><div class=\"card-header\">Processed Image (incl. Overlays)</div>";
-    txt += "<div class=\"card-body\"><img src=\"/img_tmp/alg_roi.jpg\" style=\"width:100%;\"></div></div>";
+    txt = "<div class=\"card\"><div class=\"card-header\">Processed image</div>";
+    txt += "<div class=\"card-body image-body\"><img class=\"recog-img\" src=\"/img_tmp/alg_roi.jpg\"></div></div>";
     txt += "</div></div></body></html>";
     httpd_resp_sendstr_chunk(req, txt.c_str());
     httpd_resp_sendstr_chunk(req, NULL);
