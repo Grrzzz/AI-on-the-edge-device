@@ -1,141 +1,128 @@
 <h1>
   <img src="images/icon/watermeter.svg" width="40px" style="vertical-align: middle;">
-  <span style="vertical-align: middle;">AI-on-the-Edge Device [SLFork]</span>
+  <span style="vertical-align: middle;">AI-on-the-Edge Device 2.0 "Grrzzz"</span>
 </h1>
 
-Artificial intelligence is everywhere — from speech recognition to image analysis. While traditional AI often relies on powerful cloud 
-servers, **AI-on-edge** runs directly on compact, affordable devices. This project brings edge computing to your home by using a low-cost, 
-AI-enabled device to digitize your analog meters — whether it's water, gas or electricity. With budget-friendly hardware and an easy setup, 
-you can turn any standard meter into a smart, connected device.
+Digitize your water, gas or electricity meter with a 10 euro ESP32-CAM. The device takes a picture of the meter, reads the digits
+with a neural network directly on the chip and sends the value to Home Assistant, MQTT, InfluxDB or whatever you like.
 
-## Key Features
-- **Compact & Cost-Effective** – Designed for small, affordable, AI-capable hardware
-- **Local Image Processing** – Fully processes and evaluates images on-device without external dependencies
-- **On-Device AI** – TensorFlow enables efficient edge intelligence without external dependencies
-- **Web-Based Interface** – Browser UI for monitoring, configuration and control
-- **OTA Update** – Seamless over-the-air firmware updates via the web interface
+This is my personal fork of [Slider0007's SLFork](https://github.com/Slider0007/AI-on-the-edge-device), which itself continues
+[jomjol's AI-on-the-Edge Device](https://github.com/jomjol/AI-on-the-edge-device). Release 2.0 replaces the web interface with a
+single page app in the style of my [FingerprintDoorbell](https://github.com/Grrzzz/FingerprintDoorbell) fork, adds a JSON REST
+backend and a one-click update from GitHub, and trims the firmware to the `esp32cam` board.
 
-### ✨ Fork-Specific Enhancements
-- **[Hardware Support](#supported-hardware)** – Compatible with ESP32 and ESP32-S3 devices
-- **Device Provisioning** - Web-based service for user-friendly firmware, SD card provisioning incl. Wi-Fi config
-- **Connectivity** – Operates in WiFi Client, WiFi Access Point (Standalone) or Ethernet mode
-- **Flashlight** – Fully customizable setup using one or multiple digital, PWM-driven or smart LEDs
-- **Durability** – Minimizes SD card wear by keeping process data (ROIs, models, markers) in RAM
-- **Performance** - Reduced I/O cycles (data kept in RAM) and hardware-optimized routines
-- **User Experience** – Consistent UI, dynamic config reloads without reboot, improved error handling/logging
-- **Configuration** – Firmware-managed JSON-based config for better maintainability and resilience
-- **Codebase** – Streamlined, mostly consistently styled, easier to maintain
-- **API Design** – Relevant APIs use JSON notation for seamless integration
-- **TLS Support** – Secure connection supported for MQTT
+<p align="center">
+  <img src="docs/images/ui-dashboard.png" width="800" alt="Dashboard">
+</p>
 
-Further refinements are documented in the [changelog](CHANGELOG.md) (v16.0.0-SLFork and newer).
+## What is new in 2.0
 
-
-## APIs & Integrations
-- **[Home Assistant Integration](docs/API/MQTT/home-assistant-discovery.md)** – Automatic device discovery via MQTT
-- **[REST API](docs/API/REST/_OVERVIEW.md)** – Retrieve live data, check device status, and issue control commands over HTTP
-- **[MQTT v3](docs/API/MQTT/_OVERVIEW.md)** – Publish data to your MQTT broker (TLS supported)
-
-API documentation: see links above<br>
-ℹ️ APIs aren’t fully compatible with jomjol’s firmware.
-
-
-## Workflow
-The device captures an image of your meter at scheduled intervals and aligns it using predefined markers for accuracy. It then 
-extracts the Regions of Interest (ROIs) from the image and processes these sections using AI. The extracted data is analyzed 
-and converted into a digital reading, ready to be sent or accessed through various services and APIs (see above).
-
-<img src="images/idea.jpg" width="800"> 
-
+- **New web interface** - a single page app (`index.html`, `app.js`, `style.css`) with light and dark theme, a responsive layout for
+  phones and a live cycle status in the sidebar (current process step, time in this state, Start cycle button)
+- **Dashboard** - big counter display, status badge, the processed image with the regions of interest and the recognized digits
+  and analog dials. While the camera takes a picture an animated scan scene is shown
+- **Meter type icon themes** - water, gas, electricity, heat and more; icons, accent color and the animated process state images
+  follow the meter type you configured
+- **Guided setup** - Wizard for first start, tabbed Setup (General, Network, Recognition, MQTT, Camera, GPIO) with a save bar and
+  a confirm dialog before anything is applied
+- **Configuration editor** - reference image, alignment markers, digit and analog regions with live preview, plus quiet
+  "How it works" help on every page
+- **One-click update from GitHub** - `System > Update` checks the latest release of this repository, downloads it and flashes it with
+  a progress overlay, just like the Doorbell. A manual upload of the release zip is still available
+- **JSON REST API** - all former `.html` and text endpoints have JSON counterparts (`/api/status`, `/api/cycle`, `/api/fallback`,
+  `/api/flow/*`, `/api/reboot`, `/api/update`, `/api/mqtt/*`, `/api/recognition`, `/fileserver/<dir>/?format=json`), see the
+  [REST API documentation](docs/API/REST/_OVERVIEW.md)
+- **Automatic migration of v16 installations** - the old `config.ini` (including Wi-Fi, hostname, GPIO and log level) is converted
+  on first boot, models and images are carried over. A v16 backup can also be imported in the web interface
+- **Less restrictive image validation** and a one-time wider search retry when the alignment marker is just outside the search field
+- **Only `esp32cam`** - all other board variants were removed to keep the firmware small and testable
 
 ## Impressions
-### Installation Example
-#### Watermeter using ESP32CAM board
-<img src="images/device_watermeter.jpg" width="266"><img src="images/device_case.jpg" width="266"><img src="images/device_size.png" width="266"> 
 
+| Configuration | Regions of interest |
+|:---:|:---:|
+| <img src="docs/images/ui-configuration.png" width="400"> | <img src="docs/images/ui-regions.png" width="400"> |
 
-### Software
-#### Web Interface (left: ≥ v18, right: < v18)
-<img src="images/webinterface_dashboard.jpg" width="403"><img src="images/webinterface_v17.png" width="397"> 
+| Setup | Recognition |
+|:---:|:---:|
+| <img src="docs/images/ui-setup.png" width="400"> | <img src="docs/images/ui-setup-recognition.png" width="400"> |
 
+| System info | Update |
+|:---:|:---:|
+| <img src="docs/images/ui-info.png" width="400"> | <img src="docs/images/ui-update.png" width="400"> |
 
-## Supported Hardware
-### Board Compatibility Matrix
-| Board Type | SOC / Module | Network Interfaces | Flashlight LED | Minimum Firmware | Firmware Package | Remarks |
-|:---|:---|:---|:---|:---|:---|:---|
-| [ESP32-CAM](images/boards/esp32-cam.png) | ESP32 | • WiFi Client<br>• WiFi AP | ✅ Onboard LED<br>→ Pin: GPIO4 (PWM) | All Releases | `esp32cam` | ⚠️ Only boards with ≥ 4MB RAM are supported |
-| [ESP32-S3-CAM (AI-THINKER)](images/boards/esp32s3-cam.png) | ESP32S3-WROOM-1-N16R8 | • WiFi Client<br>• WiFi AP | ✅ Onboard LED<br>→ Pin: GPIO48 (SmartLED) | ≥ v17.4.0 | `freenove-esp32s3-n16r8` | ℹ️ Board is pin-compatible and identified as `freenove-esp32s3-n16r8` |
-| [ESP32-S3-CAM (NULLLAB)](images/boards/nulllab-esp32s3-cam.jpg) | ESP32S3 | • WiFi Client<br>• WiFi AP | ✅ Onboard LEDs (2x)<br>→ Pin: GPIO3 (PWM) | ≥ v18.0.0 | `nulllab-esp32s3-cam` | ℹ️ Features dual onboard flashlight LED |
-| [Freenove ESP32S3-WROOM-N8R8](https://github.com/Freenove/Freenove_ESP32_S3_WROOM_Board) | ESP32S3-WROOM-1-N8R8 | • WiFi Client<br>• WiFi AP | ⚠️ Onboard LED (Low intensity: External LED recommended (PWM, SmartLED))<br>→ Pin: GPIO48 (SmartLED) | ≥ v17.1.0 | `freenove-esp32s3-n8r8` | ℹ️ SOC and pin-compatible boards with 8MB flash and 8MB RAM supported |
-| [Freenove ESP32S3-WROOM-N16R8](images/boards/freenove-esp32s3-n16r8.png) | ESP32S3-WROOM-1-N16R8 | • WiFi Client<br>• WiFi AP | ⚠️ Onboard LED (Low intensity: External LED recommended (PWM, SmartLED))<br>→ Pin: GPIO48 (SmartLED) | ≥ v17.0.0 | `freenove-esp32s3-n16r8` | ℹ️ SOC and pin-compatible boards with 16MB flash and 8MB RAM supported |
-| [Waveshare ESP32S3-ETH](https://www.waveshare.com/esp32-s3-eth.htm) | ESP32S3 | • WiFi Client<br>• WiFi AP<br>• 10/100M Ethernet | ❌ No Onboard LED: External LED required (PWM, SmartLED)<br>→ Pin (Configurable): GPIO17 (PWM) | ≥ v17.2.0  | `waveshare-esp32s3-eth` | ℹ️ POE supported (optional hardware required) |
-| [XIAO ESP32S3 Sense](https://www.seeedstudio.com/XIAO-ESP32S3-Sense-p-5639.html) | ESP32S3 | • WiFi Client<br>• WiFi AP | ❌ No Onboard LED: External LED required (PWM, SmartLED)<br>→ Pin (Configurable): GPIO1 (PWM) | ≥ v17.0.0  | `xiao-esp32s3-sense` | ⚠️ Small heatsink recommended |
+| File explorer | Dark theme |
+|:---:|:---:|
+| <img src="docs/images/ui-files.png" width="400"> | <img src="docs/images/ui-dashboard-dark.png" width="400"> |
 
-### Camera Compatibility Matrix
-| Camera Type | Sensor Resolution | Digital Zoom | Minimum Firmware | Remarks                       
-|:---         |:---               |:---          |:---              |:---
-| [OV2640](docs/Installation/ComponentDocu/Camera/OV2640/OV2640%20datasheet.pdf) | 2MP | 1.0x - 2.5x | All Releases |
-| [OV3660](docs/Installation/ComponentDocu/Camera/OV3660/OV3660_CSP3_DS_1.3_sida.pdf) | 3MP | 1.0x - 3.2x | ≥ v17.4.0 |
-| [OV5640](docs/Installation/ComponentDocu/Camera/OV5640/OV5640%20datasheet.pdf) | 5MP | 1.0x - 4.0x | ≥ v17.0.0 |ℹ️ Fixed-focus only; Autofocus (AF) variant not supported
+<p align="center">
+  <img src="docs/images/ui-mobile.png" width="260" alt="Mobile dashboard">
+</p>
 
-#### ⚠️ Important Note
-The camera clock frequency — configurable via the WebUI or config file — may negatively impact wireless network performance. This can 
-result in slower WebUI loading times or increased latency, particularly when using low-quality boards or those with onboard antennas. 
-To optimize performance, experiment with different camera clock frequencies while evaluating both network responsiveness and resulting 
-image quality. The ideal setting may vary depending on your specific hardware setup and the Wi-Fi channel in use.
+## Key features
 
+- **Local image processing** - the picture is aligned, cut into regions and evaluated on the device, no cloud involved
+- **On-device AI** - TensorFlow Lite models for digital and analog counters
+- **Integrations** - [Home Assistant discovery](docs/API/MQTT/home-assistant-discovery.md), [MQTT](docs/API/MQTT/_OVERVIEW.md)
+  (TLS supported), InfluxDB v1/v2, webhook, [REST](docs/API/REST/_OVERVIEW.md)
+- **Flashlight** - onboard LED or external PWM or smart LEDs
+- **Easy maintenance** - backup and restore, file explorer, OTA update, dynamic config reload without reboot
 
-## Firmware Installation
+## Supported hardware
 
-There are several convenient options to install the firmware and prepare the SD card content.
+| Board | SOC | Network | Flashlight | Firmware package |
+|:---|:---|:---|:---|:---|
+| [ESP32-CAM](images/boards/esp32-cam.png) | ESP32 | Wi-Fi client, Wi-Fi AP | Onboard LED (GPIO4, PWM) | `esp32cam` |
 
-### Download Firmware
-- **Releases** - Official firmware releases are available on the **[GitHub Releases Page](https://github.com/slider0007/AI-on-the-edge-device/releases)**<br>
-- **Development Builds** - You can also test the latest development build / upcoming release via pull request labeled
-[autorelease: pending](https://github.com/Slider0007/AI-on-the-edge-device/pulls?q=is%3Aopen+is%3Apr+label%3A%22autorelease%3A+pending%22). 
-Follow the instructions at the bottom of the pull request to download the corresponding precompiled development build.
+Cameras: OV2640 (2 MP), fixed focus. Boards need at least 4 MB flash and PSRAM.
 
-⚠️ **Important:** Do **not** use source files directly from the repository — this includes SD card preparation. Always use the official 
-precompiled release packages or GitHub CI precompiled development builds. Using any of the source files may result in incomplete or 
-non-functional firmware.
+## Installation
 
----
-### Over The Air (OTA) Update
-Once the initial installation is complete, it is **strongly recommended** to perform all future firmware updates via the **device’s 
-web interface**: `System > OTA Update`. This method ensures seamless upgrades with minimal risk.
+Download `AI-on-the-edge-device__esp32cam__grrzzz_release_<version>.zip` from the
+[Releases page](https://github.com/Grrzzz/AI-on-the-edge-device/releases). Do not use the source files of the repository directly.
 
----
-### Option 1: Web Installer (Only For Releases)
+### First installation
 
-For the easiest and most user-friendly setup, use the **[Web Installer](https://slider0007.github.io/AI-on-the-edge-device/)**.<br>
-Follow the step-by-step instructions on the Web Installer page. More details: [Web Installer Provisioning Guide](docs/Installation/DeviceProvisioning/WebInstaller.md)
+1. Unpack the zip. It contains `bootloader.bin`, `partitions.bin`, `firmware.bin` and the SD card content (`config`, `html`).
+2. Copy the SD card content to a FAT32 formatted SD card.
+3. Flash the three binaries to the ESP32-CAM, for example with `esptool`:
+   ```
+   esptool.py --chip esp32 write_flash 0x1000 bootloader.bin 0x8000 partitions.bin 0x10000 firmware.bin
+   ```
+   (the partition layout is defined in `code/partitions_4MB_legacy.csv`)
+4. Insert the card, power the device and connect to the Wi-Fi access point it opens. The wizard guides you through the rest.
 
-<img src="images/webinstaller_home.jpg" width="800">
+### Update from an earlier release
 
----
-### Option 2: Manual Installation (MCU + SD Card)
-Follow the steps in the [Manual Provisioning Guide](docs/Installation/DeviceProvisioning/Manual.md) to flash the MCU and 
-prepare the SD card manually.
+Open `System > Update` in the web interface. The device finds the newest release on GitHub and installs it with one click.
+Alternatively upload the release zip on the same page.
 
+### Migration from v16 (jomjol)
 
-## Build Yourself
-Developers and advanced users can build the firmware from source. Follow the [Build / Developer Guide](docs/Development/Instructions.md) for environment setup, firmware compilation and debugging. If you don’t need to customize the firmware, it’s easier to use the precompiled releases provided on the 
-[Releases Page](https://github.com/slider0007/AI-on-the-edge-device/releases/).
+1. Create a backup in the old web interface and keep it.
+2. Update via `System > Update` (upload the release zip; ignore the file name warning).
+3. On the first boot the old `config.ini` is converted automatically: Wi-Fi, hostname, GPIO, log level, markers, regions
+   and the TensorFlow models are carried over.
+4. Check the result in `Configuration` and `System > Setup`. Renew the reference image if the alignment is unstable.
 
+If something is missing, `System > Backup / Restore` can import a v16 backup.
 
-## Support / Community
-ℹ️ This is a fork of [jomjol’s project](https://github.com/jomjol/AI-on-the-edge-device), customized for personal use.
+Developer notes for the web interface are in [docs/WebUI](docs/WebUI/README.md).
 
-- It is **actively developed and maintained** independently
-- It is **no longer compatible** with the upstream project
-- It still uses the core principle of [jomjol’s project](https://github.com/jomjol/AI-on-the-edge-device) — make sure to **respect the upstream license**
-- It remains public to give something back to the community and help others with similar use cases
-- Customized code can be used for **non-commercial purposes** - be fair and **credit the original source**
-- Community discussions, feedback and bug reports are always welcome and appreciated
+## Build yourself
 
-Although no longer working on the upstream project, this version aims to provide a flexible and robust alternative.  
-Thanks for your interest and support!
+```
+cd code
+python -m platformio run -e esp32cam
+```
 
+Set `RELEASE_VERSION=v2.0.0` to get a named release zip in `.builds/`. See the [Build / Developer Guide](docs/Development/Instructions.md).
 
-## Further Documentation
-Some generic documentation can be found in [documentation repository](https://jomjol.github.io/AI-on-the-edge-device-docs/) of upstream project. Upstream documentation may not reflect all features or modifications present in this fork. For repository-specific guides, check the [docs](/docs/) folder.
+## Credits and license
+
+- [jomjol](https://github.com/jomjol/AI-on-the-edge-device) - the original AI-on-the-Edge Device
+- [Slider0007](https://github.com/Slider0007/AI-on-the-edge-device) - the SLFork this release is based on
+- Respect the upstream license, see [LICENSE.md](LICENSE.md). Use for non-commercial purposes and credit the original sources.
+
+This fork is maintained for my own devices and published to give something back. Issues and feedback are welcome, support is
+best effort.
