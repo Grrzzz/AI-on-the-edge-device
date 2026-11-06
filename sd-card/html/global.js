@@ -647,19 +647,26 @@ function confirmDialog({ title = 'Are you sure?', text = '', okLabel = 'Confirm'
     body.append(actions);
     dlg.append(body);
 
+    // Settle right when the user decides. Waiting for the 'close' event alone is not reliable
+    // (it can be delayed or missing, e.g. in frames that are not rendered), the event only covers Esc.
     let result = false;
-    ok.onclick = () => {
-      result = true;
-      dlg.close();
-    };
-    cancel.onclick = () => dlg.close();
-    dlg.addEventListener('click', (e) => {
-      if (e.target === dlg) dlg.close(); // backdrop
-    });
-    dlg.addEventListener('close', () => {
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      if (dlg.open) dlg.close();
       dlg.remove();
       resolve(result);
+    };
+    ok.onclick = () => {
+      result = true;
+      settle();
+    };
+    cancel.onclick = settle;
+    dlg.addEventListener('click', (e) => {
+      if (e.target === dlg) settle(); // backdrop
     });
+    dlg.addEventListener('close', settle);
 
     document.body.append(dlg);
     dlg.showModal();
@@ -707,12 +714,20 @@ function promptDialog({ title = 'Enter a value', text = '', value = '', okLabel 
     dlg.append(body);
 
     let result = null;
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      if (dlg.open) dlg.close();
+      dlg.remove();
+      resolve(result);
+    };
     const submit = () => {
       result = input.value;
-      dlg.close();
+      settle();
     };
     ok.onclick = submit;
-    cancel.onclick = () => dlg.close();
+    cancel.onclick = settle;
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -720,12 +735,9 @@ function promptDialog({ title = 'Enter a value', text = '', value = '', okLabel 
       }
     });
     dlg.addEventListener('click', (e) => {
-      if (e.target === dlg) dlg.close();
+      if (e.target === dlg) settle();
     });
-    dlg.addEventListener('close', () => {
-      dlg.remove();
-      resolve(result);
-    });
+    dlg.addEventListener('close', settle);
 
     document.body.append(dlg);
     dlg.showModal();
