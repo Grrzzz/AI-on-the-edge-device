@@ -112,7 +112,6 @@ body {
   height: 42px;
   border-radius: 12px;
   object-fit: contain;
-  background: var(--surface);
   flex-shrink: 0;
 }
 
@@ -398,6 +397,69 @@ body {
 .cycle-btn.queue {
   background: var(--primary-soft);
   color: var(--primary);
+}
+
+/* Animated scan icon: shown while the camera takes the picture */
+.cycle-scan {
+  display: none;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 0;
+  color: var(--primary);
+  overflow: visible;
+}
+
+.cycle[data-phase='capture'] .cycle-dot {
+  display: none;
+}
+
+.cycle[data-phase='capture'] .cycle-scan {
+  display: block;
+}
+
+.cycle-scan .scan-corners {
+  transform-origin: 32px 32px;
+  animation: scan-breathe 1.3s ease-in-out infinite;
+}
+
+.cycle-scan .scan-lens {
+  transform-origin: 32px 32px;
+  animation: scan-breathe 1.3s ease-in-out infinite reverse;
+}
+
+.cycle-scan .scan-pupil {
+  transform-origin: 32px 32px;
+  animation: scan-pupil 1.3s ease-in-out infinite;
+}
+
+.cycle-scan .scan-line {
+  animation: scan-sweep 1.3s ease-in-out infinite alternate;
+}
+
+@keyframes scan-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(0.88); }
+}
+
+@keyframes scan-pupil {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.6); opacity: 0.5; }
+}
+
+@keyframes scan-sweep {
+  from { transform: translateY(-18px); opacity: 0.2; }
+  50% { opacity: 1; }
+  to { transform: translateY(18px); opacity: 0.2; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cycle-scan .scan-corners,
+  .cycle-scan .scan-lens,
+  .cycle-scan .scan-pupil,
+  .cycle-scan .scan-line {
+    animation: none;
+  }
 }
 
 @keyframes cycle-pulse {

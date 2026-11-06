@@ -41,7 +41,7 @@
   <div class="app" id="app">
     <aside class="sidebar" id="sidebar">
       <div class="brand">
-        <img src="favicon.ico" alt="" class="brand-logo" />
+        <img src="icon.svg" alt="" class="brand-logo" />
         <div class="brand-text">
           <h1 class="brand-title">AI-on-the-Edge</h1>
           <div class="brand-sub" id="device-name">Loading...</div>
@@ -74,7 +74,18 @@
           <span class="cycle-label">Cycle</span>
           <span class="cycle-count" id="cycle-count">#-</span>
         </div>
-        <div class="cycle-state"><span class="cycle-dot"></span><span id="cycle-state">Connecting ...</span></div>
+        <div class="cycle-state">
+          <span class="cycle-dot"></span>
+          <svg class="cycle-scan" viewBox="0 0 64 64" aria-hidden="true">
+            <g class="scan-corners" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 21V11h10M43 11h10v10M53 43v10H43M21 53H11V43" />
+            </g>
+            <circle class="scan-lens" cx="32" cy="32" r="11.5" fill="none" stroke="currentColor" stroke-width="5" />
+            <circle class="scan-pupil" cx="32" cy="32" r="4.5" fill="currentColor" />
+            <rect class="scan-line" x="12" y="30" width="40" height="4" rx="2" fill="currentColor" />
+          </svg>
+          <span id="cycle-state">Connecting ...</span>
+        </div>
         <div class="cycle-timer" id="cycle-timer">&nbsp;</div>
         <button class="button btn-action cycle-btn" id="cycle-start" type="button" disabled>Start cycle</button>
       </div>

@@ -9715,6 +9715,7 @@ const CycleMonitor = (() => {
 
     if (!status) {
       panel.dataset.kind = 'offline';
+      panel.dataset.phase = '';
       $('cycle-state').textContent = 'Device not reachable';
       $('cycle-count').textContent = '#-';
       $('cycle-timer').textContent = ' ';
@@ -9726,6 +9727,7 @@ const CycleMonitor = (() => {
 
     const kind = status.error < 0 ? 'error' : status.error > 0 ? 'warn' : status.running ? 'running' : 'idle';
     panel.dataset.kind = kind;
+    panel.dataset.phase = status.running && /take/i.test(status.state || '') ? 'capture' : '';
     $('cycle-state').textContent = status.state || '-';
     $('cycle-count').textContent = `#${status.cycle}`;
 
