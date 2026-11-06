@@ -3824,46 +3824,35 @@ const App = (() => {
               </div>
             </div>
 
-            <div class="card" data-r="checker" hidden>
-              <div class="card-header"><span>Rebooting</span></div>
-              <div class="side-body">
-                <div class="sys-strong"><span data-r="checkerText">Waiting for the device</span></div>
-                <div class="sys-muted sys-small-text">The device usually reboots in 10 to 20 seconds.</div>
-              </div>
-            </div>
           </div>
         </div>`;
       const r = collectRefs(root);
       let alive = true;
       let inFlight = false;
-      let dotTimer = null;
+      const overlay = createUpdateOverlay();
       this._stop = () => {
         alive = false;
-        clearInterval(dotTimer);
+        overlay.close();
       };
 
-      const showRequestUI = (show) => {
-        r.request.hidden = !show;
-        r.checker.hidden = show;
+      const unlock = () => {
+        inFlight = false;
+        r.reboot.disabled = false;
       };
 
+      // wait until the device is back, then reload the app
       const rebootChecker = async () => {
-        r.checkerText.textContent = 'Waiting for the device';
-        dotTimer = setInterval(() => { r.checkerText.textContent += '.'; }, 1000);
-
         const result = await Api.ota.rebootAndWait({ interval: 2000, cancelled: () => !alive });
-        clearInterval(dotTimer);
         if (!alive) return;
 
         if (result === 'online') {
+          overlay.title('Device is back');
+          overlay.text('Reloading ...');
           reloadApp();
           return;
         }
         // 120 seconds elapsed but device is not ready yet
-        firework.launch('Reboot takes unusually long. Retry reboot or power cycle the device', 'danger', 30000);
-        inFlight = false;
-        r.reboot.disabled = false;
-        showRequestUI(true);
+        overlay.fail('Reboot takes unusually long', 'Retry the reboot or power cycle the device.', unlock);
       };
 
       const doReboot = async () => {
@@ -3873,11 +3862,11 @@ const App = (() => {
 
         if (await Api.system.reboot()) {
           if (!alive) return;
-          showRequestUI(false);
+          overlay.open('Rebooting ...', 'The device restarts and is not reachable for about 10 to 20 seconds. This page reloads automatically.');
+          overlay.progress(null);
           rebootChecker();
-        } else {
-          inFlight = false;
-          if (alive) r.reboot.disabled = false;
+        } else if (alive) {
+          unlock();
         }
       };
 
