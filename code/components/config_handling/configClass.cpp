@@ -1,4 +1,5 @@
 #include "configClass.h"
+#include "configLegacyIni.h"
 #include "../../include/defines.h"
 
 #include <esp_heap_caps.h>
@@ -82,10 +83,25 @@ ConfigClass::~ConfigClass()
 //**************************************************************************************************
 // Read configuration from file (JSON notation)
 //**************************************************************************************************
+// A configuration that was never modified (e.g. created with default values at the first start) has an empty 'lastmodified'
+static bool isConfigUnmodified(const std::string &content)
+{
+    cJSON *root = cJSON_Parse(content.c_str());
+    if (root == nullptr) {
+        return false;
+    }
+    const cJSON *lastModified = cJSON_GetObjectItem(cJSON_GetObjectItem(root, "config"), "lastmodified");
+    const bool unmodified = cJSON_IsString(lastModified) && lastModified->valuestring != nullptr && lastModified->valuestring[0] == '\0';
+    cJSON_Delete(root);
+    return unmodified;
+}
+
+
 void ConfigClass::readConfigFile(bool unityTest, std::string unityTestData)
 {
     std::string content;
     bool fallbackCfgChecked = false;
+    bool legacyIniMigration = false;
 
     if (unityTest) {
         clearCfgDataTemp();
@@ -94,6 +110,20 @@ void ConfigClass::readConfigFile(bool unityTest, std::string unityTestData)
     else {
         if (readFileToString(CONFIG_PERSISTENCE_FILE, content)) {
             LogFile.writeToFile(ESP_LOG_INFO, TAG, "Config file found");
+        }
+    }
+
+    // Firmware v16 stored the configuration in config.ini: Convert it if there is no (modified) config.json yet
+    if (!unityTest && fileExists(LEGACY_INI_FILE) && (content.empty() || isConfigUnmodified(content))) {
+        std::string legacyJson;
+        if (legacyIniToJson(legacyJson)) {
+            if (!content.empty()) {
+                copyFile(CONFIG_PERSISTENCE_FILE, CONFIG_PERSISTENCE_FILE_BACKUP);
+            }
+            content = std::move(legacyJson);
+            fallbackCfgChecked = true;
+            legacyIniMigration = true;
+            LogFile.writeToFile(ESP_LOG_INFO, TAG, "Migrate configuration of firmware v16 (config.ini)");
         }
     }
 
@@ -136,6 +166,9 @@ void ConfigClass::readConfigFile(bool unityTest, std::string unityTestData)
             clearCfgDataTemp();
             parseJsonFromFile("{}", unityTest);
         }
+    }
+    else if (legacyIniMigration) {
+        legacyIniFinishMigration(); // rename config.ini, copy markers, take over the last valid value
     }
 }
 
