@@ -487,12 +487,12 @@ async function apiCall(endpoint, init = {}, extras = {}) {
  * API call with toast message for user-initiated actions
  * @param {string} endpoint
  * @param {RequestInit} [init]
- * @param {{ action?: string, resultMsg?: string|Object, loadingMsg?: string, parseType?: 'text'|'json'|'blob', httpObj?: Object }} [notify]
+ * @param {{ action?: string, resultMsg?: string|Object, loadingMsg?: string, loadingIcon?: 'scan', parseType?: 'text'|'json'|'blob', httpObj?: Object }} [notify]
  * @returns {Promise<ApiResult>}
  */
 async function apiCallNotify(endpoint, init = {}, notify = {}) {
-  const { action = 'Request', resultMsg, loadingMsg, parseType, httpObj } = notify;
-  const loadingId = loadingMsg ? firework.launch(loadingMsg, 'success', 120000) : null;
+  const { action = 'Request', resultMsg, loadingMsg, loadingIcon, parseType, httpObj } = notify;
+  const loadingId = loadingMsg ? firework.launch((loadingIcon === 'scan' ? scanIconHtml(20) + ' ' : '') + loadingMsg, 'success', 120000) : null;
   const res = await apiCall(endpoint, init, { parseType });
   firework.dismiss(loadingId);
 
@@ -698,15 +698,36 @@ function parseCurrentParametrization(paramsKeyified) {
 /* ========================================================================== */
 /* Images                                                                     */
 /* ========================================================================== */
+// Animated scan icon (viewfinder + lens + scan line), used as loading indicator while the camera takes a picture.
+// As image source (placeholder while an image loads) and as inline markup (scanIconHtml).
 const loaderSpinner = `data:image/svg+xml;base64,${btoa(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-        stroke="#007bff" stroke-width="1" stroke-linecap="round">
-        <path d="M12 3a9 9 0 1 1-6.36 2.64">
-            <animateTransform attributeName="transform" type="rotate" from="0 12 12"
-                to="360 12 12" dur="0.8s" repeatCount="indefinite" />
-        </path>
-    </svg>
+  <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" color="#5b5ef0">
+    <style>
+      .c, .l, .p { transform-origin: 32px 32px; }
+      .c { animation: b 1.3s ease-in-out infinite; }
+      .l { animation: b 1.3s ease-in-out infinite reverse; }
+      .p { animation: q 1.3s ease-in-out infinite; }
+      .s { animation: w 1.3s ease-in-out infinite alternate; }
+      @keyframes b { 0%, 100% { transform: scale(1); } 50% { transform: scale(0.88); } }
+      @keyframes q { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.6); opacity: 0.5; } }
+      @keyframes w { from { transform: translateY(-18px); opacity: 0.2; } 50% { opacity: 1; } to { transform: translateY(18px); opacity: 0.2; } }
+    </style>
+    <g class="c" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M11 21V11h10M43 11h10v10M53 43v10H43M21 53H11V43"/>
+    </g>
+    <circle class="l" cx="32" cy="32" r="11.5" fill="none" stroke="currentColor" stroke-width="5"/>
+    <circle class="p" cx="32" cy="32" r="4.5" fill="currentColor"/>
+    <rect class="s" x="12" y="30" width="40" height="4" rx="2" fill="currentColor"/>
+  </svg>
 `)}`;
+
+// Inline variant (colored by the text color, animated by the .scan-icon styles)
+const scanIconHtml = (size = 20) =>
+  `<svg class="scan-icon" width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true">` +
+  '<g class="scan-corners" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21V11h10M43 11h10v10M53 43v10H43M21 53H11V43"/></g>' +
+  '<circle class="scan-lens" cx="32" cy="32" r="11.5" fill="none" stroke="currentColor" stroke-width="5"/>' +
+  '<circle class="scan-pupil" cx="32" cy="32" r="4.5" fill="currentColor"/>' +
+  '<rect class="scan-line" x="12" y="30" width="40" height="4" rx="2" fill="currentColor"/></svg>';
 
 const noImageAvailable = `data:image/svg+xml;utf8,${encodeURIComponent(`
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
@@ -4045,6 +4066,26 @@ const App = (() => {
   };
   const show = (v) => (v === null || v === undefined || v === '' ? '--' : String(v));
 
+  // The reading as a counter: black wheels for the whole numbers, red wheels for the decimals ('N' = digit not recognized)
+  const meterEl = (value) => {
+    const text = String(value).trim().replace(',', '.');
+    const m = /^(-?)([0-9N]+)(?:\.([0-9N]+))?$/.exec(text);
+    if (!m) return el('div', 'dash-hero-value', value); // not a number (e.g. 'Outdated'): plain text
+    const meter = el('div', 'dash-meter');
+    meter.setAttribute('role', 'img');
+    meter.setAttribute('aria-label', `Meter reading ${text}`);
+    const wheels = (digits, cls) => {
+      for (const d of digits) meter.append(el('span', `dash-wheel ${cls}${d === 'N' ? ' dash-wheel-na' : ''}`, d));
+    };
+    if (m[1]) meter.append(el('span', 'dash-meter-sign', '−'));
+    wheels(m[2], '');
+    if (m[3]) {
+      meter.append(el('span', 'dash-meter-dot'));
+      wheels(m[3], 'dash-wheel-red');
+    }
+    return meter;
+  };
+
   // ------------------------------------------------------------------------
   // View: dashboard
   // ------------------------------------------------------------------------
@@ -4076,11 +4117,7 @@ const App = (() => {
       </div>
       <div class="refresh-group">
         <div class="refresh-loader">
-          <div class="loader" data-ref="loader">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" class="spinner-svg">
-              <path d="M12 3a9 9 0 1 1-6.36 2.64"></path>
-            </svg>
-          </div>
+          <div class="loader" data-ref="loader">${scanIconHtml(24)}</div>
           <button type="button" class="button btn-action dash-refresh-btn" data-action="refresh">Refresh</button>
         </div>
       </div>
@@ -4265,7 +4302,7 @@ const App = (() => {
           edit.addEventListener('click', () => openFallbackEditor(card, seq, prefill));
           actions.append(chips, edit);
 
-          card.append(el('div', 'dash-hero-label', `Sequence · ${seq}`), el('div', 'dash-hero-value', show(data.actual_value[seq])), status, actions);
+          card.append(el('div', 'dash-hero-label', `Sequence · ${seq}`), meterEl(show(data.actual_value[seq])), status, actions);
           container.appendChild(card);
         }
       };
@@ -4639,6 +4676,7 @@ const App = (() => {
       const res = await apiCallNotify(`/camera?${query}`, { timeout }, {
         action: 'Setting image parameter',
         loadingMsg: 'Capturing image...',
+        loadingIcon: 'scan',
         parseType: 'blob',
       });
       return { ok: res.ok, blob: res.ok ? res.data : null };

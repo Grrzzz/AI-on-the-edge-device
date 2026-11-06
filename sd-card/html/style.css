@@ -399,15 +399,42 @@ body {
   color: var(--primary);
 }
 
-/* Animated scan icon: shown while the camera takes the picture */
-.cycle-scan {
-  display: none;
+/* Animated scan icon (camera takes the picture): sidebar, dashboard loader, toasts */
+.scan-icon {
   flex: none;
-  width: 20px;
-  height: 20px;
-  margin-top: 0;
   color: var(--primary);
   overflow: visible;
+  vertical-align: -4px;
+}
+
+.scan-icon .scan-corners,
+.scan-icon .scan-lens,
+.scan-icon .scan-pupil {
+  transform-origin: 32px 32px;
+}
+
+.scan-icon .scan-corners {
+  animation: scan-breathe 1.3s ease-in-out infinite;
+}
+
+.scan-icon .scan-lens {
+  animation: scan-breathe 1.3s ease-in-out infinite reverse;
+}
+
+.scan-icon .scan-pupil {
+  animation: scan-pupil 1.3s ease-in-out infinite;
+}
+
+.scan-icon .scan-line {
+  animation: scan-sweep 1.3s ease-in-out infinite alternate;
+}
+
+/* sidebar: replaces the status dot while the image is taken */
+.cycle-scan {
+  display: none;
+  width: 20px;
+  height: 20px;
+  vertical-align: baseline;
 }
 
 .cycle[data-phase='capture'] .cycle-dot {
@@ -416,25 +443,6 @@ body {
 
 .cycle[data-phase='capture'] .cycle-scan {
   display: block;
-}
-
-.cycle-scan .scan-corners {
-  transform-origin: 32px 32px;
-  animation: scan-breathe 1.3s ease-in-out infinite;
-}
-
-.cycle-scan .scan-lens {
-  transform-origin: 32px 32px;
-  animation: scan-breathe 1.3s ease-in-out infinite reverse;
-}
-
-.cycle-scan .scan-pupil {
-  transform-origin: 32px 32px;
-  animation: scan-pupil 1.3s ease-in-out infinite;
-}
-
-.cycle-scan .scan-line {
-  animation: scan-sweep 1.3s ease-in-out infinite alternate;
 }
 
 @keyframes scan-breathe {
@@ -454,10 +462,10 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cycle-scan .scan-corners,
-  .cycle-scan .scan-lens,
-  .cycle-scan .scan-pupil,
-  .cycle-scan .scan-line {
+  .scan-icon .scan-corners,
+  .scan-icon .scan-lens,
+  .scan-icon .scan-pupil,
+  .scan-icon .scan-line {
     animation: none;
   }
 }
@@ -836,10 +844,6 @@ details {
   opacity: 1;
   visibility: visible;
   color: var(--primary);
-}
-
-.is-loading .spinner-svg {
-  animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
@@ -3100,6 +3104,62 @@ a .rst-content .admonition-title {
   word-break: break-all;
 }
 
+.dash .dash-meter {
+  display: flex;
+  width: fit-content;
+  align-items: stretch;
+  gap: 2px;
+  margin: 8px 0 4px;
+  padding: 6px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #d7d9de, #a9acb3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 2px 6px rgba(0, 0, 0, 0.25);
+  font-size: clamp(1.5rem, 5.5vw, 2.3rem);
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.dash .dash-wheel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.78em;
+  height: 1.28em;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #050506 0%, #2a2b30 46%, #101012 54%, #030304 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06), inset 0 -2px 3px rgba(0, 0, 0, 0.7);
+  color: #f4f4f5;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.dash .dash-wheel-red {
+  background: linear-gradient(180deg, #4a0a0c 0%, #c62128 46%, #8f1419 54%, #3b0709 100%);
+  color: #fff;
+}
+
+.dash .dash-wheel-na {
+  color: #fbbf24;
+}
+
+.dash .dash-meter-dot {
+  align-self: flex-end;
+  width: 0.14em;
+  height: 0.14em;
+  margin: 0 0.04em 0.12em;
+  border-radius: 50%;
+  background: #2b2b30;
+}
+
+.dash .dash-meter-sign {
+  align-self: center;
+  padding: 0 0.1em;
+  color: #2b2b30;
+  font-weight: 700;
+}
+
 .dash .dash-hero-status {
   margin: 6px 0 14px;
   font-size: 1.05rem;
@@ -3165,8 +3225,8 @@ a .rst-content .admonition-title {
 }
 
 .dash .dash-img.is-loading {
-  width: 50px;
-  height: 50px;
+  width: 64px;
+  height: 64px;
   margin: 40px auto;
   object-fit: contain;
 }
