@@ -589,16 +589,11 @@ esp_err_t handler_main(httpd_req_t *req)
                 "target=\"_blank\">Error Documentation</a>.<br><br>";
             message += "<button onclick=\"window.location.href='/reboot';\">Reboot Device</button>";
             message += "&nbsp;<button onclick=\"window.open('/log');\">Log</button>";
-            message += "&nbsp;<button onclick=\"window.open('/sys_ota.html');\">OTA Update</button>";
+            message += "&nbsp;<button onclick=\"window.open('/#/system/update');\">OTA Update</button>";
             message += "&nbsp;<button onclick=\"window.open('/fileserver/');\">File Explorer</button>";
-            message += "&nbsp;<button onclick=\"window.open('/sys_info.html');\">System Info</button>";
+            message += "&nbsp;<button onclick=\"window.open('/#/system/info');\">System Info</button>";
             httpd_resp_send(req, message.c_str(), HTTPD_RESP_USE_STRLEN);
             return ESP_OK;
-        }
-
-        if (flowctrl.getStatusSetupModus()) {
-            LogFile.writeToFile(ESP_LOG_INFO, TAG, "System is in setup mode. Redirect from index.html --> setup.html");
-            filepath = "/sdcard/html/setup.html";
         }
     }
 

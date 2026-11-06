@@ -5,17 +5,14 @@
   <title>AI-on-the-Edge Device</title>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
 
   <script>
-    // Theme Control (mode: auto | light | dark)
-    // Pages inside the content frame only know 'light' / 'dark' (localStorage 'theme').
-    // In mode 'auto' the stored value is removed so every page falls back to the OS setting.
+    // Apply the theme before the first paint (mode: auto | light | dark)
     (function () {
       let mode = 'auto';
       try { mode = localStorage.getItem('theme') || 'auto'; } catch (e) { }
-      if (mode !== 'light' && mode !== 'dark') mode = 'auto';
-      const dark = mode === 'auto' ? window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches : mode === 'dark';
-      document.documentElement.classList.remove('light', 'dark');
+      const dark = mode === 'dark' || (mode !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
       document.documentElement.classList.add(dark ? 'dark' : 'light');
     })();
   </script>
@@ -24,106 +21,7 @@
   <link rel="icon" type="image/svg+xml" href="icon.svg?v=$COMMIT_HASH" />
   <link rel="apple-touch-icon" sizes="180x180" href="/icon-apple-touch.png?v=$COMMIT_HASH" />
   <link rel="manifest" type="application/manifest+json" href="/site.webmanifest?v=$COMMIT_HASH" />
-  <link rel="stylesheet" href="style-shell.css?v=$COMMIT_HASH" type="text/css" />
-
-  <link href="firework.css?v=$COMMIT_HASH" rel="stylesheet" />
-  <script src="firework.js?v=$COMMIT_HASH"></script>
-  <script src="global.js?v=$COMMIT_HASH"></script>
-  <script>
-    const UI = {
-      get app() { return document.getElementById('app'); },
-      get deviceName() { return document.getElementById('device-name'); },
-      get topbarTitle() { return document.getElementById('topbar-title'); },
-      get main() { return document.getElementById('maincontent'); },
-      get hasDiscovery() { return document.getElementById('HASendDiscovery'); },
-    };
-
-
-    /* ---------------------------------------------------------- theme */
-    function systemPrefersDark() {
-      return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    }
-
-    function getThemeMode() {
-      let mode = null;
-      try { mode = localStorage.getItem('theme'); } catch (e) { }
-      return mode === 'light' || mode === 'dark' ? mode : 'auto';
-    }
-
-    function setThemeMode(mode) {
-      const dark = mode === 'auto' ? systemPrefersDark() : mode === 'dark';
-      document.documentElement.classList.toggle('dark', dark);
-      document.documentElement.classList.toggle('light', !dark);
-
-      try {
-        if (mode === 'auto') localStorage.removeItem('theme');
-        else localStorage.setItem('theme', mode);
-      } catch (e) { }
-
-      if (mode === 'auto') document.cookie = 'theme=;path=/;max-age=0;SameSite=Lax';
-      else document.cookie = `theme=${mode};path=/;max-age=${60 * 60 * 24 * 400};SameSite=Lax`;
-
-      document.querySelectorAll('.theme-seg button').forEach((b) => b.classList.toggle('on', b.dataset.mode === mode));
-
-      // Pages inside the frame do not receive 'storage' events for removals reliably: apply directly
-      try {
-        const d = UI.main.contentDocument?.documentElement;
-        if (d) {
-          d.classList.toggle('dark', dark);
-          d.classList.toggle('light', !dark);
-          UI.main.contentWindow.refreshTheme?.();
-        }
-      } catch (e) { }
-    }
-
-    function getCookie(cname) {
-      const name = cname + '=';
-      const decodedCookie = decodeURIComponent(document.cookie);
-      const ca = decodedCookie.split(';');
-      const cookie = ca.find((row) => row.trim().startsWith(name));
-      return cookie ? cookie.trim().substring(name.length) : '';
-    }
-
-    /* ----------------------------------------------------- navigation */
-    function setActive(page) {
-      let base = (page || '').split('?')[0];
-      if (/^https?:\/\//.test(base)) base = new URL(base).pathname.replace(/^\//, '').replace(/\/$/, '');
-
-      let activeGroup = null;
-      document.querySelectorAll('[data-page]').forEach((el) => {
-        const on = !!base && el.dataset.page === base;
-        el.classList.toggle('active', on);
-        if (on) activeGroup = el.closest('.nav-group');
-      });
-
-      // Accordion: keep only the group of the current page open
-      document.querySelectorAll('.nav-group').forEach((g) => g.classList.toggle('open', g === activeGroup));
-    }
-
-    function loadPage(page) {
-
-      document.cookie = `page=${page};path=/;SameSite=Lax`;
-
-      if (UI.main) {
-        UI.main.classList.remove('ready'); // Hide iframe until loaded
-        UI.main.src = page;
-      }
-
-      setActive(page);
-      closeNav();
-    }
-
-    function openNav() { UI.app.classList.add('nav-open'); }
-    function closeNav() { UI.app.classList.remove('nav-open'); }
-    function toggleNav() { UI.app.classList.toggle('nav-open'); }
-
-    function toggleGroup(btn) {
-      const group = btn.closest('.nav-group');
-      const willOpen = !group.classList.contains('open');
-      document.querySelectorAll('.nav-group').forEach((g) => g.classList.remove('open'));
-      group.classList.toggle('open', willOpen);
-    }
-  </script>
+  <link rel="stylesheet" href="style.css?v=$COMMIT_HASH" />
 </head>
 
 <body>
@@ -152,32 +50,32 @@
 
       <nav class="nav" aria-label="Main navigation">
         <ul class="nav-top">
-        <li><button class="nav-item" data-page="dashboard.html" onclick="loadPage('dashboard.html?v=$COMMIT_HASH')"><svg><use href="#i-home" /></svg>Dashboard</button></li>
-        <li><button class="nav-item" data-page="recognition_details" onclick="loadPage(getDomainname() + '/recognition_details')"><svg><use href="#i-eye" /></svg>Recognition</button></li>
+          <li><button class="nav-item" data-route="dashboard" data-href="#/dashboard"><svg><use href="#i-home" /></svg>Dashboard</button></li>
+          <li><button class="nav-item" data-route="recognition" data-href="#/recognition"><svg><use href="#i-eye" /></svg>Recognition</button></li>
         </ul>
         <ul class="nav-top">
-        <li><button class="nav-item" data-page="edit_setup.html" onclick="loadPage('edit_setup.html?v=$COMMIT_HASH')"><svg><use href="#i-target" /></svg>Setup</button></li>
+          <li><button class="nav-item" data-route="setup" data-href="#/setup"><svg><use href="#i-target" /></svg>Setup</button></li>
         </ul>
         <ul class="nav-top">
-        <li><button class="nav-item" data-page="edit_configuration.html" onclick="loadPage('edit_configuration.html?v=$COMMIT_HASH')"><svg><use href="#i-sliders" /></svg>Configuration</button></li>
+          <li><button class="nav-item" data-route="config" data-href="#/config"><svg><use href="#i-sliders" /></svg>Configuration</button></li>
         </ul>
         <div class="nav-group" data-group="system">
-          <button class="nav-item nav-parent" onclick="toggleGroup(this)"><svg><use href="#i-server" /></svg>System<svg class="chev" viewBox="0 0 24 24"><use href="#i-chev" /></svg></button>
+          <button class="nav-item nav-parent" type="button"><svg><use href="#i-server" /></svg>System<svg class="chev" viewBox="0 0 24 24"><use href="#i-chev" /></svg></button>
           <ul class="nav-sub">
-            <li><button class="nav-sub-item" data-page="sys_info.html" onclick="loadPage('sys_info.html?v=$COMMIT_HASH')">Info</button></li>
-            <li><button class="nav-sub-item" data-page="sys_ota.html" onclick="loadPage('sys_ota.html?v=$COMMIT_HASH')">Update</button></li>
-            <li><button class="nav-sub-item" data-page="sys_backup.html" onclick="loadPage('sys_backup.html?v=$COMMIT_HASH')">Backup / Restore</button></li>
-            <li><button class="nav-sub-item" data-page="fileserver" onclick="loadPage(getDomainname() + '/fileserver/')">File Explorer</button></li>
-            <li><button class="nav-sub-item" data-page="sys_reboot.html" onclick="loadPage('sys_reboot.html?v=$COMMIT_HASH')">Reboot</button></li>
+            <li><button class="nav-sub-item" data-route="system-info" data-href="#/system/info">Info</button></li>
+            <li><button class="nav-sub-item" data-route="system-update" data-href="#/system/update">Update</button></li>
+            <li><button class="nav-sub-item" data-route="system-backup" data-href="#/system/backup">Backup / Restore</button></li>
+            <li><button class="nav-sub-item" data-route="system-files" data-href="#/system/files">File Explorer</button></li>
+            <li><button class="nav-sub-item" data-route="system-reboot" data-href="#/system/reboot">Reboot</button></li>
           </ul>
         </div>
       </nav>
 
       <div class="sidebar-footer">
         <div class="theme-seg" role="group" aria-label="Theme">
-          <button data-mode="auto" onclick="setThemeMode('auto')">Auto</button>
-          <button data-mode="light" onclick="setThemeMode('light')">Light</button>
-          <button data-mode="dark" onclick="setThemeMode('dark')">Dark</button>
+          <button type="button" data-mode="auto">Auto</button>
+          <button type="button" data-mode="light">Light</button>
+          <button type="button" data-mode="dark">Dark</button>
         </div>
         <div class="foot-meta">
           <span id="fw-version">&nbsp;</span>
@@ -186,137 +84,18 @@
       </div>
     </aside>
 
-    <div class="scrim" onclick="closeNav()"></div>
+    <div class="scrim" id="nav-scrim"></div>
 
     <main class="content">
       <div class="topbar">
-        <button class="icon-btn" onclick="toggleNav()" aria-label="Open menu"><svg viewBox="0 0 24 24"><use href="#i-menu" /></svg></button>
+        <button class="icon-btn" id="nav-toggle" type="button" aria-label="Open menu"><svg viewBox="0 0 24 24"><use href="#i-menu" /></svg></button>
         <div class="topbar-title" id="topbar-title">AI-on-the-Edge</div>
       </div>
-      <iframe title="maincontent" class="iframe" id="maincontent"></iframe>
+      <div class="view-host" id="view"></div>
     </main>
   </div>
 
-  <script>
-    const CYCLE_START_NOTIFY = {
-      '001': { msg: 'Cycle start triggered', type: 'success', time: 2000 },
-      '002': { msg: 'Cycle start scheduled. Start new cycle after actual cycle is completed', type: 'success', time: 3000 },
-      '003': { msg: 'Cycle start triggered. Restore from state \'Initialization Delayed\'', type: 'success', time: 3000 },
-      '099': { msg: 'Cycle start rejected. Process not (yet) initialized', type: 'danger', time: 30000 },
-    };
-
-    async function manualCycleStart() {
-      closeNav();
-      const res = await apiCallNotify('/cycle_start', {}, { action: 'Cycle start request', resultMsg: CYCLE_START_NOTIFY });
-      if (!res.ok) return;
-
-      const code = res.data.substring(0, 3);
-      if (!CYCLE_START_NOTIFY[code]) return;
-
-      try {
-        UI.main.contentWindow.location.reload();
-      } catch {
-        UI.main.src = UI.main.src;
-      }
-    }
-
-    async function homeAssistantSendDiscoveryVisibility() {
-      try {
-        const config = getConfigFromStorage();
-
-        if (config?.mqtt?.enabled && config?.mqtt?.homeassistant?.discoveryenabled) {
-          if (UI.hasDiscovery) UI.hasDiscovery.style.display = '';
-        }
-      } catch (error) {
-        console.error('Error updating HA discovery visibility:', error);
-      }
-    }
-
-    async function homeAssistantPublishDiscoveryTopics() {
-      closeNav();
-      const res = await apiCallNotify('/mqtt?task=publish_ha_discovery', {}, { action: 'HA discovery request' });
-      if (!res.ok) return;
-
-      firework.launch("Publishing Home Assistant discovery topics scheduled. Will be processed during state 'Publish to MQTT'", 'success', 5000);
-    }
-
-
-    async function loadHostname() {
-      const res = await apiCall('/info?type=hostname');
-      if (!res.ok || !res.data) return;
-
-      const hostname = res.data.trim();
-      document.title = `${hostname} | AI-on-the-Edge Device`;
-      if (UI.deviceName) UI.deviceName.innerText = hostname;
-      if (UI.topbarTitle) UI.topbarTitle.innerText = hostname;
-    }
-
-    async function fetchFwVersion(type) {
-      const res = await apiCall(`/info?type=${type}`);
-      return res.ok ? res.data : '';
-    }
-
-    async function checkFwVersion() {
-      const [fwVersion, uiVersion] = await Promise.all([
-        fetchFwVersion('firmware_version'),
-        fetchFwVersion('html_version')
-      ]);
-
-      const label = document.getElementById('fw-version');
-      if (label && fwVersion) label.textContent = fwVersion;
-
-      if (!fwVersion || !uiVersion || uiVersion.startsWith('?')) {
-        console.error('Failed to fetch firmware or WebUI version strings.');
-        return;
-      }
-
-      if (fwVersion !== uiVersion) {
-        firework.launch("Web interface version does not match the firmware version. It's strongly advised to use matching version. Check logs for more details.",
-          'warning', 10000);
-      }
-    }
-
-    async function init() {
-      // Theme Control
-      setThemeMode(getThemeMode());
-
-      // Follow the OS setting while mode is 'auto'
-      if (window.matchMedia) {
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => {
-          if (getThemeMode() === 'auto') setThemeMode('auto');
-        });
-      }
-
-      // Fallback: Reveal on load for pages that never post 'iframe-ready'
-      if (UI.main) { UI.main.addEventListener('load', () => { UI.main.classList.add('ready'); }); }
-
-      // Cookie management
-      let page = getCookie('page');
-
-      //@Deprecated: Keep for migration purpose
-      const removedPages = ['overview.html', 'data_graph.html', 'data_viewer.html', 'edit_config_param.html', 'sys_ota_page.html', 'sys_reboot_page.html', 'edit_fallbackvalue.html', 'edit_reference.html', 'edit_alignment.html', 'edit_sequence.html'];
-
-      if (!page || page.includes('sys_reboot.html') || removedPages.some((p) => page.includes(p))) {
-        page = 'dashboard.html?v=$COMMIT_HASH';
-        document.cookie = `page=${page};path=/;SameSite=Lax`;
-      }
-      UI.main.src = page;
-      setActive(page);
-
-      loadHostname();
-      loadConfig().then(homeAssistantSendDiscoveryVisibility).catch((e) => console.error('Failed to load config', e));
-      checkFwVersion();
-    }
-
-    // Listen for the iframe ready
-    window.addEventListener('message', (event) => {
-      if (event.source !== UI.main?.contentWindow) return;
-      if (event.data?.type === 'iframe-ready') UI.main.classList.add('ready');
-    });
-
-    // Initialize as soon as DOM is ready
-    window.addEventListener('DOMContentLoaded', init);
-  </script>
+  <script src="app.js?v=$COMMIT_HASH"></script>
 </body>
 
 </html>

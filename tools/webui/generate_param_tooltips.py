@@ -48,7 +48,7 @@ jsonOutPath = os.path.join(htmlTempDir, "tooltips.json")
 jsonOutPathGz = os.path.join(htmlTempDir, "tooltips.json.gz")
 
 # Pages to clean up
-pagesToUpdate = ["edit_configuration.html", "edit_setup.html", "setup.html"]
+pagesToUpdate = []  # the WebUI (app.js) renders the .tooltip-trigger elements itself
 
 # Dictionary to hold all documentation: { "section_parameter": "<html>...</html>" }
 tooltip_database = {}

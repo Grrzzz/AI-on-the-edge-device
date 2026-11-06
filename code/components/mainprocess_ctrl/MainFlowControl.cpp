@@ -809,7 +809,7 @@ esp_err_t handler_recognition_details(httpd_req_t *req)
                 if (typeof refreshTheme === 'function') refreshTheme();
             });
         </script>
-        <link rel="stylesheet" href="/style-iframe.css">
+        <link rel="stylesheet" href="/style.css">
         </head><body>)";
 
     txt += R"(<div class="container"><div class="container-header">

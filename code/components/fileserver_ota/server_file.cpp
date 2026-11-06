@@ -134,7 +134,7 @@ esp_err_t sendFile(httpd_req_t *req, const std::string &filename, bool disableCa
     static char vbuf[512];
     setvbuf(file, vbuf, _IOFBF, sizeof(vbuf));
 
-    const bool doNotCacheFile = filename == "/sdcard/html/index.html" || filename == "/sdcard/html/setup.html";
+    const bool doNotCacheFile = filename == "/sdcard/html/index.html" || filename == "/sdcard/html/app.js" || filename == "/sdcard/html/style.css";
     const char *cacheControl = "max-age=0";
 
     if (!disableCache && !doNotCacheFile) {
