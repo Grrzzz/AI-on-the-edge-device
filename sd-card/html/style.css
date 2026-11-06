@@ -3222,6 +3222,87 @@ a .rst-content .admonition-title {
   border-radius: 0.6rem;
 }
 
+.dash .dash-img[hidden] {
+  display: none;
+}
+
+/* animated scene while the camera takes the picture */
+.dash .dash-stage {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: 0.6rem;
+  background: linear-gradient(135deg, var(--surface), var(--bg));
+  text-align: center;
+}
+
+.dash .dash-stage[hidden] {
+  display: none;
+}
+
+.dash .dash-stage-rings span {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  width: 190px;
+  height: 190px;
+  margin: -95px 0 0 -95px;
+  border: 2px solid var(--meter-accent, var(--primary));
+  border-radius: 50%;
+  opacity: 0;
+  animation: dash-stage-ring 2.7s ease-out infinite;
+}
+
+.dash .dash-stage-rings span:nth-child(2) {
+  animation-delay: 0.9s;
+}
+
+.dash .dash-stage-rings span:nth-child(3) {
+  animation-delay: 1.8s;
+}
+
+.dash .dash-stage-icon {
+  position: relative;
+  line-height: 0;
+}
+
+.dash .dash-stage-title {
+  position: relative;
+  margin-top: 10px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.dash .dash-stage-sub {
+  position: relative;
+  color: var(--text-secondary);
+}
+
+@keyframes dash-stage-ring {
+  0% {
+    transform: scale(0.45);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash .dash-stage-rings span {
+    animation: none;
+    opacity: 0.2;
+  }
+}
+
 .dash .dash-img.is-loading {
   width: 64px;
   height: 64px;

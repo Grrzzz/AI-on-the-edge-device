@@ -4378,6 +4378,7 @@ const App = (() => {
         <div class="card-header">Image view</div>
         <div class="card-body">
           <img class="dash-img is-loading" data-ref="img" alt="Image view" />
+          <div class="dash-stage" data-ref="stage" hidden></div>
         </div>
       </div>
     </main>
@@ -4575,9 +4576,38 @@ const App = (() => {
         }
       };
 
+      // While the camera takes the picture the device has no image: show the animated scan scene instead of the static state image
+      const setStage = (on) => {
+        if (st.capturing === on) return;
+        st.capturing = on;
+        ref.stage.hidden = !on;
+        ref.img.hidden = on;
+        if (on) {
+          ref.stage.innerHTML =
+            '<div class="dash-stage-rings"><span></span><span></span><span></span></div>' +
+            `<div class="dash-stage-icon">${scanIconHtml(150)}</div>` +
+            '<div class="dash-stage-title">Taking image ...</div>' +
+            '<div class="dash-stage-sub">The camera captures the picture</div>';
+        } else {
+          ref.stage.textContent = '';
+        }
+      };
+
+      // the sidebar polls the status every 2 s: switch the scene right away and load the image as soon as the capture is over
+      const onCycleStatus = (e) => {
+        if (st.dead) return;
+        const capturing = !!(e.detail?.running && /take image/i.test(String(e.detail.state)));
+        const wasCapturing = st.capturing;
+        setStage(capturing);
+        if (wasCapturing && !capturing) refresh(true);
+      };
+      window.addEventListener('cycle-status', onCycleStatus);
+      st.offStatus = () => window.removeEventListener('cycle-status', onCycleStatus);
+
       const loadProcessData = async () => {
         const d = await Api.process.get(st.abort.signal);
         if (!d || st.dead) return null;
+        setStage(/take image/i.test(String(d.process_state)));
 
         try {
           renderSequenceCards(d);
@@ -4651,7 +4681,7 @@ const App = (() => {
           loadActivity();
 
           // Manual refresh always reloads the image; auto refresh only when cycle or step changed
-          if (!auto || key !== st.lastImageKey) {
+          if (!st.capturing && (!auto || key !== st.lastImageKey)) {
             await Promise.all([loadRoiImage(), loadRecognition()]);
             st.lastImageKey = key;
           }
@@ -4671,7 +4701,7 @@ const App = (() => {
         if (st.dead) return;
         st.timer = setTimeout(() => {
           refresh(true).then(scheduleAuto);
-        }, AUTO_REFRESH_MS);
+        }, st.capturing ? 1500 : AUTO_REFRESH_MS);
       };
 
       root.addEventListener('click', (e) => {
@@ -4683,7 +4713,7 @@ const App = (() => {
         if (typeof loaderSpinner !== 'undefined') ref.img.src = loaderSpinner;
         st.lastImageKey = await loadProcessData();
         if (st.dead) return;
-        loadRoiImage();
+        if (!st.capturing) loadRoiImage();
         loadRecognition();
         loadActivity();
         scheduleAuto();
@@ -4695,6 +4725,7 @@ const App = (() => {
       if (!st) return;
       st.dead = true;
       clearTimeout(st.timer);
+      st.offStatus?.();
       st.abort.abort();
       dashActive = null;
     },
@@ -9927,6 +9958,7 @@ const CycleMonitor = (() => {
         fetchedAt = performance.now();
         lastAnswerAt = fetchedAt;
         stale = false;
+        window.dispatchEvent(new CustomEvent('cycle-status', { detail: answer }));
       } else if (status) {
         stale = true; // keep the last known state
         if (!lastAnswerAt) status = null;
