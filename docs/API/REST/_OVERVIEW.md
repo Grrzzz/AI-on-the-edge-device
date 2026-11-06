@@ -14,7 +14,6 @@ Further details can be found in the respective REST API endpoint description.
 | [/process_data](process_data.md)     | Process Data                                       | JSON + HTML | 
 | [/info](info.md)                     | Device Info + Process Status                       | JSON + HTML | 
 | [/config](config.md)                 | Device Configuration                               | JSON + HTML | 
-| [/metrics](metrics.md)               | Prometheus / OpenMetrics Data                      | HTML        | 
 | [/cycle_start](cycle_start.md)       | Trigger Cycle (Flow) Start                         | HTML        | 
 | [/set_fallbackvalue](set_fallbackvalue.md) | Set Fallback Value                           | HTML        | 
 | [/editflow](editflow.md)             | Parametrization Helper                             | HTML        | 

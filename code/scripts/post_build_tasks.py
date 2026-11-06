@@ -96,22 +96,10 @@ def postBuildAction(source, target, env):
                     f.write(content)
 
     # -------------------------------------------------------------------------------------------------
-    # Step 4: Generate API docs
-    # -------------------------------------------------------------------------------------------------
-    print(f"{scriptName}: Step 4: WebUI - Generate API docs")
-    scriptApiDocs = os.path.join(projectRoot, "tools", "webui", "generate_api_docs.py")
-    result = subprocess.run([sys.executable, scriptApiDocs, projectRoot], capture_output=True, text=True)
-    if result.returncode != 0:
-        print("Error generating API docs: ")
-        print(result.stdout)
-        print(result.stderr)
-        raise RuntimeError("API docs generation failed")
-
-    # -------------------------------------------------------------------------------------------------
-    # Step 5: Create ZIP after compilation (local only)
+    # Step 4: Create ZIP after compilation (local only)
     # -------------------------------------------------------------------------------------------------
     if not inGithubActions:
-        print(f"{scriptName}: Step 5: Create firmware package (ZIP file in .builds folder)")
+        print(f"{scriptName}: Step 4: Create firmware package (ZIP file in .builds folder)")
 
         zipFilename = f"AI-on-the-edge-device__{envName}__SLFork_{commitHash}.zip"
         zipPath = os.path.join(projectRoot, ".builds", zipFilename)

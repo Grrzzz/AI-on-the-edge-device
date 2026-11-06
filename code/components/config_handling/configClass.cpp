@@ -221,9 +221,6 @@ esp_err_t ConfigClass::parseConfig(bool init, bool unityTest)
     parseSectionRoi("analog", cfgDataTemp.sectionAnalog, "_ana");
     parseSectionPostProcessing();
     parseSectionMqtt(unityTest);
-    parseSectionInfluxDBv1(unityTest);
-    parseSectionInfluxDBv2(unityTest);
-    parseSectionWebhook(unityTest);
     parseSectionGpio(init);
     parseSectionLogging();
     parseSectionNetwork(init, unityTest);
@@ -401,8 +398,7 @@ void ConfigClass::parseSectionSequences(bool init)
 
     // Sync all underlaying  vectors with master vector
     configClassHelper::syncSequenceVectors(master, cfgDataTemp.sectionDigit.sequence, cfgDataTemp.sectionAnalog.sequence,
-                                           cfgDataTemp.sectionPostProcessing.sequence, cfgDataTemp.sectionInfluxDBv1.sequence,
-                                           cfgDataTemp.sectionInfluxDBv2.sequence);
+                                           cfgDataTemp.sectionPostProcessing.sequence);
 }
 
 
@@ -523,93 +519,6 @@ void ConfigClass::parseSectionMqtt(bool unityTest)
     }
     cJsonUtils::parseIntClamped(mqtt, {"homeassistant", "metertype"}, section.homeAssistant.meterType, 0, 16);
     cJsonUtils::parseBool(mqtt, {"homeassistant", "retaindiscovery"}, section.homeAssistant.retainDiscovery);
-}
-
-
-void ConfigClass::parseSectionInfluxDBv1(bool unityTest)
-{
-    cJSON *influx = cJSON_GetObjectItem(cJsonObject, "influxdbv1");
-    auto &section = cfgDataTemp.sectionInfluxDBv1;
-
-    cJsonUtils::parseBool(influx, {"enabled"}, section.enabled);
-    cJsonUtils::parseString(influx, {"uri"}, section.uri);
-    cJsonUtils::parseString(influx, {"database"}, section.database);
-    cJsonUtils::parseIntClamped(influx, {"authmode"}, section.authMode, 0, 2);
-    cJsonUtils::parseString(influx, {"username"}, section.username);
-    parseSecretParameter(influx, {"password"}, section.password, "influxdbv1_pw", unityTest);
-
-    parseTlsParameters(cJSON_GetObjectItem(influx, "tls"), section.tls);
-
-    cJSON *seqArr = cJSON_GetObjectItem(influx, "sequence");
-    for (int i = 0; i < cJSON_GetArraySize(seqArr); i++) {
-        cJSON *el = cJSON_GetArrayItem(seqArr, i);
-        std::string name;
-        if (!cJsonUtils::parseString(el, {"sequencename"}, name)) {
-            continue;
-        }
-        auto *seq = configClassHelper::findSequenceByName(section.sequence, name);
-        if (!seq) {
-            continue;
-        }
-        if (cJsonUtils::parseString(el, {"measurementname"}, seq->measurementName)) {
-            configClassHelper::validateStructure(seq->measurementName);
-        }
-        if (cJsonUtils::parseString(el, {"fieldkey1"}, seq->fieldKey1)) {
-            configClassHelper::validateStructure(seq->fieldKey1);
-        }
-    }
-}
-
-
-void ConfigClass::parseSectionInfluxDBv2(bool unityTest)
-{
-    cJSON *influx = cJSON_GetObjectItem(cJsonObject, "influxdbv2");
-    auto &section = cfgDataTemp.sectionInfluxDBv2;
-
-    cJsonUtils::parseBool(influx, {"enabled"}, section.enabled);
-    cJsonUtils::parseString(influx, {"uri"}, section.uri);
-    cJsonUtils::parseString(influx, {"bucket"}, section.bucket);
-    cJsonUtils::parseString(influx, {"organization"}, section.organization);
-    cJsonUtils::parseIntClamped(influx, {"authmode"}, section.authMode, 1, 2);
-    parseSecretParameter(influx, {"token"}, section.token, "influxdbv2_pw", unityTest);
-
-    parseTlsParameters(cJSON_GetObjectItem(influx, "tls"), section.tls);
-
-    cJSON *seqArr = cJSON_GetObjectItem(influx, "sequence");
-    for (int i = 0; i < cJSON_GetArraySize(seqArr); i++) {
-        cJSON *el = cJSON_GetArrayItem(seqArr, i);
-        std::string name;
-        if (!cJsonUtils::parseString(el, {"sequencename"}, name)) {
-            continue;
-        }
-        auto *seq = configClassHelper::findSequenceByName(section.sequence, name);
-        if (!seq) {
-            continue;
-        }
-        if (cJsonUtils::parseString(el, {"measurementname"}, seq->measurementName)) {
-            configClassHelper::validateStructure(seq->measurementName);
-        }
-        if (cJsonUtils::parseString(el, {"fieldkey1"}, seq->fieldKey1)) {
-            configClassHelper::validateStructure(seq->fieldKey1);
-        }
-    }
-}
-
-
-void ConfigClass::parseSectionWebhook(bool unityTest)
-{
-    cJSON *webhook = cJSON_GetObjectItem(cJsonObject, "webhook");
-    auto &section = cfgDataTemp.sectionWebhook;
-
-    cJsonUtils::parseBool(webhook, {"enabled"}, section.enabled);
-    cJsonUtils::parseString(webhook, {"uri"}, section.uri);
-    cJsonUtils::parseString(webhook, {"apikey"}, section.apiKey);
-    cJsonUtils::parseIntClamped(webhook, {"publishimage"}, section.publishImage, 0, 2);
-    cJsonUtils::parseIntClamped(webhook, {"authmode"}, section.authMode, 0, 2);
-    cJsonUtils::parseString(webhook, {"username"}, section.username);
-    parseSecretParameter(webhook, {"password"}, section.password, "webhook_pw", unityTest);
-
-    parseTlsParameters(cJSON_GetObjectItem(webhook, "tls"), section.tls);
 }
 
 
@@ -1055,73 +964,6 @@ esp_err_t ConfigClass::serializeConfig(bool unityTest)
     addEl(mqttHA, "retaindiscovery", cfgDataTemp.sectionMqtt.homeAssistant.retainDiscovery);
 
 
-    // InfluxDB v1.x
-    cJSON *influxv1 = addObj(cJsonObject, "influxdbv1");
-    addEl(influxv1, "enabled", cfgDataTemp.sectionInfluxDBv1.enabled);
-    addEl(influxv1, "uri", cfgDataTemp.sectionInfluxDBv1.uri);
-    addEl(influxv1, "database", cfgDataTemp.sectionInfluxDBv1.database);
-    addEl(influxv1, "authmode", cfgDataTemp.sectionInfluxDBv1.authMode);
-    addEl(influxv1, "username", cfgDataTemp.sectionInfluxDBv1.username);
-    addEl(influxv1, "password", cfgDataTemp.sectionInfluxDBv1.password.empty() ? "" : "******");
-
-    cJSON *influxv1Tls = addObj(influxv1, "tls");
-    addEl(influxv1Tls, "servercertverification", cfgDataTemp.sectionInfluxDBv1.tls.serverCertVerification);
-    addEl(influxv1Tls, "cacert", cfgDataTemp.sectionInfluxDBv1.tls.caCert);
-    addEl(influxv1Tls, "clientcert", cfgDataTemp.sectionInfluxDBv1.tls.clientCert);
-    addEl(influxv1Tls, "clientkey", cfgDataTemp.sectionInfluxDBv1.tls.clientKey);
-
-    cJSON *influxv1SeqArr = addArr(influxv1, "sequence");
-    for (const auto &seq : cfgDataTemp.sectionInfluxDBv1.sequence) {
-        cJSON *seqEl = addArrObj(influxv1SeqArr);
-        addEl(seqEl, "sequenceid", seq.sequenceId);
-        addEl(seqEl, "sequencename", seq.sequenceName);
-        addEl(seqEl, "measurementname", seq.measurementName);
-        addEl(seqEl, "fieldkey1", seq.fieldKey1);
-    }
-
-
-    // InfluxDB v2.x
-    cJSON *influxv2 = addObj(cJsonObject, "influxdbv2");
-    addEl(influxv2, "enabled", cfgDataTemp.sectionInfluxDBv2.enabled);
-    addEl(influxv2, "uri", cfgDataTemp.sectionInfluxDBv2.uri);
-    addEl(influxv2, "bucket", cfgDataTemp.sectionInfluxDBv2.bucket);
-    addEl(influxv2, "organization", cfgDataTemp.sectionInfluxDBv2.organization);
-    addEl(influxv2, "authmode", cfgDataTemp.sectionInfluxDBv2.authMode);
-    addEl(influxv2, "token", cfgDataTemp.sectionInfluxDBv2.token.empty() ? "" : "******");
-
-    cJSON *influxv2Tls = addObj(influxv2, "tls");
-    addEl(influxv2Tls, "servercertverification", cfgDataTemp.sectionInfluxDBv2.tls.serverCertVerification);
-    addEl(influxv2Tls, "cacert", cfgDataTemp.sectionInfluxDBv2.tls.caCert);
-    addEl(influxv2Tls, "clientcert", cfgDataTemp.sectionInfluxDBv2.tls.clientCert);
-    addEl(influxv2Tls, "clientkey", cfgDataTemp.sectionInfluxDBv2.tls.clientKey);
-
-    cJSON *influxv2SeqArr = addArr(influxv2, "sequence");
-    for (const auto &seq : cfgDataTemp.sectionInfluxDBv2.sequence) {
-        cJSON *seqEl = addArrObj(influxv2SeqArr);
-        addEl(seqEl, "sequenceid", seq.sequenceId);
-        addEl(seqEl, "sequencename", seq.sequenceName);
-        addEl(seqEl, "measurementname", seq.measurementName);
-        addEl(seqEl, "fieldkey1", seq.fieldKey1);
-    }
-
-
-    // Webhook
-    cJSON *webhook = addObj(cJsonObject, "webhook");
-    addEl(webhook, "enabled", cfgDataTemp.sectionWebhook.enabled);
-    addEl(webhook, "uri", cfgDataTemp.sectionWebhook.uri);
-    addEl(webhook, "apikey", cfgDataTemp.sectionWebhook.apiKey);
-    addEl(webhook, "publishimage", cfgDataTemp.sectionWebhook.publishImage);
-    addEl(webhook, "authmode", cfgDataTemp.sectionWebhook.authMode);
-    addEl(webhook, "username", cfgDataTemp.sectionWebhook.username);
-    addEl(webhook, "password", cfgDataTemp.sectionWebhook.password.empty() ? "" : "******");
-
-    cJSON *webhookTls = addObj(webhook, "tls");
-    addEl(webhookTls, "servercertverification", cfgDataTemp.sectionWebhook.tls.serverCertVerification);
-    addEl(webhookTls, "cacert", cfgDataTemp.sectionWebhook.tls.caCert);
-    addEl(webhookTls, "clientcert", cfgDataTemp.sectionWebhook.tls.clientCert);
-    addEl(webhookTls, "clientkey", cfgDataTemp.sectionWebhook.tls.clientKey);
-
-
     // GPIO
     // ***************************
     cJSON *gpio = addObj(cJsonObject, "gpio");
@@ -1341,12 +1183,6 @@ template <typename ConfigDataType> inline void clearConfigDataStructure(ConfigDa
     // Clear remaining sections
     data.sectionPostProcessing.sequence.clear();
     decltype(data.sectionPostProcessing.sequence)().swap(data.sectionPostProcessing.sequence);
-
-    data.sectionInfluxDBv1.sequence.clear();
-    decltype(data.sectionInfluxDBv1.sequence)().swap(data.sectionInfluxDBv1.sequence);
-
-    data.sectionInfluxDBv2.sequence.clear();
-    decltype(data.sectionInfluxDBv2.sequence)().swap(data.sectionInfluxDBv2.sequence);
 
     data.sectionGpio.gpioPin.clear();
     decltype(data.sectionGpio.gpioPin)().swap(data.sectionGpio.gpioPin);

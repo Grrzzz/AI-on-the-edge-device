@@ -32,7 +32,6 @@ static const char *UNITY_TAG = "UNITYTEST_MAIN";
 #include "components/mainprocess_ctrl/test_flowpostprocessing_helper.cpp"
 #include "components/mainprocess_ctrl/test_flowpostprocessing.cpp"
 
-#include "components/openmetrics_ctrl/test_openmetrics.cpp"
 
 esp_err_t initNVSFlash();
 esp_err_t initSDCard();
@@ -84,7 +83,6 @@ void task_UnityTesting(void *pvParameter)
     RUN_TEST(test_doFlowPP5);
 
     ESP_LOGI(UNITY_TAG, "---------------------------------------------------------------------------");
-    RUN_TEST(test_openmetrics);
     UNITY_END();
 
     while (1)

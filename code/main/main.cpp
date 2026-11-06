@@ -36,7 +36,6 @@
 #include "server_mqtt.h"
 #endif // ENABLE_MQTT
 
-#include "openmetrics.h"
 #include "softAP.h"
 
 
@@ -305,7 +304,6 @@ extern "C" void app_main(void)
 #ifdef ENABLE_MQTT
     registerMqttUri(server);
 #endif // ENABLE_MQTT
-    registerOpenmetricsUri(server);
 
     GpioHandler *gpioHandle = getGpioHandle();
     if (gpioHandle) {

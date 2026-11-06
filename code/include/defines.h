@@ -17,22 +17,6 @@
 #endif
 
 
-// InfluxDB v1.x + v2.x (Default: enabled)
-#ifndef ENV_DISABLE_INFLUXDB // Disable module by build_flag in platformio.ini
-    #ifndef ENABLE_INFLUXDB
-        #define ENABLE_INFLUXDB
-    #endif
-#endif
-
-
-// Webhook (Default: enabled)
-#ifndef ENV_DISABLE_WEBHOOK // Disable module by build_flag in platformio.ini
-    #ifndef ENABLE_WEBHOOK
-        #define ENABLE_WEBHOOK
-    #endif
-#endif
-
-
 //**************************************************************************************
 // GLOBAL DEBUG FLAGS
 //**************************************************************************************
@@ -163,7 +147,7 @@
 //#define KEEP_LOGFILE_OPEN_FOR_APPENDING
 
 
-// ClassFlowPostProcessing + Influxdb + Influxdbv2
+// ClassFlowPostProcessing
 //******************************
 #define TIME_FORMAT_OUTPUT              "%Y-%m-%dT%H:%M:%S%z"
 #define FALLBACKVALUE_TIME_FORMAT_INPUT "%d-%d-%dT%d:%d:%d"
@@ -227,11 +211,6 @@
 // CImageTplMatch
 //******************************
 #define ANGLE_DEVIATION_THRESHOLD (45.0f) // Alignment correction angle limit
-
-
-// interface_influxdbv1 + interface_influxdbv2 + webhook
-//******************************
-#define MAX_HTTP_OUTPUT_BUFFER 2048
 
 
 // WLAN AP (softAP) for provisioning
@@ -319,9 +298,6 @@ CONFIG_WPA_11R_SUPPORT=n
 #define FLOW_PROCESS_ANALOG_ROI      "ROI Processing - Analog"
 #define FLOW_POSTPROCESSING          "Post-Processing"
 #define FLOW_PUBLISH_MQTT            "Publish to MQTT"
-#define FLOW_PUBLISH_INFLUXDB        "Publish to InfluxDBv1"
-#define FLOW_PUBLISH_INFLUXDB2       "Publish to InfluxDBv2"
-#define FLOW_PUBLISH_WEBHOOK         "Publish to Webhook"
 
 #define FLOW_ADDITIONAL_TASKS        "Additional Tasks"
 #define FLOW_POST_EVENT_HANDLING     "Post Process Event Handling"

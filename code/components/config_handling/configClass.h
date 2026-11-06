@@ -52,9 +52,6 @@ class ConfigClass
     template <typename SectionType> void parseSectionRoi(const char *sectionKey, SectionType &section, const char *roiSuffix);
     void parseSectionPostProcessing();
     void parseSectionMqtt(bool unityTest);
-    void parseSectionInfluxDBv1(bool unityTest);
-    void parseSectionInfluxDBv2(bool unityTest);
-    void parseSectionWebhook(bool unityTest);
     void parseSectionGpio(bool init);
     void parseSectionLogging();
     void parseSectionNetwork(bool init, bool unityTest);

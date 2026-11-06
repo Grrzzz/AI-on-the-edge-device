@@ -22,9 +22,6 @@ The following infos are available:
 | `cycle_counter`                      | Process Cycle Counter                              | `64`
 | `datalogging_sdcard_status`          | Datalogging Status<br><br>Possible states:<br>- `Enabled`<br>- `Disabled` | `Enabled`
 | `mqtt_status`                        | MQTT Status<br><br>Possible states:<br>- `Connected (Encrypted)`<br>- `Connected`<br>- `Disconnected`<br>- `Disabled` | `Connected`
-| `influxdbv1_status`                  | InfluxDB v1.x Status<br><br>Possible states:<br>- `Enabled (Encrypted)`<br>- `Enabled`<br>- `Disabled` | `Disabled`
-| `influxdbv2_status`                  | InfluxDB v2.x Status<br><br>Possible states:<br>- `Enabled (Encrypted)`<br>- `Enabled`<br>- `Disabled` | `Disabled`
-| `webhook_status`                     | Webhook Status<br><br>Possible states:<br>- `Enabled (Encrypted)`<br>- `Enabled`<br>- `Disabled` | `Disabled`
 | `ntp_syncstatus`                     | NTP Synchronization Status<br><br>Possible states:<br>- `Synchronized`<br>- `In Progress`<br>- `Disabled` | `Synchronized`
 | `current_time`                       | Current Date / Time                                | `2024-02-24T10:56:11+0100`
 | `device_starttime`                   | Device Start / Boot Time                           | `2024-02-24T10:56:11+0100`

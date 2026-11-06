@@ -150,65 +150,6 @@ Modify JSON elements accordingly to test default values and stringfy as compact 
       "retaindiscovery": false
     }
   },
-  "influxdbv1": {
-    "enabled": false,
-    "uri": "",
-    "database": "",
-    "authmode": 0,
-    "username": "",
-    "password": "",
-    "tls": {
-      "servercertverification":	2,
-      "cacert": "",
-      "clientcert": "",
-      "clientkey": ""
-    },
-    "sequence": [
-      {
-        "sequenceid": 0,
-        "sequencename": "main",
-        "measurementname": "",
-        "fieldkey1": ""
-      }
-    ]
-  },
-  "influxdbv2": {
-    "enabled": false,
-    "uri": "",
-    "bucket": "",
-    "organization": "",
-    "authmode": 1,
-    "token": "",
-    "tls": {
-      "servercertverification":	2,
-      "cacert": "",
-      "clientcert": "",
-      "clientkey": ""
-    },
-    "sequence": [
-      {
-        "sequenceid": 0,
-        "sequencename": "main",
-        "measurementname": "",
-        "fieldkey1": ""
-      }
-    ]
-  },
-  "webhook": {
-      "enabled": false,
-      "uri": "",
-      "apikey": "",
-      "publishimage": 0,
-      "authmode": 0,
-      "username": "",
-      "password": "",
-      "tls": {
-          "servercertverification":	2,
-          "cacert": "",
-          "clientcert": "",
-          "clientkey": ""
-      }
-  },
   "gpio": {
     "customizationenabled": false,
     "gpiopin": [

@@ -82,8 +82,6 @@ struct SequenceData {
     std::string sValueStatus = "";        // Value status
 
     const struct PostProcessingPerSequence *paramPostProc = nullptr;
-    const struct InfluxDBPerSequence *paramInfluxDBv1 = nullptr;
-    const struct InfluxDBPerSequence *paramInfluxDBv2 = nullptr;
 };
 
 #endif // CLASSFLOWDEFINETYPES_H

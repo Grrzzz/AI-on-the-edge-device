@@ -15,14 +15,7 @@
 #include "ClassFlowMQTT.h"
 #endif // ENABLE_MQTT
 
-#ifdef ENABLE_INFLUXDB
-#include "ClassFlowInfluxDBv1.h"
-#include "ClassFlowInfluxDBv2.h"
-#endif // ENABLE_INFLUXDB
 
-#ifdef ENABLE_WEBHOOK
-#include "ClassFlowWebhook.h"
-#endif // ENABLE_WEBHOOK
 
 
 enum flowStateEvent {
@@ -51,13 +44,6 @@ class ClassFlowControl : public ClassFlow
 #ifdef ENABLE_MQTT
     ClassFlowMQTT *flowMQTT;
 #endif // ENABLE_MQTT
-#ifdef ENABLE_INFLUXDB
-    ClassFlowInfluxDBv1 *flowInfluxDBv1;
-    ClassFlowInfluxDBv2 *flowInfluxDBv2;
-#endif // ENABLE_INFLUXDB
-#ifdef ENABLE_WEBHOOK
-    ClassFlowWebhook *flowWebhook;
-#endif // ENABLE_WEBHOOK
 
     std::string actualProcessState;
     std::string actualProcessStateWithTime;

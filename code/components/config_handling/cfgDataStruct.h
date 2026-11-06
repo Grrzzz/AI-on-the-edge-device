@@ -84,13 +84,6 @@ enum HAMeterType {
 };
 
 
-enum WebhookUploadImage {
-    WEBHOOK_PUBLISH_IMAGE_DISABLED = 0,
-    WEBHOOK_PUBLISH_IMAGE_ENABLED = 1,
-    WEBHOOK_PUBLISH_IMAGE_ON_ERROR_ONLY = 2
-};
-
-
 enum GpioSmartledType {
     LEDTYPE_WS2812 = 0,
     LEDTYPE_WS2812B_UNIVERSAL = 1,
@@ -167,14 +160,6 @@ struct PostProcessingPerSequence {
     bool allowNegativeRate = false;
     bool useFallbackValue = true;
     int fallbackValueAgeStartup = 720;
-};
-
-
-struct InfluxDBPerSequence {
-    int sequenceId = -1;
-    std::string sequenceName = "";
-    std::string measurementName = "";
-    std::string fieldKey1 = "";
 };
 
 
@@ -346,42 +331,6 @@ struct CfgData {
             bool retainDiscovery = false;
         } homeAssistant;
     } sectionMqtt;
-
-    // InfluxDB v1.x service
-    struct SectionInfluxDBv1 {
-        bool enabled = false;
-        std::string uri = ""; // e.g. http://192.168.x.x:8086
-        std::string database = "";
-        int authMode = AUTH_NONE;
-        std::string username = "";
-        std::string password = "";
-        TLSParams tls;
-        std::vector<InfluxDBPerSequence> sequence;
-    } sectionInfluxDBv1;
-
-    // InfluxDB v2.x service
-    struct SectionInfluxDBv2 {
-        bool enabled = false;
-        std::string uri = ""; // e.g. http://192.168.x.x:8086
-        std::string bucket = "";
-        std::string organization = "";
-        int authMode = AUTH_BASIC; // AUTH_BASIC: Tokenized authentication
-        std::string token = "";
-        TLSParams tls;
-        std::vector<InfluxDBPerSequence> sequence;
-    } sectionInfluxDBv2;
-
-    // Webhook service (push-based)
-    struct SectionWebhook {
-        bool enabled = false;
-        std::string uri = ""; // e.g. http://webhook.com/1234567890
-        std::string apiKey = "";
-        int publishImage = WEBHOOK_PUBLISH_IMAGE_DISABLED;
-        int authMode = AUTH_NONE;
-        std::string username = "";
-        std::string password = "";
-        TLSParams tls;
-    } sectionWebhook;
 
     // GPIO
     struct SectionGpio {

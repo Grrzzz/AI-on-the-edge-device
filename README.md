@@ -26,7 +26,7 @@ you can turn any standard meter into a smart, connected device.
 - **Configuration** – Firmware-managed JSON-based config for better maintainability and resilience
 - **Codebase** – Streamlined, mostly consistently styled, easier to maintain
 - **API Design** – Relevant APIs use JSON notation for seamless integration
-- **TLS Support** – Secure connection supported for MQTT, InfluxDB and Webhook
+- **TLS Support** – Secure connection supported for MQTT
 
 Further refinements are documented in the [changelog](CHANGELOG.md) (v16.0.0-SLFork and newer).
 
@@ -35,11 +35,8 @@ Further refinements are documented in the [changelog](CHANGELOG.md) (v16.0.0-SLF
 - **[Home Assistant Integration](docs/API/MQTT/home-assistant-discovery.md)** – Automatic device discovery via MQTT
 - **[REST API](docs/API/REST/_OVERVIEW.md)** – Retrieve live data, check device status, and issue control commands over HTTP
 - **[MQTT v3](docs/API/MQTT/_OVERVIEW.md)** – Publish data to your MQTT broker (TLS supported)
-- **InfluxDB v1 / v2** – Log data directly into time-series databases (TLS supported)
-- **[Webhook Publishing](docs/API/Webhook/_OVERVIEW.md)** – Push content to external services via HTTP hook (TLS supported)
-- **[Prometheus/OpenMetrics Exporter](docs/API/Prometheus-OpenMetrics/_OVERVIEW.md)** – Export metrics for device monitoring purposes
 
-Explore API docs via links above or device web interface: `System > Documentation`<br>
+API documentation: see links above<br>
 ℹ️ APIs aren’t fully compatible with jomjol’s firmware.
 
 

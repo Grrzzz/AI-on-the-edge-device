@@ -44,14 +44,7 @@ ClassFlowControl::ClassFlowControl()
     flowMQTT = NULL;
 #endif // ENABLE_MQTT
 
-#ifdef ENABLE_INFLUXDB
-    flowInfluxDBv1 = NULL;
-    flowInfluxDBv2 = NULL;
-#endif // ENABLE_INFLUXDB
 
-#ifdef ENABLE_WEBHOOK
-    flowWebhook = NULL;
-#endif // ENABLE_WEBHOOK
 
     setActualProcessState(std::string(FLOW_NO_TASK));
     flowStateErrorInRow = 0;
@@ -174,36 +167,7 @@ bool ClassFlowControl::initFlow()
     }
 #endif // ENABLE_MQTT
 
-#ifdef ENABLE_INFLUXDB
-    if (cfgClassPtr->get()->sectionInfluxDBv1.enabled) {
-        flowInfluxDBv1 = new ClassFlowInfluxDBv1();
-        FlowControlPublish.push_back(flowInfluxDBv1);
-        if (!flowInfluxDBv1->loadParameter()) {
-            LogFile.writeToFile(ESP_LOG_ERROR, TAG, "InfluxDBv1: Init failed");
-            retVal = false;
-        }
-    }
 
-    if (cfgClassPtr->get()->sectionInfluxDBv2.enabled) {
-        flowInfluxDBv2 = new ClassFlowInfluxDBv2();
-        FlowControlPublish.push_back(flowInfluxDBv2);
-        if (!flowInfluxDBv2->loadParameter()) {
-            LogFile.writeToFile(ESP_LOG_ERROR, TAG, "InfluxDBv2: Init failed");
-            retVal = false;
-        }
-    }
-#endif // ENABLE_INFLUXDB
-
-#ifdef ENABLE_WEBHOOK
-    if (cfgClassPtr->get()->sectionWebhook.enabled) {
-        flowWebhook = new ClassFlowWebhook();
-        FlowControlPublish.push_back(flowWebhook);
-        if (!flowWebhook->loadParameter()) {
-            LogFile.writeToFile(ESP_LOG_ERROR, TAG, "Webhook: Init failed");
-            retVal = false;
-        }
-    }
-#endif // ENABLE_WEBHOOK
 
     // Load parameter handled in this class
     this->loadParameter();
@@ -220,21 +184,7 @@ void ClassFlowControl::deinitFlow(void)
     LogFile.writeToFile(ESP_LOG_DEBUG, TAG, "Deinit flow");
     // LogFile.writeHeapInfo("deinitFlow start");
 
-#ifdef ENABLE_WEBHOOK
-    delete flowWebhook;
-    flowWebhook = NULL;
-    // LogFile.writeHeapInfo("After WEBHOOK");
-#endif // ENABLE_WEBHOOK
 
-#ifdef ENABLE_INFLUXDB
-    delete flowInfluxDBv2;
-    flowInfluxDBv2 = NULL;
-    // LogFile.writeHeapInfo("After INFLUXv2");
-
-    delete flowInfluxDBv1;
-    flowInfluxDBv1 = NULL;
-    // LogFile.writeHeapInfo("After INFLUX");
-#endif // ENABLE_INFLUXDB
 
 #ifdef ENABLE_MQTT
     delete flowMQTT;
@@ -531,19 +481,6 @@ std::string ClassFlowControl::translateActualProcessState(std::string classname)
         return std::string(FLOW_PUBLISH_MQTT);
     }
 #endif // ENABLE_MQTT
-#ifdef ENABLE_INFLUXDB
-    else if (classname.compare("ClassFlowInfluxDBv1") == 0) {
-        return std::string(FLOW_PUBLISH_INFLUXDB);
-    }
-    else if (classname.compare("ClassFlowInfluxDBv2") == 0) {
-        return std::string(FLOW_PUBLISH_INFLUXDB2);
-    }
-#endif // ENABLE_INFLUXDB
-#ifdef ENABLE_WEBHOOK
-    else if (classname.compare("ClassFlowWebhook") == 0) {
-        return std::string(FLOW_PUBLISH_WEBHOOK);
-    }
-#endif // ENABLE_WEBHOOK
     else {
         return "Unkown State (" + classname + ")";
     }
