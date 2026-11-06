@@ -22,72 +22,6 @@
 
   <link rel="stylesheet" href="style-iframe.css?v=$COMMIT_HASH" />
 
-  <style>
-    #progress-backup {
-      font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
-      font-size: 0.8rem;
-      height: 96px;
-      overflow-y: auto;
-      padding: 12px 14px;
-      border-radius: 0.65rem;
-      background: #0a0f1c;
-      color: #cbd5e1;
-      display: flex;
-      flex-direction: column-reverse;
-    }
-
-    #progress-backup:empty {
-      display: none;
-    }
-
-    input[type='file'] {
-      width: 100%;
-      font-family: inherit;
-      font-size: inherit;
-      color: var(--text-secondary);
-    }
-
-    progress {
-      width: 100%;
-      height: 10px;
-      accent-color: var(--primary);
-    }
-
-    .hint {
-      font-size: 0.85rem;
-      color: var(--text-secondary);
-    }
-
-    .restore-part {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      padding: 16px 20px 20px;
-    }
-
-    .restore-part + .restore-part {
-      border-top: 1px solid var(--border);
-    }
-
-    .restore-part h3 {
-      margin: 0;
-      font-size: 0.95rem;
-    }
-
-    .restore-part .info-box,
-    .restore-part .warning-box {
-      margin: 0;
-    }
-
-    .progress-meta {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      margin-top: 6px;
-      font-size: 0.85rem;
-      color: var(--text-secondary);
-    }
-  </style>
 
   <link href="firework.css?v=$COMMIT_HASH" rel="stylesheet" />
   <script src="firework.js?v=$COMMIT_HASH"></script>
@@ -101,46 +35,60 @@
     </div>
 
     <div class="container-content">
-      <div class="card">
-        <div class="card-header"><span>Backup</span></div>
-        <div class="side-body">
-          <div class="hint">Downloads all configuration files (settings, reference image, markers, models) as one ZIP file.</div>
-          <div class="btn-row">
-            <button class="button btn-action" id="startBackupButton" onclick="startBackup()">Create backup</button>
-          </div>
-          <div id="progress-backup"></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><span>Restore</span></div>
-
-        <div class="restore-part">
-          <h3>Partial restore</h3>
-          <div class="info-box">
-            To restore individual configuration files, upload them in the
-            <a href="/fileserver/config/" target="_self">File Explorer</a>.
-          </div>
-        </div>
-
-        <div class="restore-part">
-          <h3>Full restore</h3>
-          <div class="warning-box"><strong>Warning:</strong> A full restore overwrites the existing configuration.</div>
-          <form id="uploadForm" enctype="multipart/form-data" method="post" style="display: flex; flex-direction: column; gap: 12px">
-            <input type="file" accept=".zip" name="fileSelector" id="fileSelector" onchange="validateFile()" />
-            <div class="hint">Supported file type (max. 16 MB): *.zip</div>
-            <div class="btn-row">
-              <button class="button btn-action" id="startRestoreButton" type="button" onclick="startRestore()" disabled>Restore</button>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-header"><span>Backup</span></div>
+          <div class="card-pad">
+            <div class="lead">
+              Downloads the whole configuration as one ZIP file: settings, reference image, alignment markers and models.
+              Create one before every update.
             </div>
-            <div>
+            <div class="prog" id="backupProg" style="margin: 0" hidden>
+              <progress id="progress-backup-bar" value="0" max="100"></progress>
+              <div class="prog-meta"><span id="backupState">Idle</span><span id="backupCount"></span></div>
+            </div>
+            <button class="button btn-wide btn-action" id="startBackupButton" onclick="startBackup()">Create backup</button>
+            <div class="log-console" id="progress-backup"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><span>Restore</span></div>
+          <form id="uploadForm" enctype="multipart/form-data" method="post" class="card-pad">
+            <div class="lead">
+              Restores a backup created here. The existing configuration is replaced and the device restarts.
+            </div>
+
+            <div class="pick" id="pickZone" tabindex="0" role="button" aria-label="Choose a backup file or drop it here">
+              <div class="pick-icon"></div>
+              <div class="pick-title">Drop a backup here</div>
+              <div class="pick-sub">or <b>browse</b> your computer &middot; *.zip, max. 16 MB</div>
+            </div>
+            <input type="file" accept=".zip" name="fileSelector" id="fileSelector" onchange="validateFile()" hidden />
+
+            <div class="file-row" id="fileInfo" hidden>
+              <div class="fi"></div>
+              <div class="fn"><b id="fileName"></b><span id="fileSize"></span></div>
+              <span class="badge" id="fileBadge"></span>
+              <button class="button" type="button" id="fileClear" onclick="clearFile()">Remove</button>
+            </div>
+
+            <button class="button btn-wide btn-action" id="startRestoreButton" type="button" onclick="startRestore()" disabled>Restore</button>
+
+            <div class="prog" style="margin: 0">
               <progress id="progress-restore" value="0" max="100"></progress>
-              <div class="progress-meta">
+              <div class="prog-meta">
                 <span id="status">Status: Idle</span>
                 <span id="loadedBytes"></span>
               </div>
             </div>
           </form>
         </div>
+      </div>
+
+      <div class="note-row">
+        <span>Only need single files, for example one reference image or a model?</span>
+        <a href="/fileserver/config/" target="_self">Open the File Explorer</a>
       </div>
     </div>
   </div>
@@ -161,13 +109,22 @@
     }
 
     function failStatus(msg) {
-      setStatus(`<span style="color: red">${msg}</span>`);
+      setStatus(`<span style="color: #f87171">${msg}</span>`);
+      _('backupState').textContent = 'Failed';
       _('startBackupButton').disabled = false;
+    }
+
+    function backupProgress(done, total, label) {
+      _('backupProg').hidden = false;
+      _('progress-backup-bar').value = total ? Math.round((done / total) * 100) : 0;
+      _('backupState').textContent = label;
+      _('backupCount').textContent = total ? `${done} of ${total} files` : '';
     }
 
     async function startBackup() {
       _('startBackupButton').disabled = true;
       _('progress-backup').innerHTML = '';
+      backupProgress(0, 0, 'Collecting files ...');
 
       const hostnameRes = await apiCall('/info?type=hostname');
       if (!hostnameRes.ok) return failStatus(`Failed to get hostname. Error: ${describeError(hostnameRes)}`);
@@ -198,7 +155,8 @@
 
     const backupFiles = (urls) => {
       if (!urls || urls.length === 0) {
-        setStatus('<span style="color: red">No files</span>');
+        setStatus('<span style="color: #f87171">No files</span>');
+        _('backupState').textContent = 'No files found';
         _("startBackupButton").disabled = false;
         return;
       }
@@ -212,12 +170,14 @@
       const name = getFilenameFromUrl(url);
 
       setStatus(retry === 0 ? `- ${name} (${index + 1}/${urls.length})` : `<span style="color: gray">&nbsp;&nbsp;&nbsp;Retrying (${retry})...</span>`,);
+      backupProgress(index, urls.length, retry === 0 ? 'Reading ' + name : 'Retrying ' + name);
 
       // Retry with a longer timeout, or give up after MAX_RETRIES
       const retryOrFail = (reason) => {
         console.error(`Failed to fetch ${url}: ${reason}`);
         if (retry >= MAX_RETRIES) {
-          setStatus(`<span style="color: red">Backup failed. Error: Failed to fetch ${name} (${reason})</span>`);
+          setStatus(`<span style="color: #f87171">Backup failed. Error: Failed to fetch ${name} (${reason})</span>`);
+          _('backupState').textContent = 'Failed';
           _('startBackupButton').disabled = false;
         } else {
           fetchFiles(urls, filesData, index, retry + 1);
@@ -278,11 +238,13 @@
         const zipData = fflate.zipSync(zipFiles, { level: 6 });
         const backupFileName = `${hostname}_${timestamp}.zip`;
         downloadBlob(zipData, backupFileName);
+        backupProgress(urls.length, urls.length, 'Done: ' + backupFileName);
         setStatus(`Backup completed: ${backupFileName}`);
         firework.launch(`Backup completed: ${backupFileName}`, "success", 5000);
       } catch (err) {
         console.error("ZIP creation error:", err);
-        setStatus('<span style="color: red">Failed to create ZIP file. Error: ' + err.message + "</span>");
+        setStatus('<span style="color: #f87171">Failed to create ZIP file. Error: ' + err.message + "</span>");
+        _('backupState').textContent = 'Failed';
         _("startBackupButton").disabled = false;
       }
     }
@@ -302,7 +264,8 @@
       if (!container) return;
       const line = document.createElement("div");
       line.innerHTML = String(status).replace(/\u00a0/g, " ");
-      container.prepend(line);
+      container.append(line);
+      container.scrollTop = container.scrollHeight;
     }
 
     function getFilenameFromUrl(url) {
@@ -312,67 +275,88 @@
 
 
     async function validateFile() {
-      _("startRestoreButton").disabled = true;
+      _('startRestoreButton').disabled = true;
 
-      const files = _("fileSelector").files;
-
+      const files = _('fileSelector').files;
       if (files.length === 0) {
-        firework.launch("No file selected", "danger", 30000);
+        showFile(null);
         return;
       }
 
       const file = files[0];
       const filename = file.name;
-
-      // Validation Logic
       const MAX_FILE_SIZE = 16000 * 1024;
-      const MAX_FILE_SIZE_STR = "16MB";
+      const bad = (msg) => showFile(file, msg, 'badge-error');
 
-      if (file.size > MAX_FILE_SIZE) {
-        firework.launch(`File size must be less than ${MAX_FILE_SIZE_STR}`, "danger", 30000);
-        return;
-      } else if (filename.length === 0) {
-        firework.launch("File path on server is not set", "danger", 30000);
-        return;
-      } else if (filename.length > 255) {
-        firework.launch("File name is too long (max. 255 characters)", "danger", 30000);
-        return;
-      } else if (filename.includes(" ")) {
-        firework.launch("File name cannot contain spaces", "danger", 30000);
-        return;
-      } else if (filename.endsWith("/")) {
-        firework.launch("Path selected, but file name cannot be parsed", "danger", 30000);
-        return;
-      } else if (!filename.toLowerCase().endsWith(".zip")) {
-        firework.launch("Only ZIP files are supported", "danger", 30000);
-        return;
-      }
+      if (file.size > MAX_FILE_SIZE) return bad('Larger than 16 MB');
+      if (filename.length > 255) return bad('File name too long');
+      if (filename.includes(' ')) return bad('Name contains spaces');
+      if (!filename.toLowerCase().endsWith('.zip')) return bad('Not a ZIP file');
 
-      // Validate meta data
+      showFile(file, 'Checking ...');
       try {
-        const zipData = new Uint8Array(await file.arrayBuffer());
-        const zip = fflate.unzipSync(zipData);
+        const zip = fflate.unzipSync(new Uint8Array(await file.arrayBuffer()));
 
-        if (!zip["meta.json"]) {
-          firework.launch("Backup file cannot be validated ('meta.json' file missing)", "danger", 30000);
-          return;
-        }
+        if (!zip['meta.json']) return bad('Not a backup (meta.json missing)');
+        const meta = JSON.parse(new TextDecoder().decode(zip['meta.json']));
+        if (!meta.app || meta.app.toLowerCase() !== 'ai-on-the-edge device [slfork]') return bad('Backup of another application');
 
-        const metaContent = new TextDecoder().decode(zip["meta.json"]);
-        const meta = JSON.parse(metaContent);
-
-        if (!meta.app || meta.app.toLowerCase() !== "ai-on-the-edge device [slfork]") {
-          firework.launch("Backup file invalid (app name: wrong or missing)", "danger", 30000,);
-          return;
-        }
-
-        // All validations passed
-        firework.launch("Press 'Restore' to perform the config restore", "success", 2000);
-        _("startRestoreButton").disabled = false;
+        const when = String(meta.timestamp || '').replace('_', ' ').replace(/-(\d\d)-(\d\d)$/, ':$1:$2');
+        showFile(file, 'Valid backup', 'badge-success');
+        if (when) _('fileSize').textContent = fmtSize(file.size) + ' \u00b7 created ' + when;
+        _('startRestoreButton').disabled = false;
       } catch (err) {
-        firework.launch("Failed to validate ZIP file contents. Check structure and try again.", "danger", 30000);
-        console.error("ZIP validation error:", err);
+        console.error('ZIP validation error:', err);
+        bad('Damaged ZIP file');
       }
+    }
+
+
+    // ------------------------------------------------------------------------
+    // File picker (drop zone), shared look with the other pages
+    // ------------------------------------------------------------------------
+    function fmtSize(n) {
+      return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+    }
+
+    function showFile(file, badgeText, badgeClass) {
+      _('fileInfo').hidden = !file;
+      if (!file) return;
+      _('fileName').textContent = file.name;
+      _('fileSize').textContent = fmtSize(file.size);
+      const b = _('fileBadge');
+      b.className = 'badge ' + (badgeClass || '');
+      b.textContent = badgeText || '';
+    }
+
+    function clearFile() {
+      _('fileSelector').value = '';
+      showFile(null);
+      _('startRestoreButton').disabled = true;
+    }
+
+    function setPickBusy(busy) {
+      _('pickZone').classList.toggle('disabled', busy);
+      _('fileClear').disabled = busy;
+    }
+
+    function initPicker() {
+      const zone = _('pickZone');
+      const input = _('fileSelector');
+      zone.addEventListener('click', () => input.click());
+      zone.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          input.click();
+        }
+      });
+      ['dragenter', 'dragover'].forEach((ev) => zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.add('over'); }));
+      ['dragleave', 'drop'].forEach((ev) => zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.remove('over'); }));
+      zone.addEventListener('drop', (e) => {
+        if (!e.dataTransfer.files.length) return;
+        input.files = e.dataTransfer.files;
+        validateFile();
+      });
     }
 
     async function startRestore() {
@@ -387,6 +371,7 @@
 
       document.getElementById("startRestoreButton").disabled = true;
       document.getElementById("fileSelector").disabled = true;
+      setPickBusy(true);
 
       uploadFile();
     }
@@ -462,6 +447,7 @@
 
       document.getElementById("startRestoreButton").disabled = false;
       document.getElementById("fileSelector").disabled = false;
+      setPickBusy(false);
       _("loadedBytes").innerHTML = "";
     }
 
@@ -491,6 +477,7 @@
     }
 
     window.addEventListener('DOMContentLoaded', () => {
+      initPicker();
       window.parent.postMessage({ type: 'iframe-ready' }, '*');
     });
   </script>

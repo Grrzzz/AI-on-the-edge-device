@@ -23,93 +23,7 @@
   <link rel="stylesheet" href="style-iframe.css?v=$COMMIT_HASH" />
 
   <style>
-    .badge-board {
-      display: inline-block;
-      max-width: 100%;
-      padding: 3px 12px;
-      border-radius: 999px;
-      background: var(--surface);
-      color: var(--text-main);
-      font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
-      font-size: 0.85rem;
-      overflow-wrap: anywhere;
-    }
-
-    .header-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      font-weight: normal;
-    }
-
-    .header-actions .button {
-      width: auto;
-      padding: 6px 16px;
-    }
-
-    .update-box {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      padding: 16px 20px 20px;
-      border-top: 1px solid var(--border);
-    }
-
-    .update-line {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 10px 16px;
-    }
-
-    .update-line .button {
-      width: auto;
-      padding: 8px 20px;
-    }
-
-    #su_text a {
-      color: var(--primary);
-    }
-
-    .progress-wrap {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    progress {
-      width: 100%;
-      height: 10px;
-      accent-color: var(--primary);
-    }
-
-    .progress-meta {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      font-size: 0.85rem;
-      color: var(--text-secondary);
-    }
-
-    input[type='file'] {
-      width: 100%;
-      font-family: inherit;
-      font-size: inherit;
-      color: var(--text-secondary);
-    }
-
-    .hint {
-      font-size: 0.85rem;
-      color: var(--text-secondary);
-    }
-
-    .manual-body {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      padding: 4px 20px 20px;
-    }
+    #su_text a { color: var(--primary); }
   </style>
 
   <link href="firework.css?v=$COMMIT_HASH" rel="stylesheet" />
@@ -124,53 +38,74 @@
     </div>
 
     <div class="container-content">
+      <div class="stat-row">
+        <div class="stat">
+          <div class="stat-label">Installed</div>
+          <div class="stat-value" id="firmware_version">Unknown</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Latest release</div>
+          <div class="stat-value" id="su_latest">Not checked</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Board</div>
+          <div class="stat-value small" id="board_type">Unknown</div>
+        </div>
+      </div>
+
       <div class="card" id="cardFirmware">
         <div class="card-header">
-          <span>Firmware</span>
-          <div class="header-actions">
-            <button class="button" id="checkBtn" type="button" onclick="checkForUpdate()">Check for update</button>
-          </div>
+          <span>Online update</span>
+          <button class="button" id="checkBtn" type="button" onclick="checkForUpdate()" style="width:auto;padding:6px 16px">Check for update</button>
         </div>
-        <table class="card-table">
-          <tr>
-            <td class="label">Installed version</td>
-            <td class="val"><span id="firmware_version" class="badge-board">Unknown</span></td>
-          </tr>
-          <tr>
-            <td class="label">Board</td>
-            <td class="val"><span id="board_type" class="badge-board">Unknown</span></td>
-          </tr>
-          <tr>
-            <td class="label">Latest release</td>
-            <td class="val"><span id="su_latest" class="badge-board">Not checked</span></td>
-          </tr>
-        </table>
 
-        <div class="update-box" id="su_box" hidden>
-          <div class="update-line">
-            <div id="su_text"></div>
-            <button class="button btn-action" id="su_start" type="button" onclick="startSelfUpdate()" hidden>Update now</button>
+        <div class="state-box" id="su_box">
+          <div class="state-main">
+            <span class="badge" id="su_badge">Not checked</span>
+            <div class="state-text" id="su_text">Look on GitHub for a newer release. The device then downloads and installs it by itself.</div>
           </div>
-          <div class="progress-wrap" id="su_progress" hidden>
-            <progress id="su_bar" value="0" max="100"></progress>
-            <div class="progress-meta"><span id="su_state">Idle</span><span id="su_percent"></span></div>
-          </div>
+          <button class="button btn-action" id="su_start" type="button" onclick="startSelfUpdate()" hidden>Update now</button>
         </div>
+
+        <ol class="steps" id="su_steps" hidden>
+          <li id="st_1">1 &middot; Download</li>
+          <li id="st_2">2 &middot; Install</li>
+          <li id="st_3">3 &middot; Restart</li>
+        </ol>
+        <div class="prog" id="su_progress" hidden>
+          <progress id="su_bar" value="0" max="100"></progress>
+          <div class="prog-meta"><span id="su_state">Idle</span><span id="su_percent"></span></div>
+        </div>
+        <div style="height: 20px"></div>
       </div>
 
       <div class="card">
         <div class="card-header"><span>Manual update</span></div>
-        <form id="uploadForm" enctype="multipart/form-data" method="post" class="manual-body">
-          <div class="hint">
-            Select a release package for your board (<b>*.zip</b>) or a <b>firmware.bin</b>. Your settings are kept during the update. Create a
-            configuration backup under <b>System &rarr; Backup / Restore</b> from time to time.
+        <form id="uploadForm" enctype="multipart/form-data" method="post" class="card-pad">
+          <div class="lead">
+            Install a release package for your board (<b>*.zip</b>) or a <b>firmware.bin</b> from this computer. Your settings are kept.
+            Create a backup under <b>System &rarr; Backup / Restore</b> from time to time.
           </div>
-          <input type="file" accept=".bin,.zip" name="fileSelector" id="fileSelector" onchange="validateFile()" />
-          <div class="hint">Supported file types (max. 8 MB): *.bin, *.zip</div>
+
+          <div class="pick" id="pickZone" tabindex="0" role="button" aria-label="Choose a package or drop it here">
+            <div class="pick-icon"></div>
+            <div class="pick-title">Drop a package here</div>
+            <div class="pick-sub">or <b>browse</b> your computer &middot; *.zip, *.bin, max. 8 MB</div>
+          </div>
+          <input type="file" accept=".bin,.zip" name="fileSelector" id="fileSelector" onchange="validateFile()" hidden />
+
+          <div class="file-row" id="fileInfo" hidden>
+            <div class="fi"></div>
+            <div class="fn"><b id="fileName"></b><span id="fileSize"></span></div>
+            <span class="badge" id="fileBadge"></span>
+            <button class="button" type="button" id="fileClear" onclick="clearFile()">Remove</button>
+          </div>
+
           <button class="button btn-wide btn-action" id="startOtaButton" type="button" onclick="startOTA()" disabled>Install</button>
-          <div class="progress-wrap">
+
+          <div class="prog" style="margin: 0">
             <progress id="progressBar" value="0" max="100"></progress>
-            <div class="progress-meta">
+            <div class="prog-meta">
               <span id="status">Status: Idle</span>
               <span id="loadedBytes"></span>
             </div>
@@ -208,10 +143,30 @@
       return false;
     }
 
-    function setUpdateText(html, showStart = false) {
-      _('su_box').hidden = false;
+    // kind: '' (neutral), 'busy', 'ok', 'new', 'err'
+    function setUpdateText(html, showStart = false, kind = '') {
+      const badges = {
+        '': ['Not checked', ''],
+        busy: ['Checking', ''],
+        ok: ['Up to date', 'badge-success'],
+        new: ['Update available', 'badge-warning'],
+        err: ['Not possible', 'badge-error'],
+      };
+      const [label, cls] = badges[kind] || badges[''];
+      const badge = _('su_badge');
+      badge.textContent = label;
+      badge.className = 'badge ' + cls;
       _('su_text').innerHTML = html;
       _('su_start').hidden = !showStart;
+    }
+
+    // 1 download, 2 install, 3 restart
+    function setStep(n) {
+      _('su_steps').hidden = n === 0;
+      for (let i = 1; i <= 3; i++) {
+        const li = _('st_' + i);
+        li.className = i < n ? 'done' : i === n ? 'active' : '';
+      }
     }
 
     function escapeHtml(t) {
@@ -221,7 +176,7 @@
     async function checkForUpdate() {
       const btn = _('checkBtn');
       btn.disabled = true;
-      setUpdateText('Checking GitHub ...');
+      setUpdateText('Asking GitHub for the latest release ...', false, 'busy');
       latestRelease = null;
 
       try {
@@ -232,7 +187,7 @@
         });
         if (res.status === 404) {
           _('su_latest').textContent = 'None published';
-          setUpdateText('No release has been published yet.');
+          setUpdateText('No release has been published yet.', false, 'err');
           return;
         }
         if (!res.ok) throw new Error(`GitHub answered HTTP ${res.status}`);
@@ -248,20 +203,20 @@
         const link = `<a href="${escapeHtml(rel.html_url)}" target="_blank" rel="noopener noreferrer">release notes</a>`;
 
         if (!isNewer(rel.tag_name, _('firmware_version').textContent)) {
-          setUpdateText(`You are up to date. (${link})`);
+          setUpdateText(`This device runs the newest version. (${link})`, false, 'ok');
           return;
         }
         if (!asset) {
-          setUpdateText(`<b>${escapeHtml(rel.tag_name)}</b> is available, but it has no package for board <b>${escapeHtml(board)}</b>. (${link})`);
+          setUpdateText(`<b>${escapeHtml(rel.tag_name)}</b> is available, but it has no package for board <b>${escapeHtml(board)}</b>. (${link})`, false, 'err');
           return;
         }
 
         latestRelease = { tag: rel.tag_name, url: asset.browser_download_url, size: asset.size };
         const mb = asset.size ? ` &middot; ${(asset.size / 1048576).toFixed(1)} MB` : '';
-        setUpdateText(`Update available: <b>${escapeHtml(rel.tag_name)}</b>${mb} (${link})`, true);
+        setUpdateText(`Version <b>${escapeHtml(rel.tag_name)}</b>${mb} is ready to install. (${link})`, true, 'new');
       } catch (e) {
         console.error('Update check failed:', e);
-        setUpdateText('Could not reach GitHub. This browser needs internet access to look for updates. You can still install a package manually.');
+        setUpdateText('Could not reach GitHub. This browser needs internet access to look for updates. You can still install a package manually.', false, 'err');
       } finally {
         btn.disabled = false;
       }
@@ -280,6 +235,7 @@
       _('fileSelector').disabled = true;
       _('startOtaButton').disabled = true;
       _('su_progress').hidden = false;
+      setStep(1);
       _('su_state').textContent = 'Starting ...';
       firework.launch('Do not reload this page or switch to another page while the update is in progress', 'warning', 90000);
 
@@ -289,8 +245,9 @@
         const unsupported = res.status === 400 || res.status === 404;
         setUpdateText(unsupported
           ? 'This firmware does not support one-click updates yet. Install the package manually below.'
-          : `Update could not be started: ${escapeHtml(detail)}`);
+          : `Update could not be started: ${escapeHtml(detail)}`, false, 'err');
         _('su_progress').hidden = true;
+        setStep(0);
         _('checkBtn').disabled = false;
         _('fileSelector').disabled = false;
         return;
@@ -310,6 +267,7 @@
           // the device may already be restarting
           if (++failures >= 4) {
             _('su_state').textContent = 'Restarting ...';
+            setStep(3);
             checkStatus(); // existing helper: waits for the device and opens the dashboard
             return;
           }
@@ -324,12 +282,14 @@
 
         if (state === 'done' || state === 'staging') {
           _('su_state').textContent = 'Installing ... the device restarts';
+          setStep(state === 'done' ? 3 : 2);
           checkStatus();
           return;
         }
         if (state === 'error') {
-          setUpdateText(`Update failed: ${escapeHtml(message || 'unknown error')}`);
+          setUpdateText(`Update failed: ${escapeHtml(message || 'unknown error')}`, false, 'err');
           _('su_progress').hidden = true;
+          setStep(0);
           _('checkBtn').disabled = false;
           _('fileSelector').disabled = false;
           return;
@@ -342,62 +302,93 @@
     // ------------------------------------------------------------------------
     let updateTimer = null;
 
+    // ------------------------------------------------------------------------
+    // File picker (drop zone), shared look with the other pages
+    // ------------------------------------------------------------------------
+    function fmtSize(n) {
+      return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+    }
+
+    function showFile(file, badgeText, badgeClass) {
+      _('fileInfo').hidden = !file;
+      if (!file) return;
+      _('fileName').textContent = file.name;
+      _('fileSize').textContent = fmtSize(file.size);
+      const b = _('fileBadge');
+      b.className = 'badge ' + (badgeClass || '');
+      b.textContent = badgeText || '';
+    }
+
+    function clearFile() {
+      _('fileSelector').value = '';
+      showFile(null);
+      _('startOtaButton').disabled = true;
+    }
+
+    function setPickBusy(busy) {
+      _('pickZone').classList.toggle('disabled', busy);
+      _('fileClear').disabled = busy;
+    }
+
+    function initPicker() {
+      const zone = _('pickZone');
+      const input = _('fileSelector');
+      zone.addEventListener('click', () => input.click());
+      zone.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          input.click();
+        }
+      });
+      ['dragenter', 'dragover'].forEach((ev) => zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.add('over'); }));
+      ['dragleave', 'drop'].forEach((ev) => zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.remove('over'); }));
+      zone.addEventListener('drop', (e) => {
+        if (!e.dataTransfer.files.length) return;
+        input.files = e.dataTransfer.files;
+        validateFile();
+      });
+    }
+
     function resetControls() {
       _('fileSelector').disabled = false;
+      setPickBusy(false);
       _('startOtaButton').disabled = false;
       _('progressBar').value = 0;
     }
 
     async function validateFile() {
-      document.getElementById('startOtaButton').disabled = true;
+      _('startOtaButton').disabled = true;
 
-      const fileInput = document.getElementById('fileSelector').files;
-      const filepath = document.getElementById('fileSelector').value;
-      const filename = filepath.split(/[\\\/]/).pop();
+      const files = _('fileSelector').files;
+      if (files.length === 0) {
+        showFile(null);
+        return;
+      }
+      const file = files[0];
+      const filename = file.name;
 
-      // Validation Logic
       const MAX_FILE_SIZE = 8000 * 1024;
-      const MAX_FILE_SIZE_STR = '8MB';
+      const bad = (msg) => showFile(file, msg, 'badge-error');
 
-      if (fileInput.length === 0) {
-        firework.launch('No file selected', 'danger', 30000);
-        return;
-      } else if (fileInput[0].size > MAX_FILE_SIZE) {
-        firework.launch(`File size must be less than ${MAX_FILE_SIZE_STR}`, 'danger', 30000);
-        return;
-      } else if (filename.length === 0) {
-        firework.launch('File path on server is not set', 'danger', 30000);
-        return;
-      } else if (filename.length > 255) {
-        firework.launch('File name is too long (max. 255 characters)', 'danger', 30000);
-        return;
-      } else if (filename.includes(' ')) {
-        firework.launch('File name cannot contain spaces', 'danger', 30000);
-        return;
-      } else if (filename.endsWith('/')) {
-        firework.launch('Path selected, but file name cannot be parsed', 'danger', 30000);
-        return;
-      }
+      if (file.size > MAX_FILE_SIZE) return bad('Larger than 8 MB');
+      if (filename.length > 255) return bad('File name too long');
+      if (filename.includes(' ')) return bad('Name contains spaces');
 
-      // Check if the filename is valid
       if (/(^AI-on-the-edge-device__)[a-zRC0-9()_\-.]*(\.zip$)/i.test(filename)) {
-        if (document.getElementById('board_type').innerText.toLowerCase() == filename.split('__')[1]) {
-          // Check if board type of filename matches
-          firework.launch("Press 'Install' to perform the OTA update", 'success', 2000);
+        if (_('board_type').textContent.trim().toLowerCase() === filename.split('__')[1].toLowerCase()) {
+          showFile(file, 'Matches this board', 'badge-success');
         } else {
-          firework.launch('The selected OTA package does not match the detected board type. Please select proper OTA package ' +
-            "or press 'Install' to continue on own risk", 'warning', 10000);
+          showFile(file, 'Other board', 'badge-warning');
         }
-      } else if (filename == 'firmware.bin') {
-        firework.launch("Press 'Install' to install MCU firmware", 'success', 5000);
+      } else if (filename === 'firmware.bin') {
+        showFile(file, 'Firmware only', 'badge-success');
       } else if (filename.endsWith('.zip') || filename.endsWith('.bin')) {
-        firework.launch('The selected file does not fully match the expected name pattern. ' + "Press 'Install' to continue on own risk", 'warning', 10000,);
+        showFile(file, 'Unexpected name', 'badge-warning');
       } else {
-        firework.launch('The selected file does not match the expected name pattern. Please select valid file', 'danger', 10000);
-        return;
+        return bad('Not a package');
       }
 
-      document.getElementById('startOtaButton').disabled = false;
+      _('startOtaButton').disabled = false;
     }
 
     async function startOTA() {
@@ -412,6 +403,7 @@
 
       _('startOtaButton').disabled = true;
       _('fileSelector').disabled = true;
+      setPickBusy(true);
 
       uploadFile();
     }
@@ -645,6 +637,7 @@
 
     getBoardType();
     getFirmwareVersion();
+    initPicker();
 
     window.addEventListener('DOMContentLoaded', () => {
       window.parent.postMessage({ type: 'iframe-ready' }, '*');
