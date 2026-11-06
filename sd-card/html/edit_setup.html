@@ -23,6 +23,11 @@
   <link rel="stylesheet" href="style-iframe.css?v=$COMMIT_HASH" />
 
   <style>
+    #saveCard,
+    #savereference {
+      display: none !important; /* replaced by the save bar (global.js: SaveBar) */
+    }
+
     .tabs {
       display: flex;
       flex-wrap: wrap;
@@ -885,8 +890,13 @@
       onTypeChanged();
     }
 
-    function onClickNewSequence() {
-      const promptResult = prompt('Please enter a name for the new number sequence', 'name');
+    async function onClickNewSequence() {
+      const promptResult = await promptDialog({
+        title: 'New number sequence',
+        text: 'Choose a name without spaces, commas, dots or quotes.',
+        value: 'name',
+        okLabel: 'Create',
+      });
       if (promptResult === null) {
         return; //break out of the function early because prompt was aborted
       }
@@ -920,9 +930,14 @@
       return '';
     }
 
-    function onClickRenameSequence() {
+    async function onClickRenameSequence() {
       const sequenceName = sequenceSelection.options[sequenceSelection.selectedIndex].text;
-      const promptResult = prompt('Please enter a new name for the selected number sequence', sequenceName);
+      const promptResult = await promptDialog({
+        title: 'Rename number sequence',
+        text: 'Choose a name without spaces, commas, dots or quotes.',
+        value: sequenceName,
+        okLabel: 'Rename',
+      });
       if (promptResult === null) {
         return; //break out of the function early because prompt was aborted
       }
@@ -952,8 +967,13 @@
       return '';
     }
 
-    function onClickDeleteSequence() {
-      if (confirm('The entire number sequence will be removed.\n Do you really want to proceed?')) {
+    async function onClickDeleteSequence() {
+      if (await confirmDialog({
+        title: 'Delete number sequence?',
+        text: 'The entire sequence including all of its digit and analog ROIs will be removed.',
+        okLabel: 'Delete sequence',
+        danger: true,
+      })) {
         const erg = DeleteNumberSequence(sequenceSelection.selectedIndex);
 
         if (erg != '') firework.launch(erg, 'danger', 5000);
@@ -1050,9 +1070,9 @@
       return 'Number sequence not existing. ROI cannot be created';
     }
 
-    function onClickDeleteROI() {
-      if (!confirm('Delete the selected ROI?')) {
-        return; //break out of the function early because prompt was aborted
+    async function onClickDeleteROI() {
+      if (!(await confirmDialog({ title: 'Delete this ROI?', text: 'The selected region is removed from the sequence.', okLabel: 'Delete', danger: true }))) {
+        return; //break out of the function early because the dialog was cancelled
       }
       if (typeSelection.value == 'digit') {
         jsonConfigModifiedDelta.digit.sequence[sequenceSelection.selectedIndex].roi.splice(roiSelected, 1);
@@ -2500,8 +2520,6 @@
     }
 
     async function saveReference() {
-      if (!confirm('Are you sure you want to save and apply the new camera configuration and reference image?')) return;
-
       const saveBtn = document.getElementById('savereference');
       saveBtn.disabled = true;
 
@@ -2512,10 +2530,9 @@
         if (!res) throw new Error('Reference image upload failed');
 
         await saveConfig(JSON.stringify(jsonConfigModifiedDelta), true);
+        showReference(); // saved: show the stored reference again (nothing pending anymore)
       } catch (error) {
         console.error('Save reference failed:', error);
-      }
-      finally {
         saveBtn.disabled = false;
       }
     }
@@ -2575,6 +2592,7 @@
       else if (mode === 'digit' || mode === 'analog') seqRefreshDraw();
       else drawRotated(!isActReference);
       updateCounts();
+      if (!drag) refreshSaveBar();
     }
 
     // ============================================================================
@@ -2623,9 +2641,43 @@
       }
     };
 
+    // Real change detection: compare the editable data with the state right after loading.
+    // Derived values (aspect ratio, marker size) are left out so that just looking at a tab never counts as a change.
+    let editorSnapshot = '';
+
+    function editorState() {
+      const d = jsonConfigModifiedDelta || {};
+      const markers = (d.imagealignment?.marker || []).map((m) => ({ x: m.x, y: m.y, updated: !!m.modified }));
+      return JSON.stringify({ markers, sequences: d.numbersequences, digit: d.digit, analog: d.analog }, (k, v) => (k === 'ar' ? undefined : v));
+    }
+
     function editorDirty() {
-      const b = document.getElementById('saveconfig');
-      return !!b && !b.disabled;
+      if (mode === 'image') return !document.getElementById('savereference').disabled;
+      return editorState() !== editorSnapshot;
+    }
+
+    function discardEditorChanges() {
+      loadEditorData();
+      if (mode === 'markers') {
+        if (Array.isArray(markerRoi) && markerRoi[marker_selected]) RefreshMarker();
+        RefreshDraw();
+      } else {
+        typeSelection.value = mode;
+        onTypeChanged();
+      }
+      refreshSaveBar();
+    }
+
+    function refreshSaveBar() {
+      if (!currentTab) return;
+      const image = mode === 'image';
+      SaveBar.set({
+        dirty: editorDirty(),
+        text: image ? 'New image not saved' : 'Unsaved changes',
+        saveLabel: 'Save',
+        onSave: () => (image ? saveReference() : saveAll()),
+        onDiscard: () => (image ? showReference() : discardEditorChanges()),
+      });
     }
 
     async function setTab(tab, initial = false) {
@@ -2633,9 +2685,9 @@
 
       if (!initial) {
         if (currentTab === 'image' && !document.getElementById('savereference').disabled) {
-          if (!confirm('The new image has not been saved yet. Discard it?')) return;
+          if (!(await confirmDialog({ title: 'Discard the new image?', text: 'The new image has not been saved yet.', okLabel: 'Discard', danger: true }))) return;
         } else if (tab === 'image' && editorDirty()) {
-          if (!confirm('Unsaved marker / ROI changes will be discarded. Continue?')) return;
+          if (!(await confirmDialog({ title: 'Discard unsaved changes?', text: 'Markers and ROIs you changed are not saved yet. Open the image tab anyway?', okLabel: 'Discard changes', danger: true }))) return;
         }
       }
 
@@ -2692,16 +2744,16 @@
       markerInit();
       seqInit();
       document.getElementById('saveconfig').disabled = true;
+      editorSnapshot = editorState();
       const upd = document.getElementById('updatemarker');
       if (upd) upd.disabled = false;
       updateCounts();
     }
 
     async function saveAll() {
-      if (!confirm('Are you sure you want to save and apply the new configuration?')) return;
-
       const saveBtn = document.getElementById('saveconfig');
       saveBtn.disabled = true;
+      SaveBar.busy(true);
 
       try {
         if (Array.isArray(markerRoi)) {
@@ -2723,11 +2775,16 @@
       } catch (error) {
         saveBtn.disabled = false;
         console.error('Saving setup failed: ', error);
+      } finally {
+        SaveBar.busy(false);
+        refreshSaveBar();
       }
     }
 
     async function init() {
       openDescription();
+      // the image tab marks an unsaved capture by enabling this button
+      new MutationObserver(refreshSaveBar).observe(document.getElementById('savereference'), { attributes: true, attributeFilter: ['disabled'] });
 
       const loader = document.getElementById('img_loading');
       if (loader) loader.src = loaderSpinner;

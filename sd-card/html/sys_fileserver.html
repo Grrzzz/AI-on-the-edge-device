@@ -267,7 +267,14 @@
           const question = isDir
             ? `Are you sure you want to delete the folder '${name}' recursively?\n\nNote: This takes quite a while. Please be patient!`
             : `Are you sure you want to delete the file '${name}'?`;
-          if (!confirm(question)) return;
+          if (!(await confirmDialog({
+            title: isDir ? 'Delete folder?' : 'Delete file?',
+            text: isDir
+              ? `'${name}' and everything in it will be removed. This can take a while.`
+              : `'${name}' will be removed from the SD card.`,
+            okLabel: 'Delete',
+            danger: true,
+          }))) return;
 
           const loadingMsg = isDir ? "Deleting folder. Please wait..." : "Deleting file..."
           const res = await apiCallNotify('/delete' + url, { method: 'POST', timeout: isDir ? 120000 : 20000 },

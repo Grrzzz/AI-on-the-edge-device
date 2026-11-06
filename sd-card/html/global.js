@@ -606,3 +606,193 @@ function loadImage(url, altUrl) {
   timer = setTimeout(fallback, 15000);
   return img;
 }
+
+
+/* ========================================================================== */
+/* Dialogs + save bar (shared by all pages)                                   */
+/* ========================================================================== */
+
+/**
+ * Modal confirmation (replaces window.confirm).
+ * @param {{title?: string, text?: string, okLabel?: string, cancelLabel?: string, danger?: boolean}} opts
+ * @returns {Promise<boolean>} true = confirmed
+ */
+function confirmDialog({ title = 'Are you sure?', text = '', okLabel = 'Confirm', cancelLabel = 'Cancel', danger = false } = {}) {
+  return new Promise((resolve) => {
+    const dlg = document.createElement('dialog');
+    dlg.className = 'dlg';
+
+    const body = document.createElement('div');
+    body.className = 'dlg-body';
+    const h = document.createElement('h2');
+    h.textContent = title;
+    body.append(h);
+    if (text) {
+      const p = document.createElement('p');
+      p.textContent = text;
+      body.append(p);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'dlg-actions';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'button ghost';
+    cancel.textContent = cancelLabel;
+    const ok = document.createElement('button');
+    ok.type = 'button';
+    ok.className = 'button ' + (danger ? 'danger-solid' : 'btn-action');
+    ok.textContent = okLabel;
+    actions.append(cancel, ok);
+    body.append(actions);
+    dlg.append(body);
+
+    let result = false;
+    ok.onclick = () => {
+      result = true;
+      dlg.close();
+    };
+    cancel.onclick = () => dlg.close();
+    dlg.addEventListener('click', (e) => {
+      if (e.target === dlg) dlg.close(); // backdrop
+    });
+    dlg.addEventListener('close', () => {
+      dlg.remove();
+      resolve(result);
+    });
+
+    document.body.append(dlg);
+    dlg.showModal();
+    (danger ? cancel : ok).focus();
+  });
+}
+
+/**
+ * Modal text input (replaces window.prompt).
+ * @returns {Promise<string|null>} entered text, null if cancelled
+ */
+function promptDialog({ title = 'Enter a value', text = '', value = '', okLabel = 'OK', cancelLabel = 'Cancel', placeholder = '' } = {}) {
+  return new Promise((resolve) => {
+    const dlg = document.createElement('dialog');
+    dlg.className = 'dlg';
+
+    const body = document.createElement('div');
+    body.className = 'dlg-body';
+    const h = document.createElement('h2');
+    h.textContent = title;
+    body.append(h);
+    if (text) {
+      const p = document.createElement('p');
+      p.textContent = text;
+      body.append(p);
+    }
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = value;
+    input.placeholder = placeholder;
+    body.append(input);
+
+    const actions = document.createElement('div');
+    actions.className = 'dlg-actions';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'button ghost';
+    cancel.textContent = cancelLabel;
+    const ok = document.createElement('button');
+    ok.type = 'button';
+    ok.className = 'button btn-action';
+    ok.textContent = okLabel;
+    actions.append(cancel, ok);
+    body.append(actions);
+    dlg.append(body);
+
+    let result = null;
+    const submit = () => {
+      result = input.value;
+      dlg.close();
+    };
+    ok.onclick = submit;
+    cancel.onclick = () => dlg.close();
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submit();
+      }
+    });
+    dlg.addEventListener('click', (e) => {
+      if (e.target === dlg) dlg.close();
+    });
+    dlg.addEventListener('close', () => {
+      dlg.remove();
+      resolve(result);
+    });
+
+    document.body.append(dlg);
+    dlg.showModal();
+    input.focus();
+    input.select();
+  });
+}
+
+/**
+ * Save bar: appears at the bottom only while there are unsaved changes.
+ *   SaveBar.set({ dirty, saveLabel, text, onSave, onDiscard })   (all optional)
+ *   SaveBar.busy(true|false)                                    (disables the buttons while saving)
+ */
+const SaveBar = (() => {
+  let bar = null;
+  let textEl = null;
+  let discardBtn = null;
+  let saveBtn = null;
+  let handlers = { onSave: null, onDiscard: null };
+
+  function ensure() {
+    if (bar) return;
+    bar = document.createElement('div');
+    bar.className = 'savebar';
+    bar.hidden = true;
+
+    textEl = document.createElement('span');
+    textEl.className = 'savebar-text';
+    textEl.textContent = 'Unsaved changes';
+
+    const actions = document.createElement('span');
+    actions.className = 'savebar-actions';
+    discardBtn = document.createElement('button');
+    discardBtn.type = 'button';
+    discardBtn.className = 'button ghost';
+    discardBtn.textContent = 'Discard';
+    discardBtn.onclick = () => handlers.onDiscard?.();
+    saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'button btn-action';
+    saveBtn.textContent = 'Save';
+    saveBtn.onclick = () => handlers.onSave?.();
+    actions.append(discardBtn, saveBtn);
+
+    bar.append(textEl, actions);
+    document.body.append(bar);
+  }
+
+  return {
+    set({ dirty = true, saveLabel, text, discardLabel, onSave, onDiscard } = {}) {
+      ensure();
+      if (onSave) handlers.onSave = onSave;
+      if (onDiscard) handlers.onDiscard = onDiscard;
+      if (saveLabel) saveBtn.textContent = saveLabel;
+      if (discardLabel) discardBtn.textContent = discardLabel;
+      if (text) textEl.textContent = text;
+      discardBtn.hidden = !handlers.onDiscard;
+      bar.hidden = !dirty;
+      document.documentElement.classList.toggle('has-savebar', !!dirty);
+    },
+    busy(flag) {
+      ensure();
+      discardBtn.disabled = !!flag;
+      saveBtn.disabled = !!flag;
+    },
+    isVisible() {
+      return !!bar && !bar.hidden;
+    },
+  };
+})();

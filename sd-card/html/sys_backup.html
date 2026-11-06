@@ -375,7 +375,14 @@
       }
     }
 
-    function startRestore() {
+    async function startRestore() {
+      if (!(await confirmDialog({
+        title: 'Restore this backup?',
+        text: 'The existing configuration is overwritten by the selected backup and the device restarts.',
+        okLabel: 'Restore',
+        danger: true,
+      }))) return;
+
       firework.launch("Do not reload this page or switch to another page while the restore is in progress", "warning", 90000);
 
       document.getElementById("startRestoreButton").disabled = true;

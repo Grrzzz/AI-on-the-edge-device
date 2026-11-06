@@ -102,19 +102,7 @@
     }
 
     #apply-buttons {
-      position: sticky;
-      bottom: 12px;
-      display: flex;
-      gap: 8px;
-      padding: 12px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--card-radius);
-      box-shadow: var(--shadow);
-    }
-
-    #apply-buttons .button {
-      width: 100%;
+      display: none; /* replaced by the save bar (global.js: SaveBar) */
     }
 
     @media screen and (max-width: 900px) {
@@ -2863,18 +2851,37 @@
     function rebootRequired() {
       setElVisibility(button_saveConfig, false);
       setElVisibility(button_saveConfigAndReboot, true);
+      updateConfigSaveBar();
+    }
+
+    // Save bar: visible only while something has been changed
+    function updateConfigSaveBar() {
+      const dirty = Object.keys(jsonConfigModifiedDelta || {}).length > 0;
+      const needsReboot = !document.getElementById('button_saveConfigAndReboot').hidden;
+      SaveBar.set({
+        dirty,
+        saveLabel: needsReboot ? 'Save and restart' : 'Save',
+        text: needsReboot ? 'Unsaved changes \u2013 a restart is required' : 'Unsaved changes',
+        onSave: () => saveConfigData(needsReboot),
+        onDiscard: () => window.location.reload(),
+      });
     }
 
     function saveConfigData(reboot = false) {
-      if (confirm('Are you sure you want to save and apply the new configuration?')) {
-        saveConfig(JSON.stringify(jsonConfigModifiedDelta), !reboot).then(() => {
+      SaveBar.busy(true);
+      saveConfig(JSON.stringify(jsonConfigModifiedDelta), !reboot)
+        .then(() => {
           if (reboot) {
             setTimeout(function () {
               window.location.replace("sys_reboot.html?v=$COMMIT_HASH#reboot");
             }, 500);
+          } else {
+            jsonConfigModifiedDelta = {}; // saved: nothing pending anymore
+            updateConfigSaveBar();
           }
-        });
-      }
+        })
+        .catch(() => { /* error toast is shown by the API layer */ })
+        .finally(() => SaveBar.busy(false));
     }
 
     // Section navigation: one section (card) at a time
@@ -2957,6 +2964,10 @@
       setVariableInputLimits();
       $('#divloading').hide(); // Hide loading indicator
       buildSectionNav();
+      jsonConfigModifiedDelta = {}; // limits / visibility handlers fired change events while initializing: nothing is modified yet
+      const contentEl = document.getElementById('divcontent');
+      ['change', 'input'].forEach((ev) => contentEl.addEventListener(ev, () => setTimeout(updateConfigSaveBar, 0)));
+      updateConfigSaveBar();
       $('#divcontent').show(); // Show parameter content
     }
 

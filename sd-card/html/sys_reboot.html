@@ -39,7 +39,7 @@
         <div class="side-body">
           <div style="color: var(--text-secondary)">The device is not reachable for about 10 to 20 seconds. This page opens the dashboard again as soon as it is back.</div>
           <div class="btn-row">
-            <button class="button btn-action" id="reboot" type="button" onclick="doReboot()">Reboot now</button>
+            <button class="button btn-action" id="reboot" type="button" onclick="requestReboot()">Reboot now</button>
           </div>
         </div>
       </div>
@@ -61,6 +61,14 @@
     function showRebootRequestUI(show) {
       document.getElementById('rebootRequest').style.display = show ? '' : 'none';
       document.getElementById('rebootChecker').style.display = show ? 'none' : '';
+    }
+
+    async function requestReboot() {
+      if (await confirmDialog({
+        title: 'Reboot device?',
+        text: 'The device is not reachable for about 10 to 20 seconds.',
+        okLabel: 'Reboot',
+      })) doReboot();
     }
 
     async function doReboot() {

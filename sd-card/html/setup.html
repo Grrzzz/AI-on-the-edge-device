@@ -1178,7 +1178,12 @@
       async finalizeSetup(isAbort = false) {
         const msg = isAbort ? 'Do you want to abort the setup and switch to operational web interface?' :
           'Do you want to complete the setup mode and switch to operational web interface?';
-        if (!confirm(msg)) return;
+        if (!(await confirmDialog({
+          title: isAbort ? 'Abort the setup?' : 'Complete the setup?',
+          text: msg,
+          okLabel: isAbort ? 'Abort setup' : 'Complete setup',
+          danger: isAbort,
+        }))) return;
         jsonConfigModifiedDelta = jsonConfigModifiedDelta || {};
         jsonConfigModifiedDelta.operationmode = jsonConfigModifiedDelta.operationmode || {};
         jsonConfigModifiedDelta.operationmode.opmode = 1; // Switch to automatic mode

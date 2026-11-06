@@ -269,7 +269,11 @@
 
     async function startSelfUpdate() {
       if (!latestRelease) return;
-      if (!confirm(`Install ${latestRelease.tag}? The device downloads the package itself and restarts afterwards.`)) return;
+      if (!(await confirmDialog({
+        title: `Update to ${latestRelease.tag}?`,
+        text: 'The device downloads the package itself and restarts afterwards. This takes a few minutes. Do not unplug it meanwhile.',
+        okLabel: 'Update',
+      }))) return;
 
       _('su_start').hidden = true;
       _('checkBtn').disabled = true;
@@ -396,7 +400,14 @@
       document.getElementById('startOtaButton').disabled = false;
     }
 
-    function startOTA() {
+    async function startOTA() {
+      const name = _('fileSelector').files[0]?.name || 'the selected package';
+      if (!(await confirmDialog({
+        title: 'Install this package?',
+        text: `${name} is installed and the device restarts. Do not unplug it meanwhile.`,
+        okLabel: 'Install',
+      }))) return;
+
       firework.launch('Do not reload this page or switch to another page while the update is in progress', 'warning', 90000);
 
       _('startOtaButton').disabled = true;
