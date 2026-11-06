@@ -17,5 +17,5 @@ Refer to MQTT API - Home Assistant description for more details about Home Assis
     - If enabled, discovery topics get automatically published after Home Assistant status topic changed to 'online'.<br>
     (Ensure Home Assistant status topic parameter is set correctly -> parameter `Home Assistant Status Topic`).<br>
     - This request can also be triggered by `WebUI > Manual Control > Resend HA Discovery`.<br>
-    - This request can also be triggered by REST API: `/mqtt?task=publish_ha_discovery`.<br>
+    - This request can also be triggered by REST API: `POST /api/mqtt/discovery`.<br>
     Check REST API description for more details.

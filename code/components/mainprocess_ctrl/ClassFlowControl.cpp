@@ -444,6 +444,13 @@ void ClassFlowControl::setActualProcessState(std::string _actualProcessState)
 {
     actualProcessState = _actualProcessState;
     actualProcessStateWithTime = "[" + getCurrentTimeString("%H:%M:%S") + "] " + _actualProcessState;
+    actualProcessStateSince = getUptime();
+}
+
+
+time_t ClassFlowControl::getActualProcessStateSince()
+{
+    return actualProcessStateSince;
 }
 
 

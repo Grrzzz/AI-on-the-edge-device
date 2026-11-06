@@ -43,11 +43,6 @@ jobs:
       matrix:
         plat:
          - esp32cam
-         - freenove-esp32s3-n8r8
-         - freenove-esp32s3-n16r8
-         - nulllab-esp32s3-cam
-         - waveshare-esp32s3-eth
-         - xiao-esp32s3-sense
     steps:
     - name: Checkout branch
       if: ${{ ! needs.prepare-release.outputs.release_created }}
@@ -167,11 +162,6 @@ jobs:
       matrix:
         plat:
          - esp32cam
-         - freenove-esp32s3-n8r8
-         - freenove-esp32s3-n16r8
-         - nulllab-esp32s3-cam
-         - waveshare-esp32s3-eth
-         - xiao-esp32s3-sense
 
     # Sets permissions of the GITHUB_TOKEN to allow downloading artifacts
     permissions:
@@ -266,11 +256,6 @@ jobs:
       matrix:
         plat:
          - esp32cam
-         - freenove-esp32s3-n8r8
-         - freenove-esp32s3-n16r8
-         - nulllab-esp32s3-cam
-         - waveshare-esp32s3-eth
-         - xiao-esp32s3-sense
 
     # Sets permissions of the GITHUB_TOKEN to allow downloading artifacts
     permissions:

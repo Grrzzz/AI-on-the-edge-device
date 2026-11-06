@@ -1,5 +1,6 @@
 #include "server_ota.h"
 #include "../../include/defines.h"
+#include "../../include/api_helper.h"
 
 #include <string>
 
@@ -970,100 +971,56 @@ static void taskSelfUpdate(void *pvParameter)
 }
 
 
-static esp_err_t sendOtaTextResponse(httpd_req_t *req, const char *status, const char *text)
+// GET /api/update/status: {"state":"idle|downloading|staging|done|error","percent":0,"message":""}
+esp_err_t handler_api_update_status(httpd_req_t *req)
 {
-    httpd_resp_set_status(req, status);
-    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
-    httpd_resp_set_type(req, "text/plain");
-    httpd_resp_sendstr(req, text);
-    return ESP_OK;
-}
+    static const char *const stateNames[] = {"idle", "downloading", "staging", "done", "error"};
 
+    char message[sizeof(selfUpdateMessage)];
+    portENTER_CRITICAL(&selfUpdateMux);
+    strlcpy(message, selfUpdateMessage, sizeof(message));
+    portEXIT_CRITICAL(&selfUpdateMux);
 
-// GET /ota?task=selfupdate&url=<urlencoded>  |  GET /ota?task=selfupdate_status
-esp_err_t handler_ota_selfupdate(httpd_req_t *req)
-{
-    char query[1100];
-    if (httpd_req_get_url_query_str(req, query, sizeof(query)) != ESP_OK) {
-        return sendOtaTextResponse(req, "400 Bad Request", "002: Missing parameter 'task' (selfupdate | selfupdate_status)");
-    }
-
-    char task[24];
-    if (httpd_query_key_value(query, "task", task, sizeof(task)) != ESP_OK) {
-        return sendOtaTextResponse(req, "400 Bad Request", "002: Missing or invalid parameter 'task' (selfupdate | selfupdate_status)");
-    }
-
-    if (strcmp(task, "selfupdate_status") == 0) {
-        static const char *const stateNames[] = {"idle", "downloading", "staging", "done", "error"};
-
-        char message[sizeof(selfUpdateMessage)];
-        portENTER_CRITICAL(&selfUpdateMux);
-        strlcpy(message, selfUpdateMessage, sizeof(message));
-        portEXIT_CRITICAL(&selfUpdateMux);
-
-        cJSON *json = cJSON_CreateObject();
-        if (!json) {
-            return sendOtaTextResponse(req, "500 Internal Server Error", "003: Out of memory");
-        }
+    cJSON *json = cJSON_CreateObject();
+    if (json != NULL) {
         cJSON_AddStringToObject(json, "state", stateNames[(int)selfUpdateState.load()]);
         cJSON_AddNumberToObject(json, "percent", selfUpdatePercent.load());
         cJSON_AddStringToObject(json, "message", message);
-        char *jsonStr = cJSON_PrintUnformatted(json);
-        cJSON_Delete(json);
-        if (!jsonStr) {
-            return sendOtaTextResponse(req, "500 Internal Server Error", "003: Out of memory");
-        }
+    }
+    return apiSendJson(req, "200 OK", json);
+}
 
-        httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, jsonStr);
-        cJSON_free(jsonStr);
-        return ESP_OK;
-    }
 
-    if (strcmp(task, "selfupdate") != 0) {
-        return sendOtaTextResponse(req, "400 Bad Request", "002: Unknown task (selfupdate | selfupdate_status)");
+// POST /api/update {"url":"https://github.com/.../AI-on-the-edge-device__<board>__<version>.zip"}
+// Starts the download of the release package (allow-listed hosts only) and the installation. Progress: GET /api/update/status
+esp_err_t handler_api_update(httpd_req_t *req)
+{
+    cJSON *body = apiReadJsonBody(req);
+    if (body == NULL) {
+        return ESP_FAIL; // response already sent
     }
-
-    // Encoded value may be up to 3x longer than the decoded URL
-    constexpr size_t encodedBufSize = SELFUPDATE_MAX_URL_LENGTH * 3 + 1;
-    char *encodedUrl = (char *)malloc(encodedBufSize);
-    if (!encodedUrl) {
-        return sendOtaTextResponse(req, "500 Internal Server Error", "003: Out of memory");
-    }
-    const esp_err_t keyErr = httpd_query_key_value(query, "url", encodedUrl, encodedBufSize);
-    if (keyErr == ESP_ERR_HTTPD_RESULT_TRUNC) {
-        free(encodedUrl);
-        return sendOtaTextResponse(req, "400 Bad Request", "002: Parameter 'url' too long");
-    }
-    if (keyErr != ESP_OK) {
-        free(encodedUrl);
-        return sendOtaTextResponse(req, "400 Bad Request", "002: Missing parameter 'url'");
-    }
-    const std::string url = urlDecode(encodedUrl);
-    free(encodedUrl);
+    const std::string url = apiGetString(body, "url");
+    cJSON_Delete(body);
 
     if (url.empty() || url.size() > SELFUPDATE_MAX_URL_LENGTH) {
-        return sendOtaTextResponse(req, "400 Bad Request", "002: Parameter 'url' empty or too long");
+        return apiSendResult(req, "400 Bad Request", false, "002", "Parameter 'url' empty or too long");
     }
 
     std::string error;
     if (!validateSelfUpdateUrl(url, error)) {
         LogFile.writeToFile(ESP_LOG_WARN, TAG, "Self update rejected: " + error);
-        return sendOtaTextResponse(req, "400 Bad Request", ("002: " + error).c_str());
+        return apiSendResult(req, "400 Bad Request", false, "002", error);
     }
 
     if (!getTimeIsSet()) {
-        return sendOtaTextResponse(req, "409 Conflict", "004: Device time not set (NTP). Certificate validation requires a valid time");
+        return apiSendResult(req, "409 Conflict", false, "004", "Device time not set (NTP). Certificate validation requires a valid time");
     }
 
     // Claim the update slot atomically (only one update at a time). A previous error state may be retried.
     SelfUpdateState expected = selfUpdateState.load();
-    if (expected != SelfUpdateState::Idle && expected != SelfUpdateState::Error) {
-        return sendOtaTextResponse(req, "409 Conflict", "005: Another update is already running");
-    }
-    if (!selfUpdateState.compare_exchange_strong(expected, SelfUpdateState::Downloading)) {
-        return sendOtaTextResponse(req, "409 Conflict", "005: Another update is already running");
+    if ((expected != SelfUpdateState::Idle && expected != SelfUpdateState::Error) ||
+        !selfUpdateState.compare_exchange_strong(expected, SelfUpdateState::Downloading)) {
+        return apiSendResult(req, "409 Conflict", false, "005", "Another update is already running");
     }
     selfUpdatePercent = 0;
     setSelfUpdateMessage("Download started");
@@ -1071,7 +1028,7 @@ esp_err_t handler_ota_selfupdate(httpd_req_t *req)
     SelfUpdateParams *params = (SelfUpdateParams *)malloc(sizeof(SelfUpdateParams));
     if (!params) {
         selfUpdateState = SelfUpdateState::Idle;
-        return sendOtaTextResponse(req, "500 Internal Server Error", "003: Out of memory");
+        return apiSendResult(req, "500 Internal Server Error", false, "003", "Out of memory");
     }
     strlcpy(params->url, url.c_str(), sizeof(params->url));
 
@@ -1079,10 +1036,10 @@ esp_err_t handler_ota_selfupdate(httpd_req_t *req)
     if (xTaskCreate(&taskSelfUpdate, "taskSelfUpdate", 10240, params, tskIDLE_PRIORITY + 2, NULL) != pdPASS) {
         free(params);
         setSelfUpdateError("Failed to create update task");
-        return sendOtaTextResponse(req, "500 Internal Server Error", "003: Failed to create update task");
+        return apiSendResult(req, "500 Internal Server Error", false, "003", "Failed to create update task");
     }
 
-    return sendOtaTextResponse(req, "200 OK", "001: Self update started");
+    return apiSendResult(req, "200 OK", true, "001", "Self update started");
 }
 
 
@@ -1180,17 +1137,14 @@ void doRebootOTA()
 }
 
 
-esp_err_t handler_reboot(httpd_req_t *req)
+// POST /api/reboot: {"ok":true,"code":"001","message":"Reboot initiated"}
+esp_err_t handler_api_reboot(httpd_req_t *req)
 {
     LogFile.writeToFile(ESP_LOG_DEBUG, TAG, "handler_reboot");
 
-    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
-    httpd_resp_set_type(req, "text/plain");
-    httpd_resp_sendstr(req, "Reboot initiated");
-
+    const esp_err_t result = apiSendResult(req, "200 OK", true, "001", "Reboot initiated");
     doReboot();
-
-    return ESP_OK;
+    return result;
 }
 
 
@@ -1205,15 +1159,21 @@ void registerOtaRebootUri(httpd_handle_t server)
     camuri.user_ctx = httpServerData;
     httpd_register_uri_handler(server, &camuri);
 
-    camuri.method = HTTP_GET;
-    camuri.uri = "/ota";
-    camuri.handler = HTTP_AUTH_BASIC(handler_ota_selfupdate);
+    camuri.method = HTTP_POST;
+    camuri.uri = "/api/update";
+    camuri.handler = HTTP_AUTH_BASIC(handler_api_update);
     camuri.user_ctx = NULL;
     httpd_register_uri_handler(server, &camuri);
 
     camuri.method = HTTP_GET;
-    camuri.uri = "/reboot";
-    camuri.handler = HTTP_AUTH_BASIC(handler_reboot);
+    camuri.uri = "/api/update/status";
+    camuri.handler = HTTP_AUTH_BASIC(handler_api_update_status);
+    camuri.user_ctx = NULL;
+    httpd_register_uri_handler(server, &camuri);
+
+    camuri.method = HTTP_POST;
+    camuri.uri = "/api/reboot";
+    camuri.handler = HTTP_AUTH_BASIC(handler_api_reboot);
     camuri.user_ctx = NULL;
     httpd_register_uri_handler(server, &camuri);
 }

@@ -14,18 +14,19 @@ Further details can be found in the respective REST API endpoint description.
 | [/process_data](process_data.md)     | Process Data                                       | JSON + HTML | 
 | [/info](info.md)                     | Device Info + Process Status                       | JSON + HTML | 
 | [/config](config.md)                 | Device Configuration                               | JSON + HTML | 
-| [/cycle_start](cycle_start.md)       | Trigger Cycle (Flow) Start                         | HTML        | 
-| [/set_fallbackvalue](set_fallbackvalue.md) | Set Fallback Value                           | HTML        | 
-| [/editflow](editflow.md)             | Parametrization Helper                             | HTML        | 
+| [/api/status](status.md)             | State of the main process                          | JSON        | 
+| [/api/cycle](cycle.md)               | Trigger Cycle (Flow) Start (POST)                  | JSON        | 
+| [/api/fallback](fallback.md)         | Read / Set Fallback Value                          | JSON        | 
+| [/api/flow/*](flow.md)               | Parametrization Helper (copy, cut reference)       | JSON        | 
 | [/api/recognition](recognition.md)|Image Recognition Details of the last cycle     | JSON        |
 | [/camera](camera.md)                 | Camera Capture, Stream, Parametrization + Flashlight| HTML       | 
 | [/gpio](gpio.md)                     | Read / Control GPIO                                | JSON + HTML | 
-| [/mqtt](mqtt.md)                     | Publish HA discovery topics / Device info topics   | HTML        | 
+| [/api/mqtt/*](mqtt.md)               | Publish HA discovery topics / Device info topics   | JSON        | 
 | [/data](data.md)                     | Data Log                                           | JSON + HTML | 
 | [/log](log.md)                       | Device Log                                         | JSON + HTML | 
 | [/ota](ota.md)                       | Over The Air Update                                | HTML        | 
-| [/ota (self update)](ota_selfupdate.md)| One-click Update (Device Downloads Release From GitHub)| JSON + HTML |
-| [/reboot](reboot.md)                 | Trigger Reboot                                     | HTML        | 
+| [/api/update](update.md)             | One-click Update (Device Downloads Release From GitHub)| JSON    | 
+| [/api/reboot](reboot.md)             | Trigger Reboot (POST)                              | JSON        | 
 | [/wlan](wlan.md)                     | WLAN Scan                                          | JSON        |
 | [/coredump](coredump.md)             | Handle Core Dumps (Software Exception)             | HTML        | 
 | [/fileserver](fileserver.md)         | Fileserver (File Download / Show Folder Content)   | JSON + HTML | 

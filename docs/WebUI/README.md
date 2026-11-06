@@ -21,7 +21,10 @@ The wizard opens automatically when the device is called without a route while t
   (`sys-`, `dash-`, `rec-`, `setup-`, `wiz-`, `cfg-`).
 
 ## Backend (JSON REST)
-The Api objects talk to these JSON endpoints: `GET /info`, `GET /config`, `POST /config`, `GET /process_data`, `GET /wlan?task=scan`,
-`GET /api/recognition`, `GET /fileserver/<dir>/?format=json`, `GET /ota?task=selfupdate_status`.
-Actions and plain values still use the original text endpoints (`/cycle_start`, `/set_fallbackvalue`, `/log`, `/reboot`, `/mqtt?task=...`, `/ota`);
-they are listed in `legacy-endpoints.md`. Moving one of them to JSON only changes its `Api` method in `app.js`.
+The Api objects talk to JSON endpoints (details in `docs/API/REST`): `GET /info`, `GET|POST /config`, `GET /process_data`,
+`GET /wlan?task=scan`, `GET /api/status`, `POST /api/cycle`, `GET|POST /api/fallback`, `GET /api/recognition`,
+`POST /api/flow/copy|cutref`, `POST /api/reboot`, `POST /api/update`, `GET /api/update/status`, `POST /api/mqtt/discovery|deviceinfo`,
+`GET /fileserver/<dir>/?format=json`.
+Endpoints that deliver files or streams stay as they are: `/log`, `/data` (log files), `/camera` (images), `/coredump` (binary),
+`/upload`, `/delete`, `/ota/<file>` (uploads) and the scalar text variants `/info?type=` and `/process_data?type=` for integrations.
+Moving another endpoint to JSON only changes its `Api` method in `app.js`.

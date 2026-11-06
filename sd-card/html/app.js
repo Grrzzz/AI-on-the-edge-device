@@ -138,24 +138,23 @@ document.addEventListener('DOMContentLoaded', () => firework.checkCookies());
 /* Environment                                                                */
 /* ========================================================================== */
 
-/* The WebUI can also be executed on a local webserver for development purposes, e.g. XAMPP.
- * Configure the physical device IP which shall be used for communication and call http://localhost
- * NOTE: And you also might have to disable CORS in your webbrowser.
- * IMPORTANT: For regular WebUI operation this IP parameter is not needed at all!
+/* The WebUI can also be served from a local webserver for development (e.g. python -m http.server on http://localhost:8000)
+ * and talk to a physical device: run localStorage.setItem('deviceIp', '192.168.2.20') in the browser console and reload.
+ * Remove the entry to use the page origin again. You might have to disable CORS in your browser.
+ * Without the entry (regular operation, also http://localhost:<port> served by the device or a mock) the page origin is used.
  */
-const dutDeviceIP = '192.168.2.20'; // Set the IP of physical device under test
 let testEnvironmentActive = false;
 
 /* Returns the domainname with prepended protocol.
  * E.g. http://watermeter.fritz.box or http://192.168.1.5
  */
 function getDomainname() {
-  // NOTE: Do not special-case 127.0.0.1/empty host here, this breaks access through a forwarded port:
-  //       https://github.com/jomjol/AI-on-the-edge-device/issues/2681
-  if (window.location.hostname === 'localhost') {
-    console.log('Test environment active! Device IP: ' + dutDeviceIP);
+  let deviceIp = null;
+  try { deviceIp = localStorage.getItem('deviceIp'); } catch (e) { }
+
+  if (deviceIp && window.location.hostname === 'localhost') {
     testEnvironmentActive = true;
-    return 'http://' + dutDeviceIP;
+    return 'http://' + deviceIp;
   }
 
   return window.location.origin; // protocol + hostname + optional port
@@ -395,10 +394,23 @@ function classifyFetchError(error, signal) {
   return error?.name === 'AbortError' ? 'aborted' : 'network';
 }
 
+// Member of a JSON response text (e.g. 'code', 'message'), null if the text is no JSON object or lacks the member
+function jsonField(data, key) {
+  if (typeof data !== 'string' || data[0] !== '{') return null;
+  try {
+    const value = JSON.parse(data)[key];
+    return value === undefined ? null : value;
+  } catch (e) {
+    return null;
+  }
+}
+
 function plainTextSnippet(data) {
   if (typeof data !== 'string') {
     return '';
   }
+  const message = jsonField(data, 'message');
+  if (message) data = String(message);
   const trimmed = data.trim();
   if (!trimmed || trimmed.startsWith('<')) {
     return '';
@@ -520,7 +532,7 @@ async function apiCallNotify(endpoint, init = {}, notify = {}) {
   if (typeof resultMsg === 'string') {
     firework.launch(resultMsg, 'success', 3000);
   } else if (resultMsg && typeof resultMsg === 'object') {
-    const code = typeof res.data === 'string' ? res.data.substring(0, 3) : '';
+    const code = typeof res.data === 'string' ? (jsonField(res.data, 'code') ?? res.data.substring(0, 3)) : '';
     if (resultMsg[code]) {
       launchNotifyEntry(resultMsg[code], 'success', 3000);
     } else {
@@ -553,8 +565,7 @@ const getTfliteFileList = () => fetchJson('/fileserver/config/models/?list_dir=t
 const getCertFileList = () => fetchJson('/fileserver/config/certs/?list_dir=true', 'Cert files request');
 
 async function apiCopy(_source, _target, async = false) {
-  const endpoint = withDomain(getDomainname(), `/editflow?task=copy&in=${_source}&out=${_target}`);
-  const res = await apiCallNotify(endpoint, { signal: async ? undefined : null }, { action: 'Copy file request' });
+  const res = await Api.post('/api/flow/copy', { in: _source, out: _target }, { action: 'Copy file request' }, { signal: async ? undefined : null });
   if (!res.ok) throw apiError('Copy file request failed', res);
   return 'Copy file request successful';
 }
@@ -1476,9 +1487,9 @@ const App = (() => {
       return getDomainname() + '/coredump?task=save';
     },
 
-    // GET /reboot -> true when the device accepted the request
+    // POST /api/reboot -> true when the device accepted the request
     async reboot() {
-      const res = await apiCallNotify('/reboot', {}, { action: 'Reboot request' });
+      const res = await Api.post('/api/reboot', undefined, { action: 'Reboot request' });
       return res.ok;
     },
   };
@@ -1593,17 +1604,17 @@ const App = (() => {
       };
     },
 
-    // GET /ota?task=selfupdate&url=... (the device downloads the package) -> { ok, unsupported, message }
+    // POST /api/update {url} (the device downloads the package) -> { ok, unsupported, message }
     async selfUpdate(url) {
-      const res = await apiCall(`/ota?task=selfupdate&url=${encodeURIComponent(url)}`);
+      const res = await apiCall('/api/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
       if (res.ok) return { ok: true, unsupported: false, message: '' };
-      const detail = typeof res.data === 'string' && res.data.trim() ? res.data.trim() : `HTTP ${res.status ?? 'error'}`;
-      return { ok: false, unsupported: res.status === 400 || res.status === 404, message: detail };
+      const detail = plainTextSnippet(res.data) || `HTTP ${res.status ?? 'error'}`;
+      return { ok: false, unsupported: res.status === 404 || res.status === 405, message: detail }; // old firmware has no /api/update
     },
 
-    // GET /ota?task=selfupdate_status -> { state, percent, message } or null (device not reachable, e.g. restarting)
+    // GET /api/update/status -> { state, percent, message } or null (device not reachable, e.g. restarting)
     async selfUpdateStatus() {
-      const res = await apiCall('/ota?task=selfupdate_status', { timeout: 4000 }, { parseType: 'json' });
+      const res = await apiCall('/api/update/status', { timeout: 4000 }, { parseType: 'json' });
       return res.ok && res.data ? res.data : null;
     },
 
@@ -3583,23 +3594,32 @@ const App = (() => {
     },
 
     /**
-     * Manual cycle start. Legacy endpoint: GET /cycle_start (text, first 3 chars = result code).
-     * @returns {Promise<{ok:boolean, code:string|null}>} code 001/002/003 ok, 099 rejected
+     * Manual cycle start. POST /api/cycle -> {ok, code, message}.
+     * @returns {Promise<{ok:boolean, code:string|null}>} code 001 started, 002 queued, 003 init delay aborted
      */
     async cycleStart() {
-      const res = await apiCallNotify('/cycle_start', {}, { action: 'Cycle start request', resultMsg: CYCLE_START_NOTIFY });
+      const res = await Api.post('/api/cycle', undefined, { action: 'Cycle start request', resultMsg: CYCLE_START_NOTIFY });
       if (!res.ok) return { ok: false, code: null };
-      const code = String(res.data ?? '').substring(0, 3);
+      const code = jsonField(res.data, 'code');
       return { ok: true, code: CYCLE_START_NOTIFY[code] ? code : null };
     },
 
     /**
-     * Set the fallback value of a sequence. Legacy endpoint: GET /set_fallbackvalue?sequence=&value=
+     * State of the main process. GET /api/status
+     * @returns {Promise<null | {state:string, stateCode:number, stateSeconds:number, cycle:number, autoStart:boolean,
+     *   running:boolean, cycleStart:'ready'|'queued'|'unavailable', processInterval:number, processTime:number, uptime:number, error:number}>}
+     */
+    async status(signal) {
+      const res = await apiCall('/api/status', { signal, timeout: 4000 }, { parseType: 'json' });
+      return res.ok && res.data ? res.data : null;
+    },
+
+    /**
+     * Set the fallback value of a sequence. POST /api/fallback {sequence, value}
      * @returns {Promise<boolean>}
      */
     async setFallbackValue(sequence, value) {
-      const endpoint = `/set_fallbackvalue?sequence=${encodeURIComponent(sequence)}&value=${encodeURIComponent(value)}`;
-      const res = await apiCallNotify(endpoint, {}, {
+      const res = await Api.post('/api/fallback', { sequence, value: String(value) }, {
         action: 'Fallback value update',
         loadingMsg: 'Updating fallback value...',
         resultMsg: 'Fallback value successfully updated',
@@ -3644,11 +3664,11 @@ const App = (() => {
 
   Api.mqtt = Object.assign(Api.mqtt ?? {}, {
     /**
-     * Schedule publishing of the Home Assistant discovery topics. Legacy endpoint: GET /mqtt?task=publish_ha_discovery
+     * Schedule publishing of the Home Assistant discovery topics. POST /api/mqtt/discovery
      * @returns {Promise<boolean>}
      */
     async publishHaDiscovery() {
-      const res = await apiCallNotify('/mqtt?task=publish_ha_discovery', {}, { action: 'HA discovery request' });
+      const res = await Api.post('/api/mqtt/discovery', undefined, { action: 'HA discovery request' });
       if (!res.ok) return false;
       firework.launch("Publishing Home Assistant discovery topics scheduled. Will be processed during state 'Publish to MQTT'", 'success', 5000);
       return true;
@@ -4208,8 +4228,8 @@ const App = (() => {
    *   POST /config?reload=true                       save a (partial) configuration and apply it
    *   GET  /camera?task=capture&<camera params>      single shot with temporary parameters (JPEG blob)
    *   POST /upload/config/reference.jpg?overwrite=true   store the reference image (JPEG blob)
-   *   GET  /editflow?task=cutref&in=..&out=..&x&y&dx&dy  cut an alignment marker from the reference image into /img_tmp
-   *   GET  /editflow?task=copy&in=..&out=..          copy a file on the SD card (marker /img_tmp -> /config)
+   *   POST /api/flow/cutref {in,out,x,y,dx,dy}  cut an alignment marker from the reference image into /img_tmp
+   *   POST /api/flow/copy {in,out}              copy a file on the SD card (marker /img_tmp -> /config)
    *   GET  /fileserver/config/reference.jpg, /fileserver/config/markerN.jpg, /fileserver/img_tmp/markerN.jpg   images
    *   GET  /log                                      current log (plain text), wizard log dialog
    */
@@ -4300,15 +4320,14 @@ const App = (() => {
 
     /** Cuts the marker area out of the stored reference image into /img_tmp. @returns {Promise<boolean>} */
     async cutMarker(n, roi) {
-      const endpoint =
-        `/editflow?task=cutref&in=/config/reference.jpg&out=/img_tmp/marker${n}.jpg` + `&x=${roi.x}&y=${roi.y}&dx=${roi.dx}&dy=${roi.dy}`;
-      const res = await apiCallNotify(endpoint, {}, {
+      const body = { in: '/config/reference.jpg', out: `/img_tmp/marker${n}.jpg`, x: roi.x, y: roi.y, dx: roi.dx, dy: roi.dy };
+      const res = await Api.post('/api/flow/cutref', body, {
         action: 'Marker update',
         loadingMsg: 'Request marker update...',
         resultMsg: 'Marker successfully updated',
         httpObj: {
           405: (r) => ({
-            msg: `Marker update available in IDLE state only. Please retry shortly. [${String(r.data).split(' | ')[1]?.trim() || 'Unknown State'}]`,
+            msg: `Marker update available in IDLE state only. Please retry shortly. [${String(jsonField(r.data, 'message') ?? '').split(' | ')[1]?.trim() || 'Unknown State'}]`,
             type: 'warning',
             time: 2000,
           }),
@@ -7182,7 +7201,7 @@ const App = (() => {
   // BEGIN GENERATED SCHEMA (gen_config_schema.py from edit_configuration.html, do not edit by hand, edit the generator)
   const SCHEMA = {
     groups: [
-      {"label": "Basics", "sections": [{"id": "general", "label": "General", "cards": ["operation", "webui", "log", "system"]}, {"id": "network", "label": "Network", "cards": ["network"]}]},
+      {"label": "Basics", "sections": [{"id": "general", "label": "General", "cards": ["operation", "time", "webui", "log", "system"]}, {"id": "network", "label": "Network", "cards": ["network"]}]},
       {"label": "Recognition", "sections": [{"id": "recognition", "label": "Recognition", "cards": ["alignment", "digit", "analog", "postprocessing"], "note": true}]},
       {"label": "Integrations", "sections": [{"id": "mqtt", "label": "MQTT", "cards": ["mqtt"]}]},
       {"label": "Advanced", "adv": true, "sections": [{"id": "camera", "label": "Camera", "cards": ["capture"]}, {"id": "gpio", "label": "GPIO", "cards": ["gpio"]}]},
@@ -7398,12 +7417,16 @@ const App = (() => {
           {"h": "Ethernet Configuration", "show": ["classvisibility_network_opmode_ethernet"]},
           {"label": "Network Configuration", "lvl": 1, "show": ["classvisibility_network_opmode_ethernet"], "id": "network_ethernet_ipv4_networkconfig", "name": "network.ethernet.ipv4.networkconfig", "t": "select", "opts": [["0", "DHCP"], ["1", "Static"]], "def": "0", "int": true, "reboot": true},
           {"label": "IP Address", "lvl": 2, "show": ["classvisibility_network_opmode_ethernet", "classvisibility_network_ethernet_ipv4_networkconfig"], "id": "network_ethernet_ipv4_ipaddress", "name": "network.ethernet.ipv4.ipaddress", "t": "ip", "ph": "192.168.xxx.xxx", "req": true, "reboot": true},
-          {"h": "Time Configuration"},
-          {"label": "Set Time", "lvl": 1, "show": ["classvisibility_network_time_timesetmanual"], "id": "network_time_timesetmanual", "name": "network.time.timesetmanual", "t": "datetime", "ph": "YYYY-MM-DDTHH:MM:SS", "noload": true},
-          {"label": "Time Zone", "lvl": 1, "id": "network_time_timezone", "name": "network.time.timezone", "t": "text", "ph": "CET-1CEST,M3.5.0,M10.5.0/3", "req": true, "link": {"pre": "Use", "text": "timezones", "href": "timezones.html", "post": "to find your settings"}},
-          {"label": "Time Synchronization", "lvl": 1, "id": "network_time_ntp_timesyncenabled", "name": "network.time.ntp.timesyncenabled", "t": "switch", "def": "true"},
-          {"label": "Time Server (NTP)", "lvl": 2, "show": ["classvisibility_network_time_ntp_timesyncenabled"], "id": "network_time_ntp_timeserver", "name": "network.time.ntp.timeserver", "t": "text", "ph": "pool.ntp.org"},
-          {"label": "Process Start Interlock", "lvl": 1, "id": "network_time_processstartinterlock", "name": "network.time.processstartinterlock", "t": "switch", "def": "true", "adv": true},
+        ],
+      },
+      {
+        "id": "time", "title": "Time",
+        "rows": [
+          {"label": "Set Time", "lvl": 0, "show": ["classvisibility_network_time_timesetmanual"], "id": "network_time_timesetmanual", "name": "network.time.timesetmanual", "t": "datetime", "ph": "YYYY-MM-DDTHH:MM:SS", "noload": true},
+          {"label": "Time Zone", "lvl": 0, "id": "network_time_timezone", "name": "network.time.timezone", "t": "select", "opts": "timezones", "tz": true, "def": "CET-1CEST,M3.5.0,M10.5.0/3", "wide": true, "req": true},
+          {"label": "Time Synchronization", "lvl": 0, "id": "network_time_ntp_timesyncenabled", "name": "network.time.ntp.timesyncenabled", "t": "switch", "def": "true"},
+          {"label": "Time Server (NTP)", "lvl": 1, "show": ["classvisibility_network_time_ntp_timesyncenabled"], "id": "network_time_ntp_timeserver", "name": "network.time.ntp.timeserver", "t": "text", "ph": "pool.ntp.org"},
+          {"label": "Process Start Interlock", "lvl": 0, "id": "network_time_processstartinterlock", "name": "network.time.processstartinterlock", "t": "switch", "def": "true", "adv": true},
         ],
       },
       {
@@ -7683,7 +7706,12 @@ const App = (() => {
         break;
       }
       case 'select': {
-        const idx = Array.from(fld.el.options).findIndex((o) => o.value.toLowerCase() === str.toLowerCase());
+        let idx = Array.from(fld.el.options).findIndex((o) => o.value.toLowerCase() === str.toLowerCase());
+        if (idx < 0 && f.tz && str) {
+          // a time zone string that is not in the list stays selectable
+          fld.el.add(new Option(`${str} (custom)`, str), 0);
+          idx = 0;
+        }
         if (idx >= 0) fld.el.selectedIndex = idx;
         break;
       }
@@ -7864,6 +7892,594 @@ const App = (() => {
   /* ======================================================================== */
   const stripExt = (name) => (name.lastIndexOf('.') > 0 ? name.substring(0, name.lastIndexOf('.')) : name);
 
+  /* ======================================================================== */
+  /* Time zones (name -> POSIX time zone string)                              */
+  /* ======================================================================== */
+  const TIMEZONE_CODES = [
+    "GMT0",
+    "EAT-3",
+    "CET-1",
+    "WAT-1",
+    "CAT-2",
+    "EET-2",
+    "<+01>-1",
+    "CET-1CEST,M3.5.0,M10.5.0/3",
+    "SAST-2",
+    "HST10HDT,M3.2.0,M11.1.0",
+    "AKST9AKDT,M3.2.0,M11.1.0",
+    "AST4",
+    "<-03>3",
+    "<-04>4<-03>,M10.1.0/0,M3.4.0/0",
+    "EST5",
+    "CST6CDT,M4.1.0,M10.5.0",
+    "CST6",
+    "<-04>4",
+    "<-05>5",
+    "MST7MDT,M3.2.0,M11.1.0",
+    "CST6CDT,M3.2.0,M11.1.0",
+    "MST7MDT,M4.1.0,M10.5.0",
+    "MST7",
+    "EST5EDT,M3.2.0,M11.1.0",
+    "AST4ADT,M3.2.0,M11.1.0",
+    "<-03>3<-02>,M3.5.0/-2,M10.5.0/-1",
+    "CST5CDT,M3.2.0/0,M11.1.0/1",
+    "PST8PDT,M3.2.0,M11.1.0",
+    "<-03>3<-02>,M3.2.0,M11.1.0",
+    "<-02>2",
+    "<-04>4<-03>,M9.1.6/24,M4.1.6/24",
+    "<-01>1<+00>,M3.5.0/0,M10.5.0/1",
+    "NST3:30NDT,M3.2.0,M11.1.0",
+    "<+11>-11",
+    "<+07>-7",
+    "<+10>-10",
+    "AEST-10AEDT,M10.1.0,M4.1.0/3",
+    "<+05>-5",
+    "NZST-12NZDT,M9.5.0,M4.1.0/3",
+    "<+03>-3",
+    "<+00>0<+02>-2,M3.5.0/1,M10.5.0/3",
+    "<+06>-6",
+    "EET-2EEST,M2.5.4/24,M10.5.5/1",
+    "<+12>-12",
+    "<+04>-4",
+    "EET-2EEST,M3.5.0/0,M10.5.0/0",
+    "<+08>-8",
+    "<+09>-9",
+    "<+0530>-5:30",
+    "EET-2EEST,M3.5.5/0,M10.5.5/0",
+    "EET-2EEST,M3.5.0/3,M10.5.0/4",
+    "EET-2EEST,M3.4.4/48,M10.5.5/1",
+    "HKT-8",
+    "WIB-7",
+    "WIT-9",
+    "IST-2IDT,M3.4.4/26,M10.5.0",
+    "<+0430>-4:30",
+    "PKT-5",
+    "<+0545>-5:45",
+    "IST-5:30",
+    "CST-8",
+    "WITA-8",
+    "PST-8",
+    "KST-9",
+    "<+0330>-3:30<+0430>,J79/24,J263/24",
+    "JST-9",
+    "<+0630>-6:30",
+    "WET0WEST,M3.5.0/1,M10.5.0",
+    "<-01>1",
+    "ACST-9:30ACDT,M10.1.0,M4.1.0/3",
+    "AEST-10",
+    "ACST-9:30",
+    "<+0845>-8:45",
+    "<+1030>-10:30<+11>-11,M10.1.0,M4.1.0",
+    "AWST-8",
+    "<+13>-13",
+    "<+14>-14",
+    "<+02>-2",
+    "<-10>10",
+    "<-11>11",
+    "<-12>12",
+    "<-06>6",
+    "<-07>7",
+    "<-08>8",
+    "<-09>9",
+    "UTC0",
+    "EET-2EEST,M3.5.0,M10.5.0/3",
+    "IST-1GMT0,M10.5.0,M3.5.0/1",
+    "GMT0BST,M3.5.0/1,M10.5.0",
+    "MSK-3",
+    "<+1245>-12:45<+1345>,M9.5.0/2:45,M4.1.0/3:45",
+    "<-06>6<-05>,M9.1.6/22,M4.1.6/22",
+    "<+12>-12<+13>,M11.2.0,M1.2.3/99",
+    "ChST-10",
+    "HST10",
+    "<-0930>9:30",
+    "SST11",
+    "<+11>-11<+12>,M10.1.0,M4.1.0/3"
+  ];
+
+  const TIMEZONE_LIST = [
+    ["Africa/Abidjan", 0],
+    ["Africa/Accra", 0],
+    ["Africa/Addis_Ababa", 1],
+    ["Africa/Algiers", 2],
+    ["Africa/Asmara", 1],
+    ["Africa/Bamako", 0],
+    ["Africa/Bangui", 3],
+    ["Africa/Banjul", 0],
+    ["Africa/Bissau", 0],
+    ["Africa/Blantyre", 4],
+    ["Africa/Brazzaville", 3],
+    ["Africa/Bujumbura", 4],
+    ["Africa/Cairo", 5],
+    ["Africa/Casablanca", 6],
+    ["Africa/Ceuta", 7],
+    ["Africa/Conakry", 0],
+    ["Africa/Dakar", 0],
+    ["Africa/Dar_es_Salaam", 1],
+    ["Africa/Djibouti", 1],
+    ["Africa/Douala", 3],
+    ["Africa/El_Aaiun", 6],
+    ["Africa/Freetown", 0],
+    ["Africa/Gaborone", 4],
+    ["Africa/Harare", 4],
+    ["Africa/Johannesburg", 8],
+    ["Africa/Juba", 4],
+    ["Africa/Kampala", 1],
+    ["Africa/Khartoum", 4],
+    ["Africa/Kigali", 4],
+    ["Africa/Kinshasa", 3],
+    ["Africa/Lagos", 3],
+    ["Africa/Libreville", 3],
+    ["Africa/Lome", 0],
+    ["Africa/Luanda", 3],
+    ["Africa/Lubumbashi", 4],
+    ["Africa/Lusaka", 4],
+    ["Africa/Malabo", 3],
+    ["Africa/Maputo", 4],
+    ["Africa/Maseru", 8],
+    ["Africa/Mbabane", 8],
+    ["Africa/Mogadishu", 1],
+    ["Africa/Monrovia", 0],
+    ["Africa/Nairobi", 1],
+    ["Africa/Ndjamena", 3],
+    ["Africa/Niamey", 3],
+    ["Africa/Nouakchott", 0],
+    ["Africa/Ouagadougou", 0],
+    ["Africa/Porto-Novo", 3],
+    ["Africa/Sao_Tome", 0],
+    ["Africa/Tripoli", 5],
+    ["Africa/Tunis", 2],
+    ["Africa/Windhoek", 4],
+    ["America/Adak", 9],
+    ["America/Anchorage", 10],
+    ["America/Anguilla", 11],
+    ["America/Antigua", 11],
+    ["America/Araguaina", 12],
+    ["America/Argentina/Buenos_Aires", 12],
+    ["America/Argentina/Catamarca", 12],
+    ["America/Argentina/Cordoba", 12],
+    ["America/Argentina/Jujuy", 12],
+    ["America/Argentina/La_Rioja", 12],
+    ["America/Argentina/Mendoza", 12],
+    ["America/Argentina/Rio_Gallegos", 12],
+    ["America/Argentina/Salta", 12],
+    ["America/Argentina/San_Juan", 12],
+    ["America/Argentina/San_Luis", 12],
+    ["America/Argentina/Tucuman", 12],
+    ["America/Argentina/Ushuaia", 12],
+    ["America/Aruba", 11],
+    ["America/Asuncion", 13],
+    ["America/Atikokan", 14],
+    ["America/Bahia", 12],
+    ["America/Bahia_Banderas", 15],
+    ["America/Barbados", 11],
+    ["America/Belem", 12],
+    ["America/Belize", 16],
+    ["America/Blanc-Sablon", 11],
+    ["America/Boa_Vista", 17],
+    ["America/Bogota", 18],
+    ["America/Boise", 19],
+    ["America/Cambridge_Bay", 19],
+    ["America/Campo_Grande", 17],
+    ["America/Cancun", 14],
+    ["America/Caracas", 17],
+    ["America/Cayenne", 12],
+    ["America/Cayman", 14],
+    ["America/Chicago", 20],
+    ["America/Chihuahua", 21],
+    ["America/Costa_Rica", 16],
+    ["America/Creston", 22],
+    ["America/Cuiaba", 17],
+    ["America/Curacao", 11],
+    ["America/Danmarkshavn", 0],
+    ["America/Dawson", 22],
+    ["America/Dawson_Creek", 22],
+    ["America/Denver", 19],
+    ["America/Detroit", 23],
+    ["America/Dominica", 11],
+    ["America/Edmonton", 19],
+    ["America/Eirunepe", 18],
+    ["America/El_Salvador", 16],
+    ["America/Fort_Nelson", 22],
+    ["America/Fortaleza", 12],
+    ["America/Glace_Bay", 24],
+    ["America/Godthab", 25],
+    ["America/Goose_Bay", 24],
+    ["America/Grand_Turk", 23],
+    ["America/Grenada", 11],
+    ["America/Guadeloupe", 11],
+    ["America/Guatemala", 16],
+    ["America/Guayaquil", 18],
+    ["America/Guyana", 17],
+    ["America/Halifax", 24],
+    ["America/Havana", 26],
+    ["America/Hermosillo", 22],
+    ["America/Indiana/Indianapolis", 23],
+    ["America/Indiana/Knox", 20],
+    ["America/Indiana/Marengo", 23],
+    ["America/Indiana/Petersburg", 23],
+    ["America/Indiana/Tell_City", 20],
+    ["America/Indiana/Vevay", 23],
+    ["America/Indiana/Vincennes", 23],
+    ["America/Indiana/Winamac", 23],
+    ["America/Inuvik", 19],
+    ["America/Iqaluit", 23],
+    ["America/Jamaica", 14],
+    ["America/Juneau", 10],
+    ["America/Kentucky/Louisville", 23],
+    ["America/Kentucky/Monticello", 23],
+    ["America/Kralendijk", 11],
+    ["America/La_Paz", 17],
+    ["America/Lima", 18],
+    ["America/Los_Angeles", 27],
+    ["America/Lower_Princes", 11],
+    ["America/Maceio", 12],
+    ["America/Managua", 16],
+    ["America/Manaus", 17],
+    ["America/Marigot", 11],
+    ["America/Martinique", 11],
+    ["America/Matamoros", 20],
+    ["America/Mazatlan", 21],
+    ["America/Menominee", 20],
+    ["America/Merida", 15],
+    ["America/Metlakatla", 10],
+    ["America/Mexico_City", 15],
+    ["America/Miquelon", 28],
+    ["America/Moncton", 24],
+    ["America/Monterrey", 15],
+    ["America/Montevideo", 12],
+    ["America/Montreal", 23],
+    ["America/Montserrat", 11],
+    ["America/Nassau", 23],
+    ["America/New_York", 23],
+    ["America/Nipigon", 23],
+    ["America/Nome", 10],
+    ["America/Noronha", 29],
+    ["America/North_Dakota/Beulah", 20],
+    ["America/North_Dakota/Center", 20],
+    ["America/North_Dakota/New_Salem", 20],
+    ["America/Nuuk", 25],
+    ["America/Ojinaga", 19],
+    ["America/Panama", 14],
+    ["America/Pangnirtung", 23],
+    ["America/Paramaribo", 12],
+    ["America/Phoenix", 22],
+    ["America/Port_of_Spain", 11],
+    ["America/Port-au-Prince", 23],
+    ["America/Porto_Velho", 17],
+    ["America/Puerto_Rico", 11],
+    ["America/Punta_Arenas", 12],
+    ["America/Rainy_River", 20],
+    ["America/Rankin_Inlet", 20],
+    ["America/Recife", 12],
+    ["America/Regina", 16],
+    ["America/Resolute", 20],
+    ["America/Rio_Branco", 18],
+    ["America/Santarem", 12],
+    ["America/Santiago", 30],
+    ["America/Santo_Domingo", 11],
+    ["America/Sao_Paulo", 12],
+    ["America/Scoresbysund", 31],
+    ["America/Sitka", 10],
+    ["America/St_Barthelemy", 11],
+    ["America/St_Johns", 32],
+    ["America/St_Kitts", 11],
+    ["America/St_Lucia", 11],
+    ["America/St_Thomas", 11],
+    ["America/St_Vincent", 11],
+    ["America/Swift_Current", 16],
+    ["America/Tegucigalpa", 16],
+    ["America/Thule", 24],
+    ["America/Thunder_Bay", 23],
+    ["America/Tijuana", 27],
+    ["America/Toronto", 23],
+    ["America/Tortola", 11],
+    ["America/Vancouver", 27],
+    ["America/Whitehorse", 22],
+    ["America/Winnipeg", 20],
+    ["America/Yakutat", 10],
+    ["America/Yellowknife", 19],
+    ["Antarctica/Casey", 33],
+    ["Antarctica/Davis", 34],
+    ["Antarctica/DumontDUrville", 35],
+    ["Antarctica/Macquarie", 36],
+    ["Antarctica/Mawson", 37],
+    ["Antarctica/McMurdo", 38],
+    ["Antarctica/Palmer", 12],
+    ["Antarctica/Rothera", 12],
+    ["Antarctica/Syowa", 39],
+    ["Antarctica/Troll", 40],
+    ["Antarctica/Vostok", 41],
+    ["Arctic/Longyearbyen", 7],
+    ["Asia/Aden", 39],
+    ["Asia/Almaty", 41],
+    ["Asia/Amman", 42],
+    ["Asia/Anadyr", 43],
+    ["Asia/Aqtau", 37],
+    ["Asia/Aqtobe", 37],
+    ["Asia/Ashgabat", 37],
+    ["Asia/Atyrau", 37],
+    ["Asia/Baghdad", 39],
+    ["Asia/Bahrain", 39],
+    ["Asia/Baku", 44],
+    ["Asia/Bangkok", 34],
+    ["Asia/Barnaul", 34],
+    ["Asia/Beirut", 45],
+    ["Asia/Bishkek", 41],
+    ["Asia/Brunei", 46],
+    ["Asia/Chita", 47],
+    ["Asia/Choibalsan", 46],
+    ["Asia/Colombo", 48],
+    ["Asia/Damascus", 49],
+    ["Asia/Dhaka", 41],
+    ["Asia/Dili", 47],
+    ["Asia/Dubai", 44],
+    ["Asia/Dushanbe", 37],
+    ["Asia/Famagusta", 50],
+    ["Asia/Gaza", 51],
+    ["Asia/Hebron", 51],
+    ["Asia/Ho_Chi_Minh", 34],
+    ["Asia/Hong_Kong", 52],
+    ["Asia/Hovd", 34],
+    ["Asia/Irkutsk", 46],
+    ["Asia/Jakarta", 53],
+    ["Asia/Jayapura", 54],
+    ["Asia/Jerusalem", 55],
+    ["Asia/Kabul", 56],
+    ["Asia/Kamchatka", 43],
+    ["Asia/Karachi", 57],
+    ["Asia/Kathmandu", 58],
+    ["Asia/Khandyga", 47],
+    ["Asia/Kolkata", 59],
+    ["Asia/Krasnoyarsk", 34],
+    ["Asia/Kuala_Lumpur", 46],
+    ["Asia/Kuching", 46],
+    ["Asia/Kuwait", 39],
+    ["Asia/Macau", 60],
+    ["Asia/Magadan", 33],
+    ["Asia/Makassar", 61],
+    ["Asia/Manila", 62],
+    ["Asia/Muscat", 44],
+    ["Asia/Nicosia", 50],
+    ["Asia/Novokuznetsk", 34],
+    ["Asia/Novosibirsk", 34],
+    ["Asia/Omsk", 41],
+    ["Asia/Oral", 37],
+    ["Asia/Phnom_Penh", 34],
+    ["Asia/Pontianak", 53],
+    ["Asia/Pyongyang", 63],
+    ["Asia/Qatar", 39],
+    ["Asia/Qyzylorda", 37],
+    ["Asia/Riyadh", 39],
+    ["Asia/Sakhalin", 33],
+    ["Asia/Samarkand", 37],
+    ["Asia/Seoul", 63],
+    ["Asia/Shanghai", 60],
+    ["Asia/Singapore", 46],
+    ["Asia/Srednekolymsk", 33],
+    ["Asia/Taipei", 60],
+    ["Asia/Tashkent", 37],
+    ["Asia/Tbilisi", 44],
+    ["Asia/Tehran", 64],
+    ["Asia/Thimphu", 41],
+    ["Asia/Tokyo", 65],
+    ["Asia/Tomsk", 34],
+    ["Asia/Ulaanbaatar", 46],
+    ["Asia/Urumqi", 41],
+    ["Asia/Ust-Nera", 35],
+    ["Asia/Vientiane", 34],
+    ["Asia/Vladivostok", 35],
+    ["Asia/Yakutsk", 47],
+    ["Asia/Yangon", 66],
+    ["Asia/Yekaterinburg", 37],
+    ["Asia/Yerevan", 44],
+    ["Atlantic/Azores", 31],
+    ["Atlantic/Bermuda", 24],
+    ["Atlantic/Canary", 67],
+    ["Atlantic/Cape_Verde", 68],
+    ["Atlantic/Faroe", 67],
+    ["Atlantic/Madeira", 67],
+    ["Atlantic/Reykjavik", 0],
+    ["Atlantic/South_Georgia", 29],
+    ["Atlantic/St_Helena", 0],
+    ["Atlantic/Stanley", 12],
+    ["Australia/Adelaide", 69],
+    ["Australia/Brisbane", 70],
+    ["Australia/Broken_Hill", 69],
+    ["Australia/Currie", 36],
+    ["Australia/Darwin", 71],
+    ["Australia/Eucla", 72],
+    ["Australia/Hobart", 36],
+    ["Australia/Lindeman", 70],
+    ["Australia/Lord_Howe", 73],
+    ["Australia/Melbourne", 36],
+    ["Australia/Perth", 74],
+    ["Australia/Sydney", 36],
+    ["Etc/GMT", 0],
+    ["Etc/GMT-0", 0],
+    ["Etc/GMT-1", 6],
+    ["Etc/GMT-10", 35],
+    ["Etc/GMT-11", 33],
+    ["Etc/GMT-12", 43],
+    ["Etc/GMT-13", 75],
+    ["Etc/GMT-14", 76],
+    ["Etc/GMT-2", 77],
+    ["Etc/GMT-3", 39],
+    ["Etc/GMT-4", 44],
+    ["Etc/GMT-5", 37],
+    ["Etc/GMT-6", 41],
+    ["Etc/GMT-7", 34],
+    ["Etc/GMT-8", 46],
+    ["Etc/GMT-9", 47],
+    ["Etc/GMT+0", 0],
+    ["Etc/GMT+1", 68],
+    ["Etc/GMT+10", 78],
+    ["Etc/GMT+11", 79],
+    ["Etc/GMT+12", 80],
+    ["Etc/GMT+2", 29],
+    ["Etc/GMT+3", 12],
+    ["Etc/GMT+4", 17],
+    ["Etc/GMT+5", 18],
+    ["Etc/GMT+6", 81],
+    ["Etc/GMT+7", 82],
+    ["Etc/GMT+8", 83],
+    ["Etc/GMT+9", 84],
+    ["Etc/GMT0", 0],
+    ["Etc/Greenwich", 0],
+    ["Etc/UCT", 85],
+    ["Etc/Universal", 85],
+    ["Etc/UTC", 85],
+    ["Etc/Zulu", 85],
+    ["Europe/Amsterdam", 7],
+    ["Europe/Andorra", 7],
+    ["Europe/Astrakhan", 44],
+    ["Europe/Athens", 50],
+    ["Europe/Belgrade", 7],
+    ["Europe/Berlin", 7],
+    ["Europe/Bratislava", 7],
+    ["Europe/Brussels", 7],
+    ["Europe/Bucharest", 50],
+    ["Europe/Budapest", 7],
+    ["Europe/Busingen", 7],
+    ["Europe/Chisinau", 86],
+    ["Europe/Copenhagen", 7],
+    ["Europe/Dublin", 87],
+    ["Europe/Gibraltar", 7],
+    ["Europe/Guernsey", 88],
+    ["Europe/Helsinki", 50],
+    ["Europe/Isle_of_Man", 88],
+    ["Europe/Istanbul", 39],
+    ["Europe/Jersey", 88],
+    ["Europe/Kaliningrad", 5],
+    ["Europe/Kiev", 50],
+    ["Europe/Kirov", 39],
+    ["Europe/Lisbon", 67],
+    ["Europe/Ljubljana", 7],
+    ["Europe/London", 88],
+    ["Europe/Luxembourg", 7],
+    ["Europe/Madrid", 7],
+    ["Europe/Malta", 7],
+    ["Europe/Mariehamn", 50],
+    ["Europe/Minsk", 39],
+    ["Europe/Monaco", 7],
+    ["Europe/Moscow", 89],
+    ["Europe/Oslo", 7],
+    ["Europe/Paris", 7],
+    ["Europe/Podgorica", 7],
+    ["Europe/Prague", 7],
+    ["Europe/Riga", 50],
+    ["Europe/Rome", 7],
+    ["Europe/Samara", 44],
+    ["Europe/San_Marino", 7],
+    ["Europe/Sarajevo", 7],
+    ["Europe/Saratov", 44],
+    ["Europe/Simferopol", 89],
+    ["Europe/Skopje", 7],
+    ["Europe/Sofia", 50],
+    ["Europe/Stockholm", 7],
+    ["Europe/Tallinn", 50],
+    ["Europe/Tirane", 7],
+    ["Europe/Ulyanovsk", 44],
+    ["Europe/Uzhgorod", 50],
+    ["Europe/Vaduz", 7],
+    ["Europe/Vatican", 7],
+    ["Europe/Vienna", 7],
+    ["Europe/Vilnius", 50],
+    ["Europe/Volgograd", 39],
+    ["Europe/Warsaw", 7],
+    ["Europe/Zagreb", 7],
+    ["Europe/Zaporozhye", 50],
+    ["Europe/Zurich", 7],
+    ["Indian/Antananarivo", 1],
+    ["Indian/Chagos", 41],
+    ["Indian/Christmas", 34],
+    ["Indian/Cocos", 66],
+    ["Indian/Comoro", 1],
+    ["Indian/Kerguelen", 37],
+    ["Indian/Mahe", 44],
+    ["Indian/Maldives", 37],
+    ["Indian/Mauritius", 44],
+    ["Indian/Mayotte", 1],
+    ["Indian/Reunion", 44],
+    ["Pacific/Apia", 75],
+    ["Pacific/Auckland", 38],
+    ["Pacific/Bougainville", 33],
+    ["Pacific/Chatham", 90],
+    ["Pacific/Chuuk", 35],
+    ["Pacific/Easter", 91],
+    ["Pacific/Efate", 33],
+    ["Pacific/Enderbury", 75],
+    ["Pacific/Fakaofo", 75],
+    ["Pacific/Fiji", 92],
+    ["Pacific/Funafuti", 43],
+    ["Pacific/Galapagos", 81],
+    ["Pacific/Gambier", 84],
+    ["Pacific/Guadalcanal", 33],
+    ["Pacific/Guam", 93],
+    ["Pacific/Honolulu", 94],
+    ["Pacific/Kiritimati", 76],
+    ["Pacific/Kosrae", 33],
+    ["Pacific/Kwajalein", 43],
+    ["Pacific/Majuro", 43],
+    ["Pacific/Marquesas", 95],
+    ["Pacific/Midway", 96],
+    ["Pacific/Nauru", 43],
+    ["Pacific/Niue", 79],
+    ["Pacific/Norfolk", 97],
+    ["Pacific/Noumea", 33],
+    ["Pacific/Pago_Pago", 96],
+    ["Pacific/Palau", 47],
+    ["Pacific/Pitcairn", 83],
+    ["Pacific/Pohnpei", 33],
+    ["Pacific/Port_Moresby", 35],
+    ["Pacific/Rarotonga", 78],
+    ["Pacific/Saipan", 93],
+    ["Pacific/Tahiti", 78],
+    ["Pacific/Tarawa", 43],
+    ["Pacific/Tongatapu", 75],
+    ["Pacific/Wake", 43],
+    ["Pacific/Wallis", 43]
+  ];
+
+  // Default first: Europe/Berlin
+  const TIMEZONE_COMMON = [
+    ['CET-1CEST,M3.5.0,M10.5.0/3', 'Europe/Berlin, Paris, Rome, Madrid'],
+    ['GMT0BST,M3.5.0/1,M10.5.0', 'Europe/London, Dublin, Lisbon'],
+    ['EET-2EEST,M3.5.0/3,M10.5.0/4', 'Europe/Helsinki, Athens, Kyiv'],
+    ['MSK-3', 'Europe/Moscow, Istanbul'],
+    ['UTC0', 'UTC'],
+    ['EST5EDT,M3.2.0,M11.1.0', 'US Eastern (New York)'],
+    ['CST6CDT,M3.2.0,M11.1.0', 'US Central (Chicago)'],
+    ['MST7MDT,M3.2.0,M11.1.0', 'US Mountain (Denver)'],
+    ['PST8PDT,M3.2.0,M11.1.0', 'US Pacific (Los Angeles)'],
+    ['<+04>-4', 'Asia/Dubai'],
+    ['IST-5:30', 'Asia/Kolkata'],
+    ['CST-8', 'Asia/Shanghai, Singapore'],
+    ['JST-9', 'Asia/Tokyo'],
+    ['AEST-10AEDT,M10.1.0,M4.1.0/3', 'Australia/Sydney'],
+  ];
+
+  const TIMEZONE_OPTIONS = TIMEZONE_LIST.map(([name, i]) => [TIMEZONE_CODES[i], name]);
+
   function optionsFor(s, f) {
     if (Array.isArray(f.opts)) {
       // ethernet modes exist only when the device configuration has an ethernet section
@@ -7871,6 +8487,8 @@ const App = (() => {
       return f.opts;
     }
     switch (f.opts) {
+      case 'timezones':
+        return TIMEZONE_OPTIONS;
       case 'sequences':
         return s.seqs.map((q) => [q.sequencename, q.sequencename]);
       case 'pins':
@@ -7994,7 +8612,18 @@ const App = (() => {
         if (f.wide) sel.classList.add('cfg-wide');
         if (f.strong) sel.classList.add('cfg-strong');
         if (f.req) sel.required = true;
-        for (const [value, label] of optionsFor(s, f)) sel.add(new Option(label, value));
+        if (f.tz) {
+          // common time zones first, then the complete list (the value is the POSIX time zone string)
+          const common = App.el('optgroup');
+          common.label = 'Common';
+          const all = App.el('optgroup');
+          all.label = 'All time zones';
+          TIMEZONE_COMMON.forEach(([value, label]) => common.append(new Option(label, value)));
+          TIMEZONE_OPTIONS.forEach(([value, label]) => all.append(new Option(label, value)));
+          sel.append(common, all);
+        } else {
+          for (const [value, label] of optionsFor(s, f)) sel.add(new Option(label, value));
+        }
         if (f.dyn) {
           // file lists: nothing selected until the configured file is found in the list
           const empty = Array.from(sel.options).findIndex((o) => o.value === '');
@@ -8660,7 +9289,102 @@ const App = (() => {
 })();
 
 /* ========================================================================== */
+/* Cycle monitor (sidebar): state of the main process, seconds counter, manual start */
+/* ========================================================================== */
+
+const CycleMonitor = (() => {
+  const POLL_MS = 2000;
+  let status = null; // last answer of Api.process.status()
+  let fetchedAt = 0; // performance.now() of the answer
+  let pollTimer = null;
+  let tickTimer = null;
+  let busy = false;
+
+  const $ = (id) => document.getElementById(id);
+
+  const formatSeconds = (s) => {
+    s = Math.max(0, Math.floor(s));
+    if (s < 60) return `${s} s`;
+    const m = Math.floor(s / 60);
+    return m < 60 ? `${m} min ${String(s % 60).padStart(2, '0')} s` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`;
+  };
+
+  function render() {
+    const panel = $('cycle-panel');
+    if (!panel) return;
+    const btn = $('cycle-start');
+
+    if (!status) {
+      panel.dataset.kind = 'offline';
+      $('cycle-state').textContent = 'Device not reachable';
+      $('cycle-count').textContent = '#-';
+      $('cycle-timer').textContent = ' ';
+      btn.disabled = true;
+      btn.classList.remove('queue');
+      btn.textContent = 'Start cycle';
+      return;
+    }
+
+    const kind = status.error < 0 ? 'error' : status.error > 0 ? 'warn' : status.running ? 'running' : 'idle';
+    panel.dataset.kind = kind;
+    $('cycle-state').textContent = status.state || '-';
+    $('cycle-count').textContent = `#${status.cycle}`;
+
+    const drift = (performance.now() - fetchedAt) / 1000;
+    let timer;
+    if (status.running && status.cycleSeconds !== undefined) {
+      // Countdown: the duration of the last cycle (processTime) is the best estimate for this one
+      const elapsed = status.cycleSeconds + drift;
+      const left = status.processTime - elapsed;
+      timer = `running for ${formatSeconds(elapsed)}`;
+      if (status.processTime > 0) timer += left > 0 ? ` · about ${formatSeconds(Math.ceil(left))} left` : ' · finishing ...';
+    } else {
+      timer = `${status.running ? 'running for' : 'in this state for'} ${formatSeconds(status.stateSeconds + drift)}`;
+    }
+    $('cycle-timer').textContent = timer;
+
+    const ready = status.cycleStart === 'ready';
+    const queued = status.cycleStart === 'queued';
+    btn.disabled = busy || !(ready || queued);
+    btn.classList.toggle('queue', queued);
+    btn.textContent = queued ? 'Queue next cycle' : status.running ? 'Next cycle queued' : 'Start cycle';
+    btn.title = ready ? 'Start a cycle now' : queued ? 'A cycle is running. The next one starts right after it.' : 'The process is not ready for a cycle start';
+  }
+
+  async function poll() {
+    if (document.hidden) return;
+    const answer = await Api.process.status();
+    status = answer;
+    fetchedAt = performance.now();
+    render();
+  }
+
+  async function start() {
+    if (busy) return;
+    busy = true;
+    render();
+    await Api.process.cycleStart();
+    busy = false;
+    await poll();
+  }
+
+  return {
+    start() {
+      $('cycle-start')?.addEventListener('click', start);
+      document.addEventListener('visibilitychange', () => !document.hidden && poll());
+      poll();
+      pollTimer = setInterval(poll, POLL_MS);
+      tickTimer = setInterval(render, 1000); // seconds counter between two polls
+    },
+  };
+})();
+
+
+/* ========================================================================== */
 /* Boot                                                                       */
 /* ========================================================================== */
 
-window.addEventListener('DOMContentLoaded', () => App.start());
+window.addEventListener('DOMContentLoaded', () => {
+  App.start();
+  CycleMonitor.start();
+});

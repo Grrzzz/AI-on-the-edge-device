@@ -1,4 +1,5 @@
 #include "server_mqtt.h"
+#include "../../include/api_helper.h"
 
 #ifdef ENABLE_MQTT
 #include <string>
@@ -383,53 +384,19 @@ bool mqttServer_schedulePublishHADiscoveryFromMqtt(std::string _topic, char *_da
 }
 
 
-esp_err_t handler_mqtt(httpd_req_t *req)
+// POST /api/mqtt/discovery: Schedule publication of the Home Assistant discovery topics
+esp_err_t handler_api_mqtt_discovery(httpd_req_t *req)
 {
-    const char *APIName = "mqtt:v2"; // API name and version
-    char _query[64];
-    char _valuechar[30];
-    std::string task;
+    publishHADiscoveryScheduled = true;
+    return apiSendResult(req, "200 OK", true, "001", "Publication of HA discovery topics scheduled during state 'Publish to MQTT'");
+}
 
-    // Default usage message when handler gets called without any parameter
-    const std::string RESTUsageInfo = "Handler usage:<br>"
-                                      "1. Schedule publication of Home Assistant discovery MQTT topics:<br>"
-                                      " - '/mqtt?task=publish_ha_discovery'<br>"
-                                      "2. Schedule publication of device info MQTT topics:<br>"
-                                      " - '/mqtt?task=publish_device_info'<br>"
-                                      "3. Print API name and version<br>"
-                                      " - '/mqtt?task=api_name'";
 
-    httpd_resp_set_type(req, "text/plain");
-
-    if (httpd_req_get_url_query_str(req, _query, sizeof(_query)) == ESP_OK) {
-        if (httpd_query_key_value(_query, "task", _valuechar, sizeof(_valuechar)) == ESP_OK) {
-            task = std::string(_valuechar);
-        }
-    }
-    else { // if no parameter is provided, print handler usage
-        httpd_resp_set_type(req, "text/html");
-        httpd_resp_sendstr(req, RESTUsageInfo.c_str());
-        return ESP_OK;
-    }
-
-    if (task.compare("api_name") == 0) {
-        httpd_resp_sendstr(req, APIName);
-        return ESP_OK;
-    }
-    else if (task.compare("publish_ha_discovery") == 0) {
-        publishHADiscoveryScheduled = true;
-        httpd_resp_sendstr(req, "001: Publication of HA discovery topics scheduled during state 'Publish to MQTT'");
-        return ESP_OK;
-    }
-    else if (task.compare("publish_device_info") == 0) {
-        publishDeviceInfoScheduled = true;
-        httpd_resp_sendstr(req, "002: Publication of device info topics scheduled during state 'Publish to MQTT'");
-        return ESP_OK;
-    }
-    else {
-        httpd_resp_sendstr(req, "E90: Task not found");
-        return ESP_ERR_NOT_FOUND;
-    }
+// POST /api/mqtt/deviceinfo: Schedule publication of the device info topics
+esp_err_t handler_api_mqtt_deviceinfo(httpd_req_t *req)
+{
+    publishDeviceInfoScheduled = true;
+    return apiSendResult(req, "200 OK", true, "002", "Publication of device info topics scheduled during state 'Publish to MQTT'");
 }
 
 
@@ -943,8 +910,14 @@ void registerMqttUri(httpd_handle_t server)
     httpd_uri_t uri = {};
     uri.method = HTTP_GET;
 
-    uri.uri = "/mqtt";
-    uri.handler = HTTP_AUTH_BASIC(handler_mqtt);
+    uri.method = HTTP_POST;
+    uri.uri = "/api/mqtt/discovery";
+    uri.handler = HTTP_AUTH_BASIC(handler_api_mqtt_discovery);
+    uri.user_ctx = NULL;
+    httpd_register_uri_handler(server, &uri);
+
+    uri.uri = "/api/mqtt/deviceinfo";
+    uri.handler = HTTP_AUTH_BASIC(handler_api_mqtt_deviceinfo);
     uri.user_ctx = NULL;
     httpd_register_uri_handler(server, &uri);
 }

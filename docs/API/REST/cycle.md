@@ -1,0 +1,16 @@
+[Overview](_OVERVIEW.md)
+
+## REST API Endpoint: `api/cycle`
+
+`POST http://IP-ADDRESS/api/cycle` (no body)
+
+Triggers a cycle (flow) start. Replaces `/cycle_start`.
+
+| HTTP | `code` | Meaning |
+|---|---|---|
+| 200 | `001` | Cycle start triggered |
+| 200 | `002` | Scheduled, starts after the running cycle |
+| 200 | `003` | Initialization delay aborted |
+| 409 | `E90` | Main task not initialized, request rejected |
+
+Response: `{"ok":true,"code":"001","message":"Cycle start triggered (12:00:01)"}`

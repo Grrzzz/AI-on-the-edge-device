@@ -71,6 +71,16 @@
         </div>
       </nav>
 
+      <div class="cycle" id="cycle-panel" data-kind="idle">
+        <div class="cycle-head">
+          <span class="cycle-label">Cycle</span>
+          <span class="cycle-count" id="cycle-count">#-</span>
+        </div>
+        <div class="cycle-state"><span class="cycle-dot"></span><span id="cycle-state">Connecting ...</span></div>
+        <div class="cycle-timer" id="cycle-timer">&nbsp;</div>
+        <button class="button btn-action cycle-btn" id="cycle-start" type="button" disabled>Start cycle</button>
+      </div>
+
       <div class="sidebar-footer">
         <div class="theme-seg" role="group" aria-label="Theme">
           <button type="button" data-mode="auto">Auto</button>

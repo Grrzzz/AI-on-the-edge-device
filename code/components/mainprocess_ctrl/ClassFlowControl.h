@@ -1,6 +1,7 @@
 #ifndef CLASSFLOWCONTROL_H
 #define CLASSFLOWCONTROL_H
 
+#include <ctime>
 #include <string>
 
 #include "configClass.h"
@@ -47,6 +48,7 @@ class ClassFlowControl : public ClassFlow
 
     std::string actualProcessState;
     std::string actualProcessStateWithTime;
+    time_t actualProcessStateSince = 0; // Uptime [s] when the state was set
     int flowStateErrorInRow;
     int flowStateDeviationInRow;
 
@@ -69,6 +71,7 @@ class ClassFlowControl : public ClassFlow
     void setActualProcessState(std::string _actualProcessState);
     std::string getActualProcessState();
     std::string getActualProcessStateWithTime();
+    time_t getActualProcessStateSince();
     std::string translateActualProcessState(std::string classname);
 
     void setFlowStateError();

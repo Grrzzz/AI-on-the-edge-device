@@ -1,5 +1,6 @@
 #include "MainFlowControl.h"
 #include "../../include/defines.h"
+#include "../../include/api_helper.h"
 
 #include <string>
 #include <vector>
@@ -42,6 +43,7 @@ static bool manualFlowStart = false;
 static long automaticProcessInterval = 0;
 static int cycleCounter = 0;
 static int processingTime = 0;
+static time_t cycleStartUptime = 0; // Uptime [s] when the running cycle started
 
 
 bool doInit(void)
@@ -216,225 +218,228 @@ void triggerFlowStartByGpio()
 }
 
 
-esp_err_t handler_cycle_start(httpd_req_t *req)
+// GET /api/status: State of the main process (for the cycle display and the start button of the WebUI)
+// {"api_name":"status:v1","state":"Idle - Waiting For Autostart","stateCode":7,"stateSeconds":42,"cycle":842,"autoStart":true,
+//  "running":false,"cycleStart":"ready","processInterval":5.0,"processTime":12,"cycleSeconds":0,"uptime":123456,"error":0}
+// processTime: duration of the last cycle [s], cycleSeconds: seconds since the running cycle started (0 if idle)
+// cycleStart: "ready" (starts immediately), "queued" (starts after the running cycle), "unavailable" (not initialized)
+static const char *getCycleStartAvailability(void)
 {
-    httpd_resp_set_type(req, "text/plain");
+    if (taskAutoFlowState == FLOW_TASK_STATE_IDLE_NO_AUTOSTART || taskAutoFlowState == FLOW_TASK_STATE_IDLE_AUTOSTART ||
+        flowctrl.getActualProcessState() == FLOW_INIT_WAITING_VALID_TIME || flowctrl.getActualProcessState() == FLOW_INIT_FAILED ||
+        taskAutoFlowState == FLOW_TASK_STATE_INIT_DELAYED) {
+        return "ready";
+    }
+    if (taskAutoFlowState == FLOW_TASK_STATE_IMG_PROCESSING || taskAutoFlowState == FLOW_TASK_STATE_PUBLISH_DATA ||
+        taskAutoFlowState == FLOW_TASK_STATE_ADDITIONAL_TASKS) {
+        return manualFlowStart ? "unavailable" : "queued"; // a start is already queued
+    }
+    return "unavailable";
+}
+
+
+esp_err_t handler_api_status(httpd_req_t *req)
+{
+    cJSON *root = cJSON_CreateObject();
+    if (root == NULL) {
+        return apiSendJson(req, "200 OK", NULL);
+    }
+
+    const bool running = taskAutoFlowState == FLOW_TASK_STATE_IMG_PROCESSING || taskAutoFlowState == FLOW_TASK_STATE_PUBLISH_DATA ||
+                         taskAutoFlowState == FLOW_TASK_STATE_ADDITIONAL_TASKS;
+    time_t since = flowctrl.getActualProcessStateSince();
+    const time_t now = getUptime();
+
+    cJSON_AddStringToObject(root, "api_name", "status:v1");
+    cJSON_AddStringToObject(root, "state", flowctrl.getActualProcessState().c_str());
+    cJSON_AddNumberToObject(root, "stateCode", taskAutoFlowState);
+    cJSON_AddNumberToObject(root, "stateSeconds", now >= since ? (double)(now - since) : 0);
+    cJSON_AddNumberToObject(root, "cycle", cycleCounter);
+    cJSON_AddBoolToObject(root, "autoStart", flowctrl.isAutoStart());
+    cJSON_AddBoolToObject(root, "running", running);
+    cJSON_AddStringToObject(root, "cycleStart", getCycleStartAvailability());
+    cJSON_AddNumberToObject(root, "processInterval", (int)(flowctrl.getProcessInterval() * 100) / 100.0);
+    cJSON_AddNumberToObject(root, "processTime", processingTime);
+    cJSON_AddNumberToObject(root, "cycleSeconds", running && now >= cycleStartUptime ? (double)(now - cycleStartUptime) : 0);
+    cJSON_AddNumberToObject(root, "uptime", (double)now);
+    cJSON_AddNumberToObject(root, "error", flowctrl.getFlowStateErrorOrDeviation());
+    return apiSendJson(req, "200 OK", root);
+}
+
+
+// POST /api/cycle: Trigger a cycle start. {"ok":true,"code":"001","message":"..."}
+// 001 started, 002 queued (after the running cycle), 003 init delay aborted, E90 rejected (not initialized, HTTP 409)
+esp_err_t handler_api_cycle(httpd_req_t *req)
+{
+    const std::string timeStamp = " (" + getCurrentTimeString("%H:%M:%S") + ")";
 
     if (taskAutoFlowState == FLOW_TASK_STATE_IDLE_NO_AUTOSTART || taskAutoFlowState == FLOW_TASK_STATE_IDLE_AUTOSTART ||
         flowctrl.getActualProcessState() == FLOW_INIT_WAITING_VALID_TIME ||
         flowctrl.getActualProcessState() == FLOW_INIT_FAILED) // Possibility to manual retrigger a cycle when init is already failed
     {
         LogFile.writeToFile(ESP_LOG_DEBUG, TAG, "Cycle start triggered by REST API");
-        const std::string zw = "001: Cycle start triggered by REST API (" + getCurrentTimeString("%H:%M:%S") + ")";
-        httpd_resp_send(req, zw.c_str(), zw.length());
         manualFlowStart = true;
 
         if (taskAutoFlowState == FLOW_TASK_STATE_IDLE_AUTOSTART) {
             xTaskAbortDelay(xHandletask_autodoFlow); // Delay will be aborted if task is in blocked (waiting) state
         }
+        return apiSendResult(req, "200 OK", true, "001", "Cycle start triggered" + timeStamp);
     }
-    else if (taskAutoFlowState == FLOW_TASK_STATE_IMG_PROCESSING || taskAutoFlowState == FLOW_TASK_STATE_PUBLISH_DATA ||
-             taskAutoFlowState == FLOW_TASK_STATE_ADDITIONAL_TASKS) {
+
+    if (taskAutoFlowState == FLOW_TASK_STATE_IMG_PROCESSING || taskAutoFlowState == FLOW_TASK_STATE_PUBLISH_DATA ||
+        taskAutoFlowState == FLOW_TASK_STATE_ADDITIONAL_TASKS) {
         LogFile.writeToFile(ESP_LOG_DEBUG, TAG, "Cycle start triggered by REST API got scheduled");
-        const std::string zw = "002: Cycle start triggered by REST API got scheduled (" + getCurrentTimeString("%H:%M:%S") + ")";
-        httpd_resp_send(req, zw.c_str(), zw.length());
-
         manualFlowStart = true;
-    }
-    else if (taskAutoFlowState == FLOW_TASK_STATE_INIT_DELAYED) {
-        LogFile.writeToFile(ESP_LOG_DEBUG, TAG, "Cycle start triggered by REST API (abort state 'Initialization (delayed)'");
-        const std::string zw = "003: Cycle start triggered by REST API abort initialization delay (" + getCurrentTimeString("%H:%M:%S") +
-                               ")";
-        httpd_resp_send(req, zw.c_str(), zw.length());
-        xTaskAbortDelay(xHandletask_autodoFlow); // Delay will be aborted if task is in blocked (waiting) state
-    }
-    else {
-        LogFile.writeToFile(ESP_LOG_WARN, TAG, "Cycle start triggered by REST API. Main task not initialized. Request rejected");
-        const std::string zw = "E90: Cycle start triggered by REST API. Main task not initialized. Request rejected (" +
-                               getCurrentTimeString("%H:%M:%S") + ")";
-        httpd_resp_send(req, zw.c_str(), zw.length());
+        return apiSendResult(req, "200 OK", true, "002", "Cycle start scheduled, starts after the running cycle" + timeStamp);
     }
 
-    return ESP_OK;
+    if (taskAutoFlowState == FLOW_TASK_STATE_INIT_DELAYED) {
+        LogFile.writeToFile(ESP_LOG_DEBUG, TAG, "Cycle start triggered by REST API (abort state 'Initialization (delayed)'");
+        xTaskAbortDelay(xHandletask_autodoFlow); // Delay will be aborted if task is in blocked (waiting) state
+        return apiSendResult(req, "200 OK", true, "003", "Initialization delay aborted" + timeStamp);
+    }
+
+    LogFile.writeToFile(ESP_LOG_WARN, TAG, "Cycle start triggered by REST API. Main task not initialized. Request rejected");
+    return apiSendResult(req, "409 Conflict", false, "E90", "Main task not initialized. Request rejected" + timeStamp);
 }
 
 
-esp_err_t handler_fallbackvalue(httpd_req_t *req)
+// GET /api/fallback?sequence=<name>: {"ok":true,"sequence":"main","value":"530.0080"}
+// POST /api/fallback {"sequence":"main","value":"1234.5"}: value >= 0 sets the Fallback Value, value < 0 takes the actual RAW value
+esp_err_t handler_api_fallback(httpd_req_t *req)
 {
     if (taskAutoFlowState <= FLOW_TASK_STATE_INIT) {
-        httpd_resp_set_type(req, "text/plain");
-        httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, "E95: Request rejected, flow not initialized");
-        return ESP_FAIL;
+        return apiSendResult(req, "403 Forbidden", false, "E95", "Request rejected, flow not initialized");
     }
 
-    // Default usage message when handler gets called without any parameter
-    const std::string RESTUsageInfo =
-        "Handler usage:<br>"
-        "- To retrieve actual Fallback Value, please provide a number sequence name only, e.g. /set_fallbackvalue?sequence=main<br>"
-        "- To set Fallback Value to a new value, please provide a number sequence name and a value, e.g. "
-        "/set_fallbackvalue?sequence=main&value=1234.5678<br>"
-        "NOTE:<br>"
-        "value >= 0.0: Set Fallback Value to provided value<br>"
-        "value <  0.0: Set Fallback Value to actual RAW value (as long RAW value is a valid number, without N)";
-
-    // Default return error message when no return is programmed
-    std::string sReturnMessage = "E90: Uninitialized";
-
-    char query[100];
-    char numberSequence[50];
-    char value[20] = ""; // Default: empty value
-
-    httpd_resp_set_type(req, "text/plain");
-
-    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
-        if (httpd_query_key_value(query, "sequence", numberSequence, sizeof(numberSequence)) != ESP_OK) {
-            // If request is incomplete
-            sReturnMessage = "E91: Query parameter incomplete or invalid! "
-                             "Call /set_fallbackvalue to show REST API usage info and/or check documentation";
-            httpd_resp_send(req, sReturnMessage.c_str(), sReturnMessage.length());
-            return ESP_FAIL;
+    std::string sequence, value;
+    if (req->method == HTTP_POST) {
+        cJSON *body = apiReadJsonBody(req);
+        if (body == NULL) {
+            return ESP_FAIL; // response already sent
         }
-
-        if (httpd_query_key_value(query, "value", value, sizeof(value)) == ESP_OK) {
-            // ESP_LOGD(TAG, "Value: %s", value);
-        }
-    }
-    else { // if no parameter is provided, print handler usage
-        httpd_resp_set_type(req, "text/html");
-        httpd_resp_send(req, RESTUsageInfo.c_str(), RESTUsageInfo.length());
-        return ESP_OK;
-    }
-
-    if (strlen(value) == 0) { // If no value is provided --> return actual FallbackValue
-        sReturnMessage = flowctrl.getFallbackValue(std::string(numberSequence));
-
-        if (sReturnMessage.empty()) {
-            sReturnMessage = "E92: Number sequence not found";
-            httpd_resp_send(req, sReturnMessage.c_str(), sReturnMessage.length());
-            return ESP_FAIL;
-        }
+        sequence = apiGetString(body, "sequence");
+        value = apiGetString(body, "value");
+        cJSON_Delete(body);
     }
     else {
-        // New value is positive: Set FallbackValue to provided value and return value
-        // New value is negative and actual RAW value is a valid number: Set FallbackValue to RAW value and return value
-        LogFile.writeToFile(ESP_LOG_DEBUG, TAG,
-                            "REST API handler_fallbackvalue called: sequence: " + std::string(numberSequence) +
-                                ", value: " + std::string(value));
-        if (!flowctrl.setFallbackValue(numberSequence, value)) {
-            sReturnMessage = "E93: Update request rejected. Please check device logs for more details";
-            httpd_resp_send(req, sReturnMessage.c_str(), sReturnMessage.length());
-            return ESP_FAIL;
-        }
-
-        sReturnMessage = flowctrl.getFallbackValue(std::string(numberSequence));
-
-        if (sReturnMessage.empty()) {
-            sReturnMessage = "E92: Number sequence not found";
-            httpd_resp_send(req, sReturnMessage.c_str(), sReturnMessage.length());
-            return ESP_FAIL;
+        char query[100];
+        char param[50];
+        if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK &&
+            httpd_query_key_value(query, "sequence", param, sizeof(param)) == ESP_OK) {
+            sequence = param;
         }
     }
 
-    httpd_resp_send(req, sReturnMessage.c_str(), sReturnMessage.length());
+    if (sequence.empty()) {
+        return apiSendResult(req, "400 Bad Request", false, "E91", "Parameter 'sequence' missing");
+    }
 
-    return ESP_OK;
+    if (req->method == HTTP_POST) {
+        if (value.empty() || value.size() >= 20) {
+            return apiSendResult(req, "400 Bad Request", false, "E91", "Parameter 'value' missing or invalid");
+        }
+
+        LogFile.writeToFile(ESP_LOG_DEBUG, TAG, "REST API fallback value called: sequence: " + sequence + ", value: " + value);
+        if (!flowctrl.setFallbackValue(sequence, value)) {
+            return apiSendResult(req, "409 Conflict", false, "E93", "Update request rejected. Please check device logs for more details");
+        }
+    }
+
+    const std::string current = flowctrl.getFallbackValue(sequence);
+    if (current.empty()) {
+        return apiSendResult(req, "404 Not Found", false, "E92", "Number sequence not found");
+    }
+
+    cJSON *root = cJSON_CreateObject();
+    if (root != NULL) {
+        cJSON_AddBoolToObject(root, "ok", true);
+        cJSON_AddStringToObject(root, "sequence", sequence.c_str());
+        cJSON_AddStringToObject(root, "value", current.c_str());
+    }
+    return apiSendJson(req, "200 OK", root);
 }
 
 
-esp_err_t handler_editflow(httpd_req_t *req)
+// Only files below /config/ and /img_tmp/ may be addressed by the flow editing endpoints
+static bool isFlowEditPathAllowed(const std::string &path)
 {
-    const char *APIName = "editflow:v4"; // API name and version
-    char query[200];
-    char valuechar[30];
-    std::string task;
+    return path.size() < 100 && path.find("..") == std::string::npos &&
+           (path.rfind("/config/", 0) == 0 || path.rfind("/img_tmp/", 0) == 0);
+}
 
-    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
-        if (httpd_query_key_value(query, "task", valuechar, sizeof(valuechar)) == ESP_OK) {
-            task = std::string(valuechar);
-        }
+
+// POST /api/flow/copy {"in":"/img_tmp/marker1.jpg","out":"/config/marker1.jpg"}
+esp_err_t handler_api_flow_copy(httpd_req_t *req)
+{
+    cJSON *body = apiReadJsonBody(req);
+    if (body == NULL) {
+        return ESP_FAIL; // response already sent
+    }
+    const std::string in = apiGetString(body, "in");
+    const std::string out = apiGetString(body, "out");
+    cJSON_Delete(body);
+
+    if (!isFlowEditPathAllowed(in) || !isFlowEditPathAllowed(out)) {
+        return apiSendResult(req, "400 Bad Request", false, "E91", "Parameters 'in' and 'out' must be paths below /config/ or /img_tmp/");
     }
 
-    if (task.compare("copy") == 0) {
-        httpd_query_key_value(query, "in", valuechar, sizeof(valuechar));
-        std::string in = std::string(valuechar);
-        httpd_query_key_value(query, "out", valuechar, sizeof(valuechar));
-        std::string out = std::string(valuechar);
+    copyFile("/sdcard" + in, "/sdcard" + out);
+    return apiSendResult(req, "200 OK", true, "001", "Copy done");
+}
 
-        in = "/sdcard" + in;
-        out = "/sdcard" + out;
 
-        copyFile(in, out);
-
-        httpd_resp_set_type(req, "text/plain");
-        httpd_resp_sendstr(req, "Copy Done");
+// POST /api/flow/cutref {"in":"/config/reference.jpg","out":"/img_tmp/marker1.jpg","x":10,"y":10,"dx":40,"dy":40}
+esp_err_t handler_api_flow_cutref(httpd_req_t *req)
+{
+    if (taskAutoFlowState < FLOW_TASK_STATE_INIT_DELAYED) {
+        return apiSendResult(req, "403 Forbidden", false, "E90", "Request rejected, flow not initialized");
     }
-    else if (task.compare("cutref") == 0) {
-        if (taskAutoFlowState < FLOW_TASK_STATE_INIT_DELAYED) {
-            httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, "E90: Request rejected, flow not initialized");
-            return ESP_FAIL;
-        }
-        // Interlock request for memory category 4MB due to memory limitation
-        else if (taskAutoFlowState == FLOW_TASK_STATE_IMG_PROCESSING && getSPIRAMCategory() == SPIRAMCategory_4MB) {
-            httpd_resp_send_err(req, HTTPD_405_METHOD_NOT_ALLOWED,
-                                ("E91: Request rejected, flow in process | Actual State: " + flowctrl.getActualProcessState()).c_str());
-            return ESP_FAIL;
-        }
-
-        httpd_query_key_value(query, "in", valuechar, sizeof(valuechar));
-        std::string in = std::string(valuechar);
-
-        httpd_query_key_value(query, "out", valuechar, sizeof(valuechar));
-        std::string out = std::string(valuechar);
-
-        httpd_query_key_value(query, "x", valuechar, sizeof(valuechar));
-        int x = std::stoi(std::string(valuechar));
-
-        httpd_query_key_value(query, "y", valuechar, sizeof(valuechar));
-        int y = std::stoi(std::string(valuechar));
-
-        httpd_query_key_value(query, "dx", valuechar, sizeof(valuechar));
-        int dx = std::stoi(std::string(valuechar));
-
-        httpd_query_key_value(query, "dy", valuechar, sizeof(valuechar));
-        int dy = std::stoi(std::string(valuechar));
-
-        in = "/sdcard" + in;   // --> img_tmp/reference.jpg
-        out = "/sdcard" + out; // --> img_tmp/markerX.jpg
-
-        // 4MB RAM external SPIRAM are not sufficient to perform alignment marker update while processing cycle
-        // Reuse allocated memory of CImage element "imgProcess" (ClassTakeImage.cpp) and interlock operation at UI level
-        if (taskAutoFlowState >= FLOW_TASK_STATE_IDLE_NO_AUTOSTART && getSPIRAMCategory() == SPIRAMCategory_4MB) {
-            STBIObjectPSRAM.usePreallocated = true;
-            STBIObjectPSRAM.name = flowctrl.getFlowImageData()->imgProcess->getName();
-            STBIObjectPSRAM.PreallocatedMemory = flowctrl.getFlowImageData()->imgProcess->getImgData();
-            STBIObjectPSRAM.PreallocatedMemorySize = flowctrl.getFlowImageData()->imgProcess->getAllocSize();
-        }
-        else {
-            STBIObjectPSRAM.usePreallocated = false;
-        }
-        // Create element, be aware: CImage of process image will be created first (921kB RAM required)
-        CImage *img = new CImage("markerSource", in, STBIObjectPSRAM.usePreallocated);
-        CImage *imgCropped = new CImage("markerCropped", dx, dy, STBI_rgb);
-
-        CImageMod::crop(*img, x, y, dx, dy, *imgCropped);
-        imgCropped->saveJpgToFile(out, 100);
-
-        delete imgCropped;
-        delete img;
-
-        httpd_resp_set_type(req, "text/plain");
-        httpd_resp_sendstr(req, "CutImage Done");
+    // Interlock request for memory category 4MB due to memory limitation
+    if (taskAutoFlowState == FLOW_TASK_STATE_IMG_PROCESSING && getSPIRAMCategory() == SPIRAMCategory_4MB) {
+        return apiSendResult(req, "405 Method Not Allowed", false, "E91",
+                             "Request rejected, flow in process | Actual State: " + flowctrl.getActualProcessState());
     }
-    else if (task.compare("api_name") == 0) {
-        httpd_resp_sendstr(req, APIName);
-        return ESP_OK;
+
+    cJSON *body = apiReadJsonBody(req);
+    if (body == NULL) {
+        return ESP_FAIL; // response already sent
+    }
+    std::string in = apiGetString(body, "in");
+    std::string out = apiGetString(body, "out");
+    int x = 0, y = 0, dx = 0, dy = 0;
+    const bool numbersOk = apiGetInt(body, "x", x) && apiGetInt(body, "y", y) && apiGetInt(body, "dx", dx) && apiGetInt(body, "dy", dy);
+    cJSON_Delete(body);
+
+    if (!isFlowEditPathAllowed(in) || !isFlowEditPathAllowed(out) || !numbersOk || x < 0 || y < 0 || dx < 1 || dy < 1) {
+        return apiSendResult(req, "400 Bad Request", false, "E91", "Parameters in, out, x, y, dx, dy missing or invalid");
+    }
+
+    in = "/sdcard" + in;   // --> config/reference.jpg
+    out = "/sdcard" + out; // --> img_tmp/markerX.jpg
+
+    // 4MB RAM external SPIRAM are not sufficient to perform alignment marker update while processing cycle
+    // Reuse allocated memory of CImage element "imgProcess" (ClassTakeImage.cpp) and interlock operation at UI level
+    if (taskAutoFlowState >= FLOW_TASK_STATE_IDLE_NO_AUTOSTART && getSPIRAMCategory() == SPIRAMCategory_4MB) {
+        STBIObjectPSRAM.usePreallocated = true;
+        STBIObjectPSRAM.name = flowctrl.getFlowImageData()->imgProcess->getName();
+        STBIObjectPSRAM.PreallocatedMemory = flowctrl.getFlowImageData()->imgProcess->getImgData();
+        STBIObjectPSRAM.PreallocatedMemorySize = flowctrl.getFlowImageData()->imgProcess->getAllocSize();
     }
     else {
-        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "E92: Task not found");
-        return ESP_FAIL;
+        STBIObjectPSRAM.usePreallocated = false;
     }
+    // Create element, be aware: CImage of process image will be created first (921kB RAM required)
+    CImage *img = new CImage("markerSource", in, STBIObjectPSRAM.usePreallocated);
+    CImage *imgCropped = new CImage("markerCropped", dx, dy, STBI_rgb);
 
-    return ESP_OK;
+    CImageMod::crop(*img, x, y, dx, dy, *imgCropped);
+    imgCropped->saveJpgToFile(out, 100);
+
+    delete imgCropped;
+    delete img;
+
+    return apiSendResult(req, "200 OK", true, "001", "Cut image done");
 }
 
 
@@ -1023,6 +1028,7 @@ void task_autodoFlow(void *pvParameter)
             LogFile.writeToFile(ESP_LOG_DEBUG, TAG, "--------------------------------");
             LogFile.writeToFile(ESP_LOG_INFO, TAG, "Cycle #" + std::to_string(++cycleCounter) + " started");
             cycleStartTime = getUptime();
+            cycleStartUptime = cycleStartTime;
             cycleStartActualTime = esp_timer_get_time();
 
             if (flowctrl.doFlowImageEvaluation(getCurrentTimeString(DEFAULT_TIME_FORMAT))) {
@@ -1244,21 +1250,43 @@ void registerMainFlowTaskUri(httpd_handle_t server)
     httpd_uri_t camuri = {};
     camuri.method = HTTP_GET;
 
-    camuri.uri = "/cycle_start";
-    camuri.handler = HTTP_AUTH_BASIC(handler_cycle_start);
+    camuri.method = HTTP_GET;
+    camuri.uri = "/api/status";
+    camuri.handler = HTTP_AUTH_BASIC(handler_api_status);
     camuri.user_ctx = NULL;
     httpd_register_uri_handler(server, &camuri);
 
-    camuri.uri = "/set_fallbackvalue";
-    camuri.handler = HTTP_AUTH_BASIC(handler_fallbackvalue);
+    camuri.method = HTTP_POST;
+    camuri.uri = "/api/cycle";
+    camuri.handler = HTTP_AUTH_BASIC(handler_api_cycle);
     camuri.user_ctx = NULL;
     httpd_register_uri_handler(server, &camuri);
 
-    camuri.uri = "/editflow";
-    camuri.handler = HTTP_AUTH_BASIC(handler_editflow);
+    camuri.method = HTTP_GET;
+    camuri.uri = "/api/fallback";
+    camuri.handler = HTTP_AUTH_BASIC(handler_api_fallback);
     camuri.user_ctx = NULL;
     httpd_register_uri_handler(server, &camuri);
 
+    camuri.method = HTTP_POST;
+    camuri.uri = "/api/fallback";
+    camuri.handler = HTTP_AUTH_BASIC(handler_api_fallback);
+    camuri.user_ctx = NULL;
+    httpd_register_uri_handler(server, &camuri);
+
+    camuri.method = HTTP_POST;
+    camuri.uri = "/api/flow/copy";
+    camuri.handler = HTTP_AUTH_BASIC(handler_api_flow_copy);
+    camuri.user_ctx = NULL;
+    httpd_register_uri_handler(server, &camuri);
+
+    camuri.method = HTTP_POST;
+    camuri.uri = "/api/flow/cutref";
+    camuri.handler = HTTP_AUTH_BASIC(handler_api_flow_cutref);
+    camuri.user_ctx = NULL;
+    httpd_register_uri_handler(server, &camuri);
+
+    camuri.method = HTTP_GET;
     camuri.uri = "/process_data";
     camuri.handler = HTTP_AUTH_BASIC(handler_process_data);
     camuri.user_ctx = httpServerData; // Pass server data as context
