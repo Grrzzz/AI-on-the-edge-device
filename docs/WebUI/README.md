@@ -8,8 +8,8 @@ Single page app, three files in `sd-card/html/`:
 | `app.js` | Toasts, helpers, core (`Api`, `App` router/theme/navigation), views, boot |
 | `style.css` | Tokens, shell, design system, toasts, one section per view |
 
-Routing is hash based: `#/dashboard`, `#/recognition`, `#/setup[/image|markers|digits|analog]`, `#/wizard`,
-`#/config[/general|network|recognition|mqtt|camera|gpio]`, `#/system/info|update|backup|files|reboot`.
+Routing is hash based: `#/dashboard`, `#/recognition`, `#/config[/image|markers|digits|analog]` (Configuration: reference image, markers, regions), `#/wizard`,
+`#/system/setup[/general|network|recognition|mqtt|camera|gpio]` (Setup: device, network, MQTT), `#/system/info|update|backup|files|reboot`.
 The wizard opens automatically when the device is called without a route while the operation mode is `Setup`.
 
 ## Conventions

@@ -1076,6 +1076,9 @@ const App = (() => {
       key = `system-${segs[1] || 'info'}`;
       parts = segs.slice(2);
     }
+    // links of earlier versions: #/setup[/tab] is now #/config, the old configuration sections moved to #/system/setup
+    if (key === 'setup') key = 'config';
+    else if (key === 'config' && ['general', 'network', 'recognition', 'mqtt', 'camera', 'gpio'].includes(parts[0])) key = 'system-setup';
     if (!views.has(key)) {
       key = 'dashboard';
       parts = [];
@@ -1084,7 +1087,7 @@ const App = (() => {
   }
 
   // Which sidebar entry is highlighted for a view
-  const navKeyOf = (key) => (key === 'wizard' ? 'setup' : key);
+  const navKeyOf = (key) => (key === 'wizard' ? 'config' : key);
 
   function updateNav(key) {
     const navKey = navKeyOf(key);
@@ -2796,7 +2799,7 @@ const App = (() => {
           set('takeimage.camera.gaincontrolmode', auto ? 1 : 0);
           if (!auto) set('takeimage.camera.manualgainvalue', num(first(t, 'CamAgcGain')) ?? 0);
         }
-        if (bool(first(t, 'CamZoom') ?? 'false')) notes.push('Digital zoom of v16 is not converted. Set the zoom under Setup > Image.');
+        if (bool(first(t, 'CamZoom') ?? 'false')) notes.push('Digital zoom of v16 is not converted. Set the zoom under Configuration > Image.');
       }
 
       // ---- alignment
@@ -2815,7 +2818,7 @@ const App = (() => {
         if (markers.length === 2 && markers.every((m) => Number.isFinite(m.x) && Number.isFinite(m.y))) {
           set('imagealignment.marker', markers);
         } else {
-          notes.push('Alignment markers not found in config.ini. Set them under Setup > Markers.');
+          notes.push('Alignment markers not found in config.ini. Set them under Configuration > Markers.');
         }
       }
 
@@ -2901,8 +2904,8 @@ const App = (() => {
         if (first(m, 'HomeassistantDiscovery') !== undefined) set('mqtt.homeassistant.discoveryenabled', bool(first(m, 'HomeassistantDiscovery')));
         const type = String(first(m, 'MeterType') || '').toLowerCase();
         if (type in METER_TYPES) set('mqtt.homeassistant.metertype', METER_TYPES[type]);
-        else if (type) notes.push(`Home Assistant meter type "${type}" is not converted. Set it under Configuration > MQTT.`);
-        if (first(m, 'user')) notes.push('The MQTT password is not part of the backup. Enter it under Configuration > MQTT.');
+        else if (type) notes.push(`Home Assistant meter type "${type}" is not converted. Set it under System > Setup > MQTT.`);
+        if (first(m, 'user')) notes.push('The MQTT password is not part of the backup. Enter it under System > Setup > MQTT.');
       }
 
       // ---- system and logging
@@ -3213,7 +3216,7 @@ const App = (() => {
         setStatus('Import completed');
         picker.setBusy(false);
         firework.launch('Backup of firmware v16 imported', 'success', 5000);
-        notes.push('Check the result under Setup (markers, regions) and Configuration.');
+        notes.push('Check the result under Configuration (markers, regions) and System > Setup.');
         await confirmDialog({ title: 'Import finished', text: notes.join('\n'), okLabel: 'OK', cancelLabel: 'Close' });
       };
 
@@ -4985,7 +4988,7 @@ const App = (() => {
     root.classList.add('setup');
     root.innerHTML = `
       <div class="container-header setup-header">
-        ${o.header ? '<div class="container-title">Setup</div><div class="page-sub">Reference image, alignment markers and the digit and analog regions of your meter.</div>' : ''}
+        ${o.header ? '<div class="container-title">Configuration</div><div class="page-sub">Reference image, alignment markers and the digit and analog regions of your meter.</div>' : ''}
         <details class="setup-desc" data-ref="desc"${o.helpOpen ? ' open' : ''}>
           <summary>How it works</summary>
           <div class="help-panel">${EDITOR_HELP}</div>
@@ -6720,13 +6723,13 @@ const App = (() => {
   }
 
   /* ======================================================================== */
-  /* View: setup (#/setup, #/setup/<image|markers|digits|analog>)             */
+  /* View: setup (#/config, #/config/<image|markers|digits|analog>)             */
   /* ======================================================================== */
   let setupEditor = null;
-  const setupHash = (tab) => '#/setup/' + TAB_TO_ROUTE[tab];
+  const setupHash = (tab) => '#/config/' + TAB_TO_ROUTE[tab];
 
-  App.register('setup', {
-    title: 'Setup',
+  App.register('config', {
+    title: 'Configuration',
     mount(root, ctx) {
       setupEditor = mountEditor(root, ctx.parts[0], {
         onNavigate: (tab) => App.navigate(setupHash(tab)),
@@ -7497,7 +7500,7 @@ const App = (() => {
 /* ========================================================================== */
 
 /* ==========================================================================
-   config view (route #/config and #/config/<section>)
+   setup view (route #/system/setup and #/system/setup/<section>)
    Part of the single page app. The form is built from a data schema (SCHEMA below, generated from the
    former hand written edit_configuration.html by gen_config_schema.py), not from static markup.
    ========================================================================== */
@@ -7507,7 +7510,7 @@ const App = (() => {
   const ADVANCED_STORAGE_KEY = 'cfgAdvanced';
   const SECTION_STORAGE_KEY = 'cfgSection2';
   const DEFAULT_SECTION = 'general';
-  const SETUP_IMAGE_ROUTE = '#/setup/image';
+  const SETUP_IMAGE_ROUTE = '#/config/image';
   const REBOOT_ROUTE = '#/system/reboot?now=1'; // the reboot page starts the restart right away with ?now=1
   const REBOOT_DELAY_MS = 500;
   const HELP_HIDE_DELAY_MS = 180;
@@ -7859,7 +7862,7 @@ const App = (() => {
     },
     imagealignment_searchfield_x: {
       title: 'Search field X',
-      text: 'Alignment looks for each marker in an area around the position you set on the Setup page. This is how far it searches to the left and right, in pixels.',
+      text: 'Alignment looks for each marker in an area around the position you set on the Configuration page. This is how far it searches to the left and right, in pixels.',
       now: (g) => 'Search area: ' + g('imagealignment_searchfield_x') + ' px to each side of the marker.',
       tip: 'Larger values cope with more camera movement but slow down processing. Leave at 20 unless the picture shifts a lot.',
     },
@@ -9092,7 +9095,7 @@ const App = (() => {
       for (const f of row.fields || []) s.rowById[f.id] = f;
     }
     for (const row of def.rows) {
-      if (row.hide) continue; // moved to the Setup page or obsolete: kept in the schema, not shown
+      if (row.hide) continue; // moved to the Configuration page or obsolete: kept in the schema, not shown
       if (isHeading(row)) {
         const h = App.el('div', 'cfg-heading', row.h);
         body.append(h);
@@ -9114,7 +9117,7 @@ const App = (() => {
     root.classList.add('cfg');
     const container = App.el('div', 'container');
     const header = App.el('div', 'container-header');
-    header.append(App.el('div', 'container-title', 'Configuration'), App.el('div', 'page-sub', 'Device, recognition and integration settings.'));
+    header.append(App.el('div', 'container-title', 'Setup'), App.el('div', 'page-sub', 'Device, recognition and integration settings.'));
 
     const details = App.el('details', 'cfg-desc');
     details.append(App.el('summary', '', 'How it works'));
@@ -9187,7 +9190,7 @@ const App = (() => {
     const panels = App.el('div', 'cfg-panels');
     s.panels = {};
     const nav = App.el('nav', 'cfg-nav');
-    nav.setAttribute('aria-label', 'Configuration sections');
+    nav.setAttribute('aria-label', 'Setup sections');
     s.navButtons = {};
     s.sections = {};
     const cardEls = {};
@@ -9216,8 +9219,8 @@ const App = (() => {
         }
         if (sec.note) {
           const note = App.el('div', 'cfg-note');
-          note.append(App.el('span', '', 'Camera image settings (zoom, brightness, exposure, flash), alignment markers and ROIs are set up on the Setup page.'));
-          const open = App.el('button', 'button', 'Open Setup');
+          note.append(App.el('span', '', 'Camera image settings (zoom, brightness, exposure, flash), alignment markers and ROIs are set up on the Configuration page.'));
+          const open = App.el('button', 'button', 'Open Configuration');
           open.type = 'button';
           open.dataset.action = 'open-setup';
           note.append(open);
@@ -9552,7 +9555,7 @@ const App = (() => {
     }
     switch (t.dataset.action) {
       case 'section':
-        App.navigate('#/config/' + t.dataset.section);
+        App.navigate('#/system/setup/' + t.dataset.section);
         break;
       case 'pick': {
         const fld = s.fields[Number(t.closest('[data-fid]').dataset.fid)];
@@ -9627,8 +9630,8 @@ const App = (() => {
   /* ======================================================================== */
   /* View                                                                     */
   /* ======================================================================== */
-  App.register('config', {
-    title: 'Configuration',
+  App.register('system-setup', {
+    title: 'Setup',
 
     mount(root, ctx) {
       const s = (S = {
@@ -9656,12 +9659,12 @@ const App = (() => {
       s.advBox.addEventListener('change', () => {
         setAdvanced(s, s.advBox.checked);
         // an advanced section is not reachable without the switch
-        if (!s.advOn && s.section && s.sections[s.section].adv) App.navigate('#/config/' + DEFAULT_SECTION);
+        if (!s.advOn && s.section && s.sections[s.section].adv) App.navigate('#/system/setup/' + DEFAULT_SECTION);
       }, { signal: sig });
       loadAndBuild(s);
     },
 
-    // sub route changed (#/config/network): the router does not remount the view
+    // sub route changed (#/system/setup/network): the router does not remount the view
     route(ctx) {
       if (!S) return;
       S.ctx = ctx;
