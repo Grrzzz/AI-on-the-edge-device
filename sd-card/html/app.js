@@ -3991,7 +3991,7 @@ const App = (() => {
      *   running:boolean, cycleStart:'ready'|'queued'|'unavailable', processInterval:number, processTime:number, uptime:number, error:number}>}
      */
     async status(signal) {
-      const res = await apiCall('/api/status', { signal, timeout: 4000 }, { parseType: 'json' });
+      const res = await apiCall('/api/status', { signal, timeout: 8000 }, { parseType: 'json' });
       return res.ok && res.data ? res.data : null;
     },
 
@@ -9667,6 +9667,9 @@ const CycleMonitor = (() => {
   let pollTimer = null;
   let tickTimer = null;
   let busy = false;
+  let polling = false; // one request at a time: a busy device must not get a queue of status requests
+  let lastAnswerAt = 0; // performance.now() of the last answer
+  let stale = false; // the last request failed, the values are the last known ones
 
   const $ = (id) => document.getElementById(id);
 
@@ -9682,7 +9685,12 @@ const CycleMonitor = (() => {
     if (!panel) return;
     const btn = $('cycle-start');
 
-    if (!status) {
+    // While the device computes an image it does not answer for a while: keep the last state ("busy") and
+    // only report 'not reachable' when the silence lasts much longer than a cycle step
+    const silence = performance.now() - lastAnswerAt;
+    const unreachable = !status || silence > (status.running ? 90000 : 15000);
+
+    if (unreachable) {
       panel.dataset.kind = 'offline';
       panel.dataset.phase = '';
       $('cycle-state').textContent = 'Device not reachable';
@@ -9697,8 +9705,9 @@ const CycleMonitor = (() => {
     const kind = status.error < 0 ? 'error' : status.error > 0 ? 'warn' : status.running ? 'running' : 'idle';
     panel.dataset.kind = kind;
     panel.dataset.phase = status.running && /take/i.test(status.state || '') ? 'capture' : '';
-    $('cycle-state').textContent = status.state || '-';
+    $('cycle-state').textContent = stale ? 'Computing ...' : status.state || '-';
     $('cycle-count').textContent = `#${status.cycle}`;
+    if (stale && status.running) panel.dataset.kind = 'running';
 
     const drift = (performance.now() - fetchedAt) / 1000;
     let timer;
@@ -9711,21 +9720,33 @@ const CycleMonitor = (() => {
     } else {
       timer = `${status.running ? 'running for' : 'in this state for'} ${formatSeconds(status.stateSeconds + drift)}`;
     }
-    $('cycle-timer').textContent = timer;
+    $('cycle-timer').textContent = stale ? `${timer} · device is busy` : timer;
 
-    const ready = status.cycleStart === 'ready';
-    const queued = status.cycleStart === 'queued';
-    btn.disabled = busy || !(ready || queued);
+    const ready = status.cycleStart === 'ready' && !stale;
+    const queued = status.cycleStart === 'queued' && !stale;
+    btn.disabled = busy || stale || !(ready || queued);
     btn.classList.toggle('queue', queued);
     btn.textContent = queued ? 'Queue next cycle' : status.running ? 'Next cycle queued' : 'Start cycle';
     btn.title = ready ? 'Start a cycle now' : queued ? 'A cycle is running. The next one starts right after it.' : 'The process is not ready for a cycle start';
   }
 
   async function poll() {
-    if (document.hidden) return;
-    const answer = await Api.process.status();
-    status = answer;
-    fetchedAt = performance.now();
+    if (document.hidden || polling) return;
+    polling = true;
+    try {
+      const answer = await Api.process.status();
+      if (answer) {
+        status = answer;
+        fetchedAt = performance.now();
+        lastAnswerAt = fetchedAt;
+        stale = false;
+      } else if (status) {
+        stale = true; // keep the last known state
+        if (!lastAnswerAt) status = null;
+      }
+    } finally {
+      polling = false;
+    }
     render();
   }
 
