@@ -4504,8 +4504,15 @@ const App = (() => {
           const isOk = ['', '000', 'E91'].includes(statusCode);
 
           const card = el('div', `card dash-hero ${isOk ? 'status-valid' : 'status-err'}`);
-          const status = el('div', 'dash-hero-status');
-          status.append(statusContent(data.value_status?.[seq]));
+
+          // status as badge next to the sequence name (the second line of some states becomes a note below the counter)
+          const statusText = String(data.value_status?.[seq] ?? '');
+          const statusEntry = STATUS_TEXT[statusCode];
+          const badgeClass = statusCode === '000' || statusText === '' ? 'badge-success' : ['W01', 'E91', 'E92', 'E93'].includes(statusCode) ? 'badge-warning' : 'badge-error';
+          const badge = el('span', `badge ${badgeClass}`, statusEntry ? statusEntry[0] : statusText);
+          badge.title = statusText;
+          const head = el('div', 'dash-hero-head');
+          head.append(el('div', 'dash-hero-label', `Sequence \u00b7 ${seq}`), badge);
 
           const chips = el('div', 'chips');
           chips.append(chip('Raw', show(data.raw_value?.[seq])));
@@ -4521,7 +4528,9 @@ const App = (() => {
           edit.addEventListener('click', () => openFallbackEditor(card, seq, prefill));
           actions.append(chips, edit);
 
-          card.append(el('div', 'dash-hero-label', `Sequence · ${seq}`), meterEl(show(data.actual_value[seq])), status, actions);
+          card.append(head, meterEl(show(data.actual_value[seq])));
+          if (statusEntry?.[1]) card.append(el('div', 'dash-hero-note', statusEntry[1]));
+          card.append(actions);
           container.appendChild(card);
         }
       };

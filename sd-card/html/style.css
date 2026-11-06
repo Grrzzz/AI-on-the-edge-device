@@ -3065,7 +3065,7 @@ a .rst-content .admonition-title {
   display: grid;
   grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
   gap: var(--card-gap);
-  align-items: start;
+  align-items: stretch;
 }
 
 .dash .dash-side {
@@ -3158,22 +3158,22 @@ a .rst-content .admonition-title {
   font-weight: 700;
 }
 
-.dash .dash-hero-status {
-  margin: 6px 0 14px;
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: var(--success);
+.dash .dash-hero-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
 }
 
-.dash .dash-hero-status small {
-  display: block;
+.dash .dash-hero-note {
+  margin: 2px 0 6px;
   font-size: 0.82rem;
-  font-weight: 400;
   color: var(--text-secondary);
 }
 
-.dash .dash-hero.status-err .dash-hero-status {
-  color: var(--error);
+.dash .dash-hero-actions {
+  margin-top: 10px;
 }
 
 .dash .dash-stats {
@@ -3203,10 +3203,33 @@ a .rst-content .admonition-title {
   transition: opacity 0.3s ease, fill 0.3s ease;
 }
 
+.dash .dash-image {
+  min-height: 0;
+}
+
 .dash .dash-image .card-body {
+  position: relative;
+  flex: 1;
+  min-height: 220px;
   padding: 0 12px 12px;
   display: flex;
   justify-content: center;
+}
+
+/* the picture fills the card, the height of the row is given by the left column */
+@media screen and (min-width: 1157px) {
+  .dash .dash-image .dash-img:not(.is-loading),
+  .dash .dash-image .dash-stage {
+    position: absolute;
+    inset: 0 12px 12px;
+    width: calc(100% - 24px);
+    height: calc(100% - 12px);
+    aspect-ratio: auto;
+  }
+
+  .dash .dash-image .dash-img:not(.is-loading) {
+    object-fit: contain;
+  }
 }
 
 .dash .dash-img:not([src]),
@@ -3531,16 +3554,30 @@ a .rst-content .admonition-title {
 }
 
 .dash-rec .rec-roi-grid {
-  grid-template-columns: repeat(auto-fill, 82px);
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, 46px);
+  gap: 8px;
+}
+
+.dash-rec .rec-body {
+  gap: 14px;
 }
 
 .dash-rec .rec-roi-tile {
-  padding: 8px 6px;
+  gap: 3px;
+  padding: 5px 4px;
+  border-radius: 0.5rem;
 }
 
 .dash-rec .rec-roi-value {
-  font-size: 1rem;
+  font-size: 0.82rem;
+}
+
+.dash-rec .rec-roi-img {
+  border-radius: 0.3rem;
+}
+
+.dash-rec .rec-roi-title {
+  margin-bottom: 6px;
 }
 
 .rec .rec-image-body {
