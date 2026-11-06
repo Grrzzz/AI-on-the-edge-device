@@ -302,6 +302,246 @@
       font-weight: 600;
     }
 
+    /* ------------------------------------------------------------ context help */
+    .help-btn {
+      flex: none;
+      display: inline-block;
+      vertical-align: -3px;
+      width: 18px;
+      height: 18px;
+      margin: 0 0 0 8px;
+      padding: 0;
+      border: 0;
+      background: var(--text-secondary);
+      cursor: help;
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v5M12 8h.01'/%3E%3C/svg%3E") center / contain no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v5M12 8h.01'/%3E%3C/svg%3E") center / contain no-repeat;
+      transition: background var(--transition-speed);
+    }
+
+    .help-btn:hover,
+    .help-btn:focus-visible,
+    .help-btn.pinned {
+      background: var(--primary);
+      outline: none;
+    }
+
+    /* rows with the new help hide the legacy question mark column */
+    tr.has-help td:last-child > * {
+      display: none;
+    }
+
+    .help-pop {
+      position: fixed;
+      z-index: 100;
+      width: min(380px, calc(100vw - 24px));
+      max-height: calc(100vh - 24px);
+      overflow-y: auto;
+      padding: 16px 18px 14px;
+      background: var(--bg-card);
+      color: var(--text-main);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    .hp-title {
+      margin: 0 0 6px;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .hp-text {
+      color: var(--text-secondary);
+    }
+
+    .hp-opts {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 10px;
+    }
+
+    .hp-opt {
+      padding: 7px 10px;
+      border-radius: 0.6rem;
+      background: var(--surface);
+    }
+
+    .hp-opt b {
+      display: block;
+      font-size: 0.82rem;
+    }
+
+    .hp-opt span {
+      color: var(--text-secondary);
+      font-size: 0.82rem;
+    }
+
+    .hp-opt.current {
+      background: var(--primary-soft);
+      box-shadow: inset 3px 0 0 var(--primary);
+    }
+
+    .hp-opt.current b::after {
+      content: ' (current)';
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .hp-now,
+    .hp-tip {
+      margin-top: 10px;
+      padding: 8px 10px;
+      border-radius: 0.6rem;
+      font-size: 0.84rem;
+    }
+
+    .hp-now {
+      background: var(--primary-soft);
+    }
+
+    .hp-now:empty,
+    .hp-tip:empty,
+    .hp-opts:empty {
+      display: none;
+    }
+
+    .hp-tip {
+      background: var(--surface);
+      color: var(--text-secondary);
+    }
+
+    .hp-tip.warn {
+      background: var(--warning-box-bg);
+      color: var(--text-main);
+    }
+
+    /* ------------------------------------------------------------ switches and option cards */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 42px;
+      height: 24px;
+      vertical-align: middle;
+      cursor: pointer;
+    }
+
+    .switch input {
+      position: absolute;
+      opacity: 0;
+      inset: 0;
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .switch span {
+      position: absolute;
+      inset: 0;
+      border-radius: 999px;
+      background: var(--surface-hover);
+      transition: background var(--transition-speed);
+    }
+
+    .switch span::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      transition: transform var(--transition-speed);
+    }
+
+    .switch input:checked + span {
+      background: var(--primary);
+    }
+
+    .switch input:checked + span::after {
+      transform: translateX(18px);
+    }
+
+    .switch input:focus-visible + span {
+      box-shadow: 0 0 0 3px var(--primary-soft);
+    }
+
+    .switch-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .switch-wrap .switch-text {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .opt-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 8px;
+    }
+
+    .opt-card {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 0.8rem;
+      background: var(--bg-card);
+      color: var(--text-main);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color var(--transition-speed), background var(--transition-speed);
+    }
+
+    .opt-card:hover {
+      border-color: var(--primary);
+    }
+
+    .opt-card.on {
+      border-color: var(--primary);
+      background: var(--primary-soft);
+    }
+
+    .opt-card b {
+      font-size: 0.9rem;
+    }
+
+    .opt-card span {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      line-height: 1.35;
+    }
+
+    .gen-hero {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 16px 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--card-radius);
+      box-shadow: var(--shadow);
+    }
+
+    .gen-hero .hero-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+    }
+
     .q {
       height: 16px;
       margin: 0;
@@ -2982,6 +3222,457 @@
       }
     }
 
+    // ------------------------------------------------------------------------
+    // Context help: plain-language explanation per parameter, aware of the current value
+    // ------------------------------------------------------------------------
+    const PARAM_HELP = {
+      // ---- General
+      operationmode_opmode: {
+        title: 'Operation mode',
+        text: 'Decides when the device takes and evaluates pictures.',
+        options: {
+          '-1': ['Setup', 'No automatic readings. Use this while you set up camera, markers and regions.'],
+          '0': ['Manual', 'A reading is only taken when you trigger it (dashboard, REST API or MQTT).'],
+          '1': ['Automatic', 'A reading is taken on a fixed schedule, see Automatic Process Interval.'],
+        },
+      },
+      operationmode_automaticprocessinterval: {
+        title: 'Automatic process interval',
+        text: 'How often the device takes a picture and evaluates it, in minutes.',
+        now: (g) => {
+          const v = parseFloat(g('operationmode_automaticprocessinterval'));
+          return v > 0 ? 'Every ' + v + ' min means about ' + Math.round(1440 / v) + ' readings per day.' : '';
+        },
+        tip: 'If an evaluation takes longer than the interval, the next one starts right after the previous one has finished. 1 to 5 minutes is usual for water and gas.',
+      },
+      operationmode_usedemoimages: {
+        title: 'Use demo images',
+        text: 'Evaluates built-in demo pictures instead of the camera. Handy to test the recognition without a meter.',
+      },
+      webui_httpauth_authmode: {
+        title: 'Web interface protection',
+        text: 'Asks for a username and password before the web interface and the API can be used.',
+        now: (g) => (g('webui_httpauth_authmode') === '1' ? 'Protection is on: you must log in with the credentials below.' : 'Protection is off: anyone in your network can open and change settings.'),
+        tip: 'The login is sent unencrypted over HTTP. It keeps casual visitors out, but use it only inside your own network.',
+      },
+      webui_httpauth_username: { title: 'Username', text: 'The name you log in with.' },
+      webui_httpauth_password: { title: 'Password', text: 'The password you log in with. Leave the field unchanged to keep the current one.' },
+
+      // ---- Recognition: alignment
+      imagealignment_alignmentalgo: {
+        title: 'Alignment algorithm',
+        text: 'Before the numbers are read, the picture is straightened and shifted so it always matches your reference image. This chooses how that is done.',
+        options: {
+          '0': ['Rotate + Align (1 channel)', 'Rotates the picture, then finds your two alignment markers using the red color channel. Fast, right for most meters.'],
+          '1': ['Rotate + Align (3 channels)', 'The same, but compares all three color channels. More accurate, but slower.'],
+          '2': ['Rotate + Align (1 channel + similarity)', 'Adds a similarity check to the marker search. Experimental.'],
+          '3': ['Rotate only', 'Only applies the image rotation, markers are not searched. Use it if the camera can not move at all.'],
+          '4': ['Off', 'No rotation and no alignment, the picture is used exactly as taken.'],
+        },
+        now: (g) => (Number(g('imagealignment_alignmentalgo')) >= 3 ? 'Markers are not used with this option, so the search field values have no effect.' : ''),
+      },
+      imagealignment_searchfield_x: {
+        title: 'Search field X',
+        text: 'Alignment looks for each marker in an area around the position you set on the Setup page. This is how far it searches to the left and right, in pixels.',
+        now: (g) => 'Search area: ' + g('imagealignment_searchfield_x') + ' px to each side of the marker.',
+        tip: 'Larger values cope with more camera movement but slow down processing. Leave at 20 unless the picture shifts a lot.',
+      },
+      imagealignment_searchfield_y: {
+        title: 'Search field Y',
+        text: 'The same as Search Field X, but how far it searches up and down, in pixels.',
+        now: (g) => 'Search area: ' + g('imagealignment_searchfield_y') + ' px above and below the marker.',
+      },
+      imagealignment_debug_savedebuginfo: {
+        title: 'Save debug info',
+        text: 'Stores extra files that show how the alignment found its markers. Turn it on only while troubleshooting, it uses SD card space.',
+      },
+
+      // ---- Recognition: digit / analog
+      digit_enabled: {
+        title: 'Digit recognition',
+        text: 'Reads the rolling number wheels of your meter. Switch it off if your meter only has dials.',
+        now: (g) => 'Digit recognition is ' + (g('digit_enabled') === 'true' ? 'on.' : 'off.'),
+      },
+      analog_enabled: {
+        title: 'Analog recognition',
+        text: 'Reads the pointer dials of your meter. Switch it off if your meter only has rolling number wheels.',
+        now: (g) => 'Analog recognition is ' + (g('analog_enabled') === 'true' ? 'on.' : 'off.'),
+      },
+      digit_model: {
+        title: 'Digit model',
+        text: 'The AI model that reads each digit. Models are files on the SD card. No model is best everywhere, test a few and keep the one with the fewest wrong readings.',
+        now: (g) => describeModel(g('digit_model')),
+      },
+      analog_model: {
+        title: 'Analog model',
+        text: 'The AI model that reads each dial. Models are files on the SD card. Test a few and keep the one with the fewest wrong readings.',
+        now: (g) => describeModel(g('analog_model')),
+      },
+      digit_debug_saveroiimages: {
+        title: 'Save ROI images',
+        text: 'Stores the small cut-out image of every digit in each cycle. Helpful to see why a digit was read wrongly. It fills the SD card over time, so switch it off afterwards.',
+      },
+      analog_debug_saveroiimages: {
+        title: 'Save ROI images',
+        text: 'Stores the small cut-out image of every dial in each cycle. Helpful to see why a dial was read wrongly. It fills the SD card over time, so switch it off afterwards.',
+      },
+
+      // ---- Recognition: post-processing
+      postprocessing_sequence_0_sequencename: {
+        title: 'Number sequence',
+        text: 'A sequence is one counter value made of your digits and dials. The settings below belong to the sequence selected here.',
+      },
+      postprocessing_sequence_0_analogdigitsyncvalue: {
+        title: 'Dial-to-wheel detune',
+        text: 'Fine-tunes how the last digit wheel and the first dial are combined into one number. On many meters they do not move in perfect step, so the digit can be off by one around a carry-over.',
+        now: (g) => 'Current value: ' + g('postprocessing_sequence_0_analogdigitsyncvalue') + ' (allowed range 6.0 to 9.9).',
+        tip: 'Leave it at 9.2 unless the digits and the first dial disagree near a carry-over. Change it in small steps.',
+      },
+      postprocessing_sequence_0_decimalshift: {
+        title: 'Decimal scaling',
+        text: 'Moves the decimal point of the final result so it matches the unit you want. A meter in cubic meters that should report liters needs a shift of 3.',
+        now: (g) => {
+          const n = parseInt(g('postprocessing_sequence_0_decimalshift'), 10) || 0;
+          const out = 12.345 * Math.pow(10, n);
+          return 'Example: a reading of 12.345 becomes ' + String(Number(out.toPrecision(10))) + (n === 0 ? ' (unchanged).' : '.');
+        },
+        tip: 'Positive values multiply by 10 per step, negative values divide. Range -9 to 9.',
+      },
+      postprocessing_sequence_0_extendedresolution: {
+        title: 'Extended resolution',
+        text: 'Gets one more decimal place out of the picture by looking at where the last wheel or dial currently points between two numbers.',
+        now: (g) => (g('postprocessing_sequence_0_extendedresolution') === 'true' ? 'On: the result has one decimal place more than your regions provide.' : 'Off: the result only has the decimal places your regions provide.'),
+        tip: 'Works with the ana-/dig-class100 and -cont models only.',
+      },
+      postprocessing_sequence_0_allownegativerate: {
+        title: 'Allow negative rate',
+        text: 'Lets the value go down. Water and gas meters only count up, so keep this off: a lower reading is then treated as a recognition error and the last valid value is kept.',
+        now: (g) => (g('postprocessing_sequence_0_allownegativerate') === 'true' ? 'On: decreasing readings are accepted.' : 'Off: a decreasing reading is rejected as a recognition error.'),
+        tip: 'Switch it on only for meters that can count backwards.',
+      },
+      postprocessing_sequence_0_maxratechecktype: {
+        title: 'Max rate check type',
+        text: 'Protects against unrealistic jumps, for example when a digit is read wrongly once. It compares a new reading with the last valid one.',
+        options: {
+          '0': ['No rate check', 'Every reading is accepted, including a false jump.'],
+          '1': ['Rate per minute', 'The change since the last valid reading is converted to a rate per minute. Self-healing: the longer no valid reading arrives, the lower the rate gets, until a reading passes again.'],
+          '2': ['Rate per interval', 'The change since the last valid reading is compared directly. Not self-healing: the limit stays fixed, so choose it to cover real use plus some wrong readings.'],
+        },
+      },
+      postprocessing_sequence_0_maxrate: {
+        title: 'Max rate',
+        text: 'The largest change you accept between two valid readings, up or down. Readings above it are rejected and the last valid value stays.',
+        now: (g) => {
+          const t = g('postprocessing_sequence_0_maxratechecktype');
+          const r = parseFloat(g('postprocessing_sequence_0_maxrate'));
+          if (t === '0') return 'Has no effect: the rate check is off.';
+          if (!(r >= 0)) return '';
+          return t === '1'
+            ? 'At most ' + r + ' per minute, which is ' + Number((r * 60).toPrecision(6)) + ' per hour.'
+            : 'At most ' + r + ' between two valid readings, however far apart they are.';
+        },
+      },
+      postprocessing_sequence_0_usefallbackvalue: {
+        title: 'Use fallback value',
+        text: 'The fallback value is the last valid reading. It is the reference for the plausibility checks (negative rate, jumps, replacing unreadable digits).',
+        tip: 'Expert setting. Only change it if you know what it does.',
+        warn: true,
+      },
+      postprocessing_sequence_0_fallbackvalueagestartup: {
+        title: 'Max age of fallback value',
+        text: 'After a restart the device reloads the last valid reading from before the restart, but only if it is not older than this many minutes.',
+        now: (g) => {
+          const m = parseFloat(g('postprocessing_sequence_0_fallbackvalueagestartup'));
+          if (!(m >= 0)) return '';
+          return m === 0 ? 'The old value is never reloaded.' : m + ' min is about ' + Number((m / 60).toPrecision(4)) + ' hours.';
+        },
+        tip: 'Expert setting. Only change it if you know what it does.',
+        warn: true,
+      },
+      postprocessing_debug_savedebuginfo: {
+        title: 'Save debug info',
+        text: 'Writes extra post-processing details to the log files. Use it only for troubleshooting.',
+      },
+    };
+
+    function describeModel(file) {
+      const f = String(file || '').toLowerCase();
+      if (!f) return '';
+      const parts = [];
+      if (f.includes('class100')) parts.push('A classification model that picks one of 100 values (0.0 to 9.9), which allows a decimal place on the last wheel or dial.');
+      else if (f.includes('cont')) parts.push('A continuous model that returns a fractional value directly, so transitions between numbers are smoother.');
+      if (/_q(\.|$)/.test(f)) parts.push('The q in the name usually marks a quantized model: smaller and faster.');
+      return parts.length ? 'Selected: ' + f.replace('.tflite', '') + '. ' + parts.join(' ') : 'Selected: ' + f.replace('.tflite', '') + '.';
+    }
+
+    const paramValue = (key) => {
+      const el = document.getElementById(key + '_value');
+      return el ? String(el.value) : '';
+    };
+
+    let helpPop = null;
+    let helpKey = null;
+    let helpBtn = null;
+    let helpPinned = false;
+    let helpHideTimer = null;
+
+    function ensureHelpPop() {
+      if (helpPop) return;
+      helpPop = document.createElement('div');
+      helpPop.className = 'help-pop';
+      helpPop.setAttribute('role', 'tooltip');
+      helpPop.hidden = true;
+      helpPop.innerHTML = '<div class="hp-title"></div><div class="hp-text"></div><div class="hp-opts"></div><div class="hp-now"></div><div class="hp-tip"></div>';
+      helpPop.addEventListener('mouseenter', () => clearTimeout(helpHideTimer));
+      helpPop.addEventListener('mouseleave', () => scheduleHideHelp());
+      document.body.append(helpPop);
+    }
+
+    function renderHelp() {
+      if (!helpPop || !helpKey) return;
+      const h = PARAM_HELP[helpKey];
+      helpPop.querySelector('.hp-title').textContent = h.title;
+      helpPop.querySelector('.hp-text').textContent = h.text;
+
+      const optsHost = helpPop.querySelector('.hp-opts');
+      optsHost.textContent = '';
+      if (h.options) {
+        const cur = paramValue(helpKey);
+        for (const [value, [name, desc]] of Object.entries(h.options)) {
+          const row = document.createElement('div');
+          row.className = 'hp-opt' + (value === cur ? ' current' : '');
+          const b = document.createElement('b');
+          b.textContent = name;
+          const sp = document.createElement('span');
+          sp.textContent = desc;
+          row.append(b, sp);
+          optsHost.append(row);
+        }
+      }
+
+      helpPop.querySelector('.hp-now').textContent = h.now ? h.now(paramValue) : '';
+      const tip = helpPop.querySelector('.hp-tip');
+      tip.textContent = h.tip || '';
+      tip.classList.toggle('warn', !!h.warn);
+    }
+
+    function placeHelp() {
+      if (!helpBtn || !helpPop) return;
+      helpPop.hidden = false;
+      const r = helpBtn.getBoundingClientRect();
+      const pw = helpPop.offsetWidth;
+      const ph = helpPop.offsetHeight;
+      let left = r.left + r.width / 2 - pw / 2;
+      left = Math.max(12, Math.min(left, window.innerWidth - pw - 12));
+      let top = r.bottom + 10;
+      if (top + ph > window.innerHeight - 12) top = Math.max(12, r.top - ph - 10);
+      helpPop.style.left = left + 'px';
+      helpPop.style.top = top + 'px';
+    }
+
+    function showHelp(btn, key) {
+      ensureHelpPop();
+      clearTimeout(helpHideTimer);
+      if (helpBtn && helpBtn !== btn) helpBtn.classList.remove('pinned');
+      helpKey = key;
+      helpBtn = btn;
+      renderHelp();
+      placeHelp();
+    }
+
+    function hideHelp() {
+      clearTimeout(helpHideTimer);
+      if (helpPop) helpPop.hidden = true;
+      if (helpBtn) helpBtn.classList.remove('pinned');
+      helpPinned = false;
+      helpKey = null;
+      helpBtn = null;
+    }
+
+    function scheduleHideHelp() {
+      if (helpPinned) return;
+      clearTimeout(helpHideTimer);
+      helpHideTimer = setTimeout(hideHelp, 180);
+    }
+
+    function attachHelp() {
+      for (const key of Object.keys(PARAM_HELP)) {
+        const el = document.getElementById(key + '_value');
+        if (!el) continue;
+        const tr = el.closest('tr');
+        const host = tr ? tr.cells[0] : el.closest('.card-header')?.querySelector('span');
+        if (!host || host.querySelector('.help-btn')) continue;
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'help-btn';
+        btn.setAttribute('aria-label', 'Explain: ' + PARAM_HELP[key].title);
+        btn.addEventListener('mouseenter', () => showHelp(btn, key));
+        btn.addEventListener('mouseleave', scheduleHideHelp);
+        btn.addEventListener('focus', () => showHelp(btn, key));
+        btn.addEventListener('blur', scheduleHideHelp);
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (helpPinned && helpBtn === btn) {
+            hideHelp();
+            return;
+          }
+          showHelp(btn, key);
+          helpPinned = true;
+          btn.classList.add('pinned');
+        });
+        host.append(btn);
+        if (tr) tr.classList.add('has-help');
+      }
+
+      // keep an open help current while the value is edited
+      const contentEl = document.getElementById('divcontent');
+      ['change', 'input'].forEach((ev) => contentEl.addEventListener(ev, () => { if (helpKey) { renderHelp(); placeHelp(); } }));
+      document.addEventListener('click', () => { if (helpPinned) hideHelp(); });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideHelp(); });
+      window.addEventListener('scroll', hideHelp, true);
+    }
+
+    // ------------------------------------------------------------------------
+    // Friendlier controls: Disabled/Enabled selects become switches, the operation mode becomes cards
+    // ------------------------------------------------------------------------
+    const enhanced = []; // { sync() }
+
+    function enhanceBooleanSelects() {
+      document.querySelectorAll('#divcontent select').forEach((sel) => {
+        if (sel.options.length !== 2 || sel.dataset.enhanced) return;
+        const labels = [...sel.options].map((o) => o.textContent.trim().toLowerCase());
+        if (!(labels.includes('enabled') && labels.includes('disabled'))) return;
+        const onOpt = [...sel.options].find((o) => o.textContent.trim().toLowerCase() === 'enabled');
+        const offOpt = [...sel.options].find((o) => o.textContent.trim().toLowerCase() === 'disabled');
+
+        const wrap = document.createElement('span');
+        wrap.className = 'switch-wrap';
+        const sw = document.createElement('label');
+        sw.className = 'switch';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.setAttribute('aria-label', sel.name || sel.id);
+        const knob = document.createElement('span');
+        sw.append(cb, knob);
+        const text = document.createElement('span');
+        text.className = 'switch-text';
+        wrap.append(sw, text);
+
+        const sync = () => {
+          const on = sel.value === onOpt.value;
+          cb.checked = on;
+          text.textContent = on ? 'On' : 'Off';
+          cb.disabled = sel.disabled;
+        };
+        cb.addEventListener('change', () => {
+          sel.value = cb.checked ? onOpt.value : offOpt.value;
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+          sync();
+        });
+
+        sel.style.display = 'none';
+        sel.dataset.enhanced = '1';
+        sel.after(wrap);
+        enhanced.push({ sync });
+        sync();
+      });
+    }
+
+    function enhanceOperationMode() {
+      const sel = document.getElementById('operationmode_opmode_value');
+      if (!sel || sel.dataset.enhanced) return;
+      const descriptions = {
+        '-1': 'Configure the device. No automatic readings.',
+        '0': 'Readings only when you trigger them.',
+        '1': 'Readings on a fixed schedule.',
+      };
+      const host = document.createElement('div');
+      host.className = 'opt-cards';
+      const cards = [...sel.options].map((o) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'opt-card';
+        const t = document.createElement('b');
+        t.textContent = o.textContent.trim();
+        const d = document.createElement('span');
+        d.textContent = descriptions[o.value] || '';
+        b.append(t, d);
+        b.addEventListener('click', () => {
+          sel.value = o.value;
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+          sync();
+        });
+        host.append(b);
+        return { o, b };
+      });
+      const sync = () => cards.forEach(({ o, b }) => b.classList.toggle('on', o.value === sel.value));
+      sel.style.display = 'none';
+      sel.dataset.enhanced = '1';
+      sel.after(host);
+      enhanced.push({ sync });
+      sync();
+    }
+
+    // ------------------------------------------------------------------------
+    // General: a summary on top
+    // ------------------------------------------------------------------------
+    let genHero = null;
+
+    function renderGenHero() {
+      if (!genHero) return;
+      const chips = genHero.querySelector('.chips');
+      chips.textContent = '';
+      const add = (label, value) => {
+        const c = document.createElement('span');
+        c.className = 'chip';
+        const b = document.createElement('b');
+        b.textContent = label;
+        c.append(b, document.createTextNode(value));
+        chips.append(c);
+      };
+      const mode = document.getElementById('operationmode_opmode_value');
+      add('Mode', mode ? mode.selectedOptions[0]?.textContent.trim() || '-' : '-');
+      if (paramValue('operationmode_opmode') === '1') add('Interval', paramValue('operationmode_automaticprocessinterval') + ' min');
+      add('Host', paramValue('network_hostname') || '-');
+      add('Digits', paramValue('digit_enabled') === 'true' ? 'on' : 'off');
+      add('Analog', paramValue('analog_enabled') === 'true' ? 'on' : 'off');
+      add('Protection', paramValue('webui_httpauth_authmode') === '1' ? 'on' : 'off');
+    }
+
+    function buildGenHero() {
+      const panels = document.querySelector('.cfg-panels');
+      if (!panels || genHero) return;
+      genHero = document.createElement('div');
+      genHero.className = 'gen-hero';
+      genHero.innerHTML = '<div class="hero-label">This device</div><div class="chips"></div>';
+      panels.prepend(genHero);
+      renderGenHero();
+
+      const nav = document.querySelector('.cfg-nav');
+      const update = () => {
+        const active = nav.querySelector('button.active');
+        genHero.hidden = !active || active.textContent !== 'General';
+      };
+      nav.addEventListener('click', () => setTimeout(update, 0));
+      update();
+    }
+
+    function enhanceConfigUi() {
+      enhanceBooleanSelects();
+      enhanceOperationMode();
+      attachHelp();
+      buildGenHero();
+
+      const contentEl = document.getElementById('divcontent');
+      ['change', 'input'].forEach((ev) =>
+        contentEl.addEventListener(ev, () => {
+          enhanced.forEach((e) => e.sync());
+          renderGenHero();
+        }),
+      );
+    }
+
     // Group headings (<th>) without any visible row below them are hidden
     function updateEmptyGroups() {
       document.querySelectorAll('#divcontent table.table').forEach((table) => {
@@ -3145,6 +3836,7 @@
       setVariableInputLimits();
       $('#divloading').hide(); // Hide loading indicator
       buildSectionNav();
+      enhanceConfigUi();
       jsonConfigModifiedDelta = {}; // limits / visibility handlers fired change events while initializing: nothing is modified yet
       const contentEl = document.getElementById('divcontent');
       ['change', 'input'].forEach((ev) => contentEl.addEventListener(ev, () => setTimeout(() => { updateConfigSaveBar(); updateEmptyGroups(); }, 0)));
