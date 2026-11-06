@@ -101,7 +101,10 @@ def postBuildAction(source, target, env):
     if not inGithubActions:
         print(f"{scriptName}: Step 4: Create firmware package (ZIP file in .builds folder)")
 
-        zipFilename = f"AI-on-the-edge-device__{envName}__SLFork_{commitHash}.zip"
+        # Naming: AI-on-the-edge-device__<board>__grrzzz_release_<release version>.zip
+        # The release version comes from the environment variable RELEASE_VERSION (e.g. v18.0.0), local builds use "dev"
+        releaseVersion = os.environ.get("RELEASE_VERSION", "").strip() or "dev"
+        zipFilename = f"AI-on-the-edge-device__{envName}__grrzzz_release_{releaseVersion}.zip"
         zipPath = os.path.join(projectRoot, ".builds", zipFilename)
 
         def addDirectoryToZip(zipFile, directory, basePath, targetPrefix="", renameMap=None, excludeFiles=None):

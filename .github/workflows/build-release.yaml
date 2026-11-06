@@ -188,7 +188,7 @@ jobs:
         rm -rf release
         mkdir -p release
         cd "AI-on-the-edge-device__${{ matrix.plat }}__SLFork_${{ steps.vars.outputs.branch }}_${{ steps.vars.outputs.sha_short }}"
-        zip -r ../release/AI-on-the-edge-device__${{ matrix.plat }}__SLFork_v${{ needs.prepare-release.outputs.version }}.zip *
+        zip -r ../release/AI-on-the-edge-device__${{ matrix.plat }}__grrzzz_release_v${{ needs.prepare-release.outputs.version }}.zip *
         cd ..
 
     - name: Upload artifacts to release tag
