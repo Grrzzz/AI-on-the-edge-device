@@ -96,18 +96,6 @@
               <td class="label">MQTT</td>
               <td class="val"><output class="badge" id="mqtt_status"></output></td>
             </tr>
-            <tr>
-              <td class="label">InfluxDB v1.x</td>
-              <td class="val"><output class="badge" id="influxdbv1_status"></output></td>
-            </tr>
-            <tr>
-              <td class="label">InfluxDB v2.x</td>
-              <td class="val"><output class="badge" id="influxdbv2_status"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Webhook</td>
-              <td class="val"><output class="badge" id="webhook_status"></output></td>
-            </tr>
           </table>
         </div>
       </div>
@@ -557,29 +545,8 @@
         addClassToElement('mqtt_status', 'badge-error');
       }
 
-      document.getElementById('influxdbv1_status').textContent = _jsonData.influxdbv1_status;
-      if (_jsonData.influxdbv1_status.substring(0, 7) == 'Enabled') addClassToElement('influxdbv1_status', 'badge-success');
-      else if (_jsonData.influxdbv1_status == 'Disabled') addClassToElement('influxdbv1_status', 'badge-disabled');
-      else {
-        document.getElementById('influxdbv1_status').textContent += ' (Unknown Status)';
-        addClassToElement('influxdbv1_status', 'badge-error');
-      }
 
-      document.getElementById('influxdbv2_status').textContent = _jsonData.influxdbv2_status;
-      if (_jsonData.influxdbv2_status.substring(0, 7) == 'Enabled') addClassToElement('influxdbv2_status', 'badge-success');
-      else if (_jsonData.influxdbv2_status == 'Disabled') addClassToElement('influxdbv2_status', 'badge-disabled');
-      else {
-        document.getElementById('influxdbv2_status').textContent += ' (Unknown Status)';
-        addClassToElement('influxdbv2_status', 'badge-error');
-      }
 
-      document.getElementById('webhook_status').textContent = _jsonData.webhook_status;
-      if (_jsonData.webhook_status.substring(0, 7) == 'Enabled') addClassToElement('webhook_status', 'badge-success');
-      else if (_jsonData.webhook_status == 'Disabled') addClassToElement('webhook_status', 'badge-disabled');
-      else {
-        document.getElementById('webhook_status').textContent += ' (Unknown Status)';
-        addClassToElement('webhook_status', 'badge-error');
-      }
 
       document.getElementById('ntp_syncstatus').textContent = _jsonData.ntp_syncstatus;
       if (_jsonData.ntp_syncstatus == 'Synchronized') addClassToElement('ntp_syncstatus', 'badge-success');

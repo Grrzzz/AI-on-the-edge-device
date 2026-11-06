@@ -355,7 +355,6 @@
     <section class="card activity">
       <div class="card-header">
         <span>Activity</span>
-        <button class="link-btn" onclick="openLogViewer()">Open log viewer</button>
       </div>
       <div class="activity-sub">Latest messages from the device.</div>
       <div class="console" id="activityLog" aria-live="polite"><span class="log-empty">Loading ...</span></div>
@@ -530,14 +529,6 @@
     // Activity log: newest message first, debug messages hidden
     const LOG_REGEX = /^(\[.*?\])\s+(.*?)\s+<(.*?)>\s+\[(.*?)\]\s+(.*)/;
     const LOG_MAX_LINES = 40;
-
-    function openLogViewer() {
-      try {
-        window.parent.loadPage('sys_log.html?v=$COMMIT_HASH');
-      } catch (e) {
-        window.location.href = 'sys_log.html?v=$COMMIT_HASH';
-      }
-    }
 
     async function loadActivity() {
       const box = document.getElementById('activityLog');
