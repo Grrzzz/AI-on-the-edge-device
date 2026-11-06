@@ -1098,6 +1098,7 @@ const App = (() => {
       parts = segs.slice(2);
     }
     // links of earlier versions: #/setup[/tab] is now #/config, the old configuration sections moved to #/system/setup
+    if (key === 'recognition') key = 'dashboard'; // the results are part of the dashboard
     if (key === 'setup') key = 'config';
     else if (key === 'config' && ['general', 'network', 'recognition', 'mqtt', 'camera', 'gpio'].includes(parts[0])) key = 'system-setup';
     if (!views.has(key)) {
@@ -4066,6 +4067,31 @@ const App = (() => {
   };
   const show = (v) => (v === null || v === undefined || v === '' ? '--' : String(v));
 
+  // Result tiles of one ROI kind (digit / analog): value of the recognition and the cut-out image
+  const recRoiSection = (title, block) => {
+    const wrap = el('div', 'rec-roi-block');
+    wrap.append(el('div', 'rec-roi-title', title));
+    if (block.enabled && block.rois.length) {
+      const grid = el('div', 'rec-roi-grid');
+      for (const roi of block.rois) {
+        const tile = el('div', 'rec-roi-tile');
+        if (!roi.na && roi.image) {
+          const img = el('img', 'rec-roi-img');
+          img.src = Api.process.imageUrl(roi.image);
+          img.alt = `ROI ${roi.value}`;
+          tile.append(el('div', 'rec-roi-value', roi.value), img);
+        } else {
+          tile.append(el('div', 'rec-roi-value na', 'N/A'), el('div', 'rec-roi-noimg', 'No image'));
+        }
+        grid.append(tile);
+      }
+      wrap.append(grid);
+    } else {
+      wrap.append(el('div', 'rec-roi-disabled', 'Disabled'));
+    }
+    return wrap;
+  };
+
   // The reading as a counter: black wheels for the whole numbers, red wheels for the decimals ('N' = digit not recognized)
   const meterEl = (value) => {
     const text = String(value).trim().replace(',', '.');
@@ -4169,6 +4195,12 @@ const App = (() => {
       </div>
     </main>
 
+    <section class="card dash-rec rec">
+      <div class="card-header"><span>Recognition</span></div>
+      <div class="dash-activity-sub">Result of the last completed cycle: what the AI read in each region.</div>
+      <div class="rec-body" data-ref="recBody"><span class="dash-log-empty">Loading ...</span></div>
+    </section>
+
     <section class="card dash-activity">
       <div class="card-header"><span>Activity</span></div>
       <div class="dash-activity-sub">Latest messages from the device.</div>
@@ -4177,7 +4209,6 @@ const App = (() => {
 
   let dashSeq = 0;
   let dashActive = null; // state of the mounted dashboard view
-  let recActive = null; // state of the mounted recognition view
 
   App.register('dashboard', {
     title: 'Dashboard',
@@ -4395,6 +4426,29 @@ const App = (() => {
         });
       };
 
+      const renderRecognition = (data) => {
+        const body = ref.recBody;
+        body.textContent = '';
+        if (!data) {
+          body.append(el('span', 'dash-log-empty', 'Recognition details not available'));
+          return;
+        }
+        if (!data.ready) {
+          body.append(el('span', 'dash-log-empty', `Waiting for the first completed cycle (${data.state || 'not initialized'})`));
+          return;
+        }
+        for (const seq of data.sequences) {
+          if (data.sequences.length > 1) body.append(el('div', 'rec-roi-title', `Sequence \u00b7 ${seq.name}`));
+          body.append(recRoiSection('Digit ROIs', seq.digit), recRoiSection('Analog ROIs', seq.analog));
+        }
+      };
+
+      const loadRecognition = async () => {
+        const data = await Api.process.recognition(st.abort.signal);
+        if (st.dead) return;
+        renderRecognition(data);
+      };
+
       const refresh = async (auto = false) => {
         if (st.running || st.dead) return;
         if (auto && st.editingSeq !== null) return; // keep an open editor untouched
@@ -4411,7 +4465,7 @@ const App = (() => {
 
           // Manual refresh always reloads the image; auto refresh only when cycle or step changed
           if (!auto || key !== st.lastImageKey) {
-            await loadRoiImage();
+            await Promise.all([loadRoiImage(), loadRecognition()]);
             st.lastImageKey = key;
           }
         } catch (error) {
@@ -4443,6 +4497,7 @@ const App = (() => {
         st.lastImageKey = await loadProcessData();
         if (st.dead) return;
         loadRoiImage();
+        loadRecognition();
         loadActivity();
         scheduleAuto();
       })();
@@ -4455,130 +4510,6 @@ const App = (() => {
       clearTimeout(st.timer);
       st.abort.abort();
       dashActive = null;
-    },
-  });
-
-  // ------------------------------------------------------------------------
-  // View: recognition
-  // ------------------------------------------------------------------------
-  App.register('recognition', {
-    title: 'Recognition',
-
-    mount(root) {
-      root.classList.add('rec');
-      const st = { dead: false, abort: new AbortController() };
-      recActive = st;
-
-      root.innerHTML = `
-        <div class="container-header">
-          <div class="container-title">Recognition</div>
-          <div class="page-sub">Result of the last completed recognition cycle.</div>
-        </div>
-        <div class="container-content" data-ref="content"></div>`;
-      const content = root.querySelector('[data-ref="content"]');
-
-      const card = (title) => {
-        const c = el('div', 'card');
-        if (title) c.append(el('div', 'card-header', title));
-        return c;
-      };
-
-      const roiSection = (title, block) => {
-        const wrap = el('div', 'rec-roi-block');
-        wrap.append(el('div', 'rec-roi-title', title));
-        if (block.enabled && block.rois.length) {
-          const grid = el('div', 'rec-roi-grid');
-          for (const roi of block.rois) {
-            const tile = el('div', 'rec-roi-tile');
-            if (!roi.na && roi.image) {
-              const img = el('img', 'rec-roi-img');
-              img.src = Api.process.imageUrl(roi.image);
-              img.alt = `ROI ${roi.value}`;
-              tile.append(el('div', 'rec-roi-value', roi.value), img);
-            } else {
-              tile.append(el('div', 'rec-roi-value na', 'N/A'), el('div', 'rec-roi-noimg', 'No image'));
-            }
-            grid.append(tile);
-          }
-          wrap.append(grid);
-        } else {
-          wrap.append(el('div', 'rec-roi-disabled', 'Disabled'));
-        }
-        return wrap;
-      };
-
-      const stat = (label, value) => {
-        const s = el('div', 'stat');
-        s.append(el('div', 'stat-label', label), el('div', 'stat-value', value));
-        return s;
-      };
-
-      const renderNotice = (title, text, state, withRefresh) => {
-        const c = card();
-        const n = el('div', 'rec-notice');
-        n.append(el('div', 'rec-notice-title', title), el('div', '', text));
-        if (state !== undefined) {
-          const s = el('div');
-          s.append('Current state: ', el('strong', '', state));
-          n.append(s);
-        }
-        if (withRefresh) {
-          const b = el('button', 'button btn-action', 'Refresh');
-          b.type = 'button';
-          b.addEventListener('click', load);
-          const wrap = el('div');
-          wrap.append(b);
-          n.append(wrap);
-        }
-        c.append(n);
-        content.append(c);
-      };
-
-      const render = (data) => {
-        content.textContent = '';
-        if (!data) {
-          renderNotice('Recognition details not available', 'The device did not answer. Please try again.', undefined, true);
-          return;
-        }
-        if (!data.ready) {
-          renderNotice('Waiting for the first completed cycle', 'Details are available once the device is initialized and a cycle has finished.', data.state, true);
-          return;
-        }
-
-        for (const seq of data.sequences) {
-          const c = card(`Sequence · ${seq.name}`);
-          const body = el('div', 'card-body rec-body');
-          const values = el('div', 'rec-values');
-          values.append(stat('Raw value', seq.rawValue), stat('Actual value', seq.actualValue));
-          body.append(values, roiSection('Digit ROIs', seq.digit), roiSection('Analog ROIs', seq.analog));
-          c.append(body);
-          content.append(c);
-        }
-
-        const c = card('Processed image');
-        const body = el('div', 'card-body rec-image-body');
-        const img = el('img', 'rec-img');
-        img.src = Api.process.imageUrl(data.image || 'alg_roi.jpg');
-        img.alt = 'Processed image';
-        body.append(img);
-        c.append(body);
-        content.append(c);
-      };
-
-      async function load() {
-        const data = await Api.process.recognition(st.abort.signal);
-        if (st.dead) return;
-        render(data);
-      }
-      load();
-    },
-
-    unmount() {
-      const st = recActive;
-      if (!st) return;
-      st.dead = true;
-      st.abort.abort();
-      recActive = null;
     },
   });
 })();
@@ -4967,7 +4898,7 @@ const App = (() => {
    * Mounts the setup editor (reference image / markers / digit ROIs / analog ROIs) into `root`.
    * All state lives in this closure, any number of mounts is possible (one at a time in practice).
    * @param {HTMLElement} root
-   * @param {'image'|'markers'|'digit'|'digits'|'analog'|undefined} tab  initial tab (default: first enabled ROI type)
+   * @param {'image'|'markers'|'digit'|'digits'|'analog'|undefined} tab  initial tab (default: image)
    * @param {{tabs?:boolean, header?:boolean, helpOpen?:boolean, saveBar?:'global'|'inline'|'none',
    *          onNavigate?:(tab:string)=>void, onTabChange?:(tab:string)=>void, onDirtyChange?:(dirty:boolean)=>void}} [opts]
    *   tabs      show the tab bar (default true)
@@ -6722,7 +6653,7 @@ const App = (() => {
         cfg = await Api.setup.loadConfig();
         if (destroyed) return;
         const wanted = ROUTE_TO_TAB[tab];
-        const start = wanted || (cfg.digit.enabled ? 'digit' : cfg.analog.enabled ? 'analog' : 'markers');
+        const start = wanted || 'image'; // first tab
         await setTab(start, true);
       } catch (error) {
         firework.launch('Failed to load config. Retry or check logs', 'danger', 5000);

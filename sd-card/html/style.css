@@ -3443,6 +3443,27 @@ a .rst-content .admonition-title {
   color: var(--text-secondary);
 }
 
+.dash-rec {
+  margin-top: var(--card-gap);
+}
+
+.dash-rec .rec-body {
+  padding-top: 0;
+}
+
+.dash-rec .rec-roi-grid {
+  grid-template-columns: repeat(auto-fill, 82px);
+  gap: 10px;
+}
+
+.dash-rec .rec-roi-tile {
+  padding: 8px 6px;
+}
+
+.dash-rec .rec-roi-value {
+  font-size: 1rem;
+}
+
 .rec .rec-image-body {
   padding: 0 12px 12px;
 }
