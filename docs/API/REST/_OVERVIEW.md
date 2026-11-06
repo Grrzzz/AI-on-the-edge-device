@@ -24,6 +24,7 @@ Further details can be found in the respective REST API endpoint description.
 | [/data](data.md)                     | Data Log                                           | JSON + HTML | 
 | [/log](log.md)                       | Device Log                                         | JSON + HTML | 
 | [/ota](ota.md)                       | Over The Air Update                                | HTML        | 
+| [/ota (self update)](ota_selfupdate.md)| One-click Update (Device Downloads Release From GitHub)| JSON + HTML |
 | [/reboot](reboot.md)                 | Trigger Reboot                                     | HTML        | 
 | [/wlan](wlan.md)                     | WLAN Scan                                          | JSON        |
 | [/coredump](coredump.md)             | Handle Core Dumps (Software Exception)             | HTML        | 

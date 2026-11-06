@@ -12,6 +12,12 @@
 #include <esp_log.h>
 #include <esp_partition.h>
 #include <esp_app_format.h>
+#include <esp_http_client.h>
+#include <esp_crt_bundle.h>
+#include <cJSON.h>
+#include <atomic>
+#include <cstring>
+#include <strings.h>
 #include "miniz.h"
 
 #ifdef ENABLE_MQTT
@@ -28,6 +34,7 @@
 #include "helper.h"
 #include "system.h"
 #include "statusled.h"
+#include "time_sntp.h"
 
 
 static const char *TAG = "SERVER_OTA";
@@ -627,6 +634,458 @@ esp_err_t handler_ota(httpd_req_t *req)
 }
 
 
+// ---------------------------------------------------------------------------------------------
+// Self update: Download of the release package from GitHub. Afterwards the regular OTA path
+// (staged package -> reboot -> checkOtaUpdate() -> processOtaUpdate()) is used, as for a manual upload.
+// ---------------------------------------------------------------------------------------------
+constexpr size_t SELFUPDATE_MAX_URL_LENGTH = 300;
+constexpr size_t SELFUPDATE_MAX_REDIRECTS = 5;
+constexpr size_t SELFUPDATE_LOCATION_BUFSIZE = 2048; // CDN redirect URLs carry long signed query strings
+constexpr size_t SELFUPDATE_DOWNLOAD_BUFSIZE = 4096;
+constexpr uint8_t SELFUPDATE_MAX_READ_RETRIES = 5;
+constexpr int SELFUPDATE_TIMEOUT_MS = 15000;
+
+static const char *const SELFUPDATE_ALLOWED_HOSTS[] = {"github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com"};
+
+enum class SelfUpdateState : uint8_t { Idle, Downloading, Staging, Done, Error };
+
+static std::atomic<SelfUpdateState> selfUpdateState{SelfUpdateState::Idle};
+static std::atomic<int> selfUpdatePercent{0};
+static char selfUpdateMessage[96] = "";
+static portMUX_TYPE selfUpdateMux = portMUX_INITIALIZER_UNLOCKED;
+
+struct SelfUpdateParams {
+    char url[SELFUPDATE_MAX_URL_LENGTH + 1];
+};
+
+
+static void setSelfUpdateMessage(const char *msg)
+{
+    portENTER_CRITICAL(&selfUpdateMux);
+    strlcpy(selfUpdateMessage, msg, sizeof(selfUpdateMessage));
+    portEXIT_CRITICAL(&selfUpdateMux);
+}
+
+
+static void setSelfUpdateError(const std::string &msg)
+{
+    LogFile.writeToFile(ESP_LOG_ERROR, TAG, "Self update failed: " + msg);
+    setSelfUpdateMessage(msg.c_str());
+    selfUpdateState = SelfUpdateState::Error;
+}
+
+
+static bool isAllowedSelfUpdateHost(const std::string &host)
+{
+    for (const char *allowed : SELFUPDATE_ALLOWED_HOSTS) {
+        if (host == allowed) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+// Splits a https URL into host and path (without query / fragment). Rejects userinfo and explicit ports.
+static bool parseHttpsUrl(const std::string &url, std::string &host, std::string &path, std::string &error)
+{
+    static const char *scheme = "https://";
+    if (url.compare(0, strlen(scheme), scheme) != 0) {
+        error = "URL scheme must be https";
+        return false;
+    }
+
+    for (const char c : url) {
+        if ((unsigned char)c <= 0x20 || (unsigned char)c >= 0x7F) {
+            error = "URL contains invalid characters";
+            return false;
+        }
+    }
+
+    const size_t hostStart = strlen(scheme);
+    const size_t hostEnd = url.find_first_of("/?#", hostStart);
+    host = toLower(url.substr(hostStart, hostEnd == std::string::npos ? std::string::npos : hostEnd - hostStart));
+    if (host.empty() || host.find_first_of("@:") != std::string::npos) {
+        error = "Invalid URL host";
+        return false;
+    }
+
+    if (!isAllowedSelfUpdateHost(host)) {
+        error = "Host not allowed: " + host;
+        return false;
+    }
+
+    path.clear();
+    if (hostEnd != std::string::npos && url[hostEnd] == '/') {
+        const size_t pathEnd = url.find_first_of("?#", hostEnd);
+        path = url.substr(hostEnd, pathEnd == std::string::npos ? std::string::npos : pathEnd - hostEnd);
+    }
+    return true;
+}
+
+
+// Validates the initial (user supplied) URL: https, allowed host, *.zip, file name matches this board
+static bool validateSelfUpdateUrl(const std::string &url, std::string &error)
+{
+    std::string host, path;
+    if (!parseHttpsUrl(url, host, path, error)) {
+        return false;
+    }
+
+    const std::string pathLower = toLower(path);
+    if (pathLower.size() < 5 || pathLower.compare(pathLower.size() - 4, 4, ".zip") != 0) {
+        error = "URL path must end in .zip";
+        return false;
+    }
+
+    const size_t slash = pathLower.find_last_of('/');
+    const std::string fileName = slash == std::string::npos ? pathLower : pathLower.substr(slash + 1);
+    const std::string boardTag = "__" + toLower(std::string(BOARD_TYPE_NAME)) + "__";
+    if (fileName.find(boardTag) == std::string::npos) {
+        error = "File name does not match this board (expected '" + boardTag + "' in name)";
+        return false;
+    }
+    return true;
+}
+
+
+struct SelfUpdateHeaderCtx {
+    char *location;
+    bool locationTooLong;
+};
+
+
+static esp_err_t selfUpdateHttpEvent(esp_http_client_event_t *evt)
+{
+    SelfUpdateHeaderCtx *ctx = (SelfUpdateHeaderCtx *)evt->user_data;
+    if (evt->event_id == HTTP_EVENT_ON_HEADER && ctx && evt->header_key && evt->header_value) {
+        if (strcasecmp(evt->header_key, "Location") == 0) {
+            if (strlen(evt->header_value) >= SELFUPDATE_LOCATION_BUFSIZE) {
+                ctx->locationTooLong = true;
+            }
+            else {
+                strlcpy(ctx->location, evt->header_value, SELFUPDATE_LOCATION_BUFSIZE);
+            }
+        }
+    }
+    return ESP_OK;
+}
+
+
+// Downloads the URL into destFile. Returns empty string on success, otherwise an error text.
+static std::string downloadSelfUpdatePackage(const std::string &startUrl, const char *destFile)
+{
+    std::string result;
+    char *location = (char *)malloc(SELFUPDATE_LOCATION_BUFSIZE);
+    char *buffer = (char *)malloc(SELFUPDATE_DOWNLOAD_BUFSIZE);
+    if (!location || !buffer) {
+        free(location);
+        free(buffer);
+        return "Out of memory";
+    }
+    location[0] = '\0';
+
+    SelfUpdateHeaderCtx headerCtx = {location, false};
+
+    esp_http_client_config_t config = {};
+    config.url = startUrl.c_str();
+    config.transport_type = HTTP_TRANSPORT_OVER_SSL;
+    config.crt_bundle_attach = esp_crt_bundle_attach;
+    config.timeout_ms = SELFUPDATE_TIMEOUT_MS;
+    config.buffer_size = 4096;           // Long header lines (CDN redirect)
+    config.buffer_size_tx = 2048;        // Long request line (CDN URL with signed query)
+    config.disable_auto_redirect = true; // Every redirect target is validated manually
+    config.event_handler = selfUpdateHttpEvent;
+    config.user_data = &headerCtx;
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    FILE *file = NULL;
+    int64_t contentLength = -1;
+    int64_t received = 0;
+
+    if (!client) {
+        free(location);
+        free(buffer);
+        return "HTTP client init failed";
+    }
+
+    for (size_t redirects = 0;; ++redirects) {
+        location[0] = '\0';
+        headerCtx.locationTooLong = false;
+
+        const esp_err_t err = esp_http_client_open(client, 0);
+        if (err != ESP_OK) {
+            result = std::string("Connection failed: ") + esp_err_to_name(err);
+            goto cleanup;
+        }
+
+        contentLength = esp_http_client_fetch_headers(client);
+        const int status = esp_http_client_get_status_code(client);
+
+        if (status == 301 || status == 302 || status == 303 || status == 307 || status == 308) {
+            if (redirects >= SELFUPDATE_MAX_REDIRECTS) {
+                result = "Too many redirects";
+                goto cleanup;
+            }
+            if (headerCtx.locationTooLong || location[0] == '\0') {
+                result = "Invalid redirect response";
+                goto cleanup;
+            }
+
+            std::string host, path, error;
+            if (!parseHttpsUrl(location, host, path, error)) {
+                result = "Redirect rejected: " + error;
+                goto cleanup;
+            }
+
+            esp_http_client_close(client);
+            if (esp_http_client_set_url(client, location) != ESP_OK) {
+                result = "Redirect URL rejected";
+                goto cleanup;
+            }
+            continue;
+        }
+
+        if (status != 200) {
+            result = "Download failed: HTTP status " + std::to_string(status);
+            goto cleanup;
+        }
+        break;
+    }
+
+    if (contentLength <= 0 || contentLength > MAX_FILE_SIZE) {
+        result = "Invalid content length of download";
+        goto cleanup;
+    }
+
+    file = fopen(destFile, "wb");
+    if (!file) {
+        result = "Failed to create file on SD card";
+        goto cleanup;
+    }
+
+    {
+        uint8_t retries = 0;
+        int lastPercent = -1;
+
+        while (received < contentLength) {
+            const int64_t remaining = contentLength - received;
+            const int toRead = (int)(remaining < (int64_t)SELFUPDATE_DOWNLOAD_BUFSIZE ? remaining : (int64_t)SELFUPDATE_DOWNLOAD_BUFSIZE);
+            const int n = esp_http_client_read(client, buffer, toRead);
+
+            if (n < 0) {
+                if (n == -ESP_ERR_HTTP_EAGAIN && ++retries <= SELFUPDATE_MAX_READ_RETRIES) {
+                    continue;
+                }
+                result = "Download interrupted (read error)";
+                goto cleanup;
+            }
+            if (n == 0) {
+                if (esp_http_client_is_complete_data_received(client)) {
+                    break;
+                }
+                if (++retries <= SELFUPDATE_MAX_READ_RETRIES) {
+                    continue;
+                }
+                result = "Download interrupted (connection closed)";
+                goto cleanup;
+            }
+
+            retries = 0;
+            if (fwrite(buffer, 1, n, file) != (size_t)n) {
+                result = "Failed to write to SD card (card full?)";
+                goto cleanup;
+            }
+            received += n;
+
+            const int percent = (int)((received * 100) / contentLength);
+            selfUpdatePercent = percent;
+            if (percent / 10 != lastPercent / 10) {
+                ESP_LOGI(TAG, "Self update download: %d%%", percent);
+                lastPercent = percent;
+            }
+        }
+    }
+
+    if (received != contentLength) {
+        result = "Download incomplete | Received " + std::to_string(received) + " of " + std::to_string(contentLength) + " bytes";
+    }
+
+cleanup:
+    if (file) {
+        fclose(file);
+    }
+    esp_http_client_close(client);
+    esp_http_client_cleanup(client);
+    free(location);
+    free(buffer);
+
+    if (!result.empty()) {
+        deleteFile(destFile);
+    }
+    return result;
+}
+
+
+static void taskSelfUpdate(void *pvParameter)
+{
+    SelfUpdateParams *params = (SelfUpdateParams *)pvParameter;
+    const std::string url(params->url);
+    free(params);
+
+    LogFile.writeToFile(ESP_LOG_INFO, TAG, "Self update started");
+
+    makeDir(DIR_OTA_STAGED);
+    deleteAllFilesInDirectory(DIR_OTA_STAGED, true);
+
+    const std::string error = downloadSelfUpdatePackage(url, FILE_OTA_STAGED_PACKAGE);
+    if (!error.empty()) {
+        deleteAllFilesInDirectory(DIR_OTA_STAGED, true);
+        setSelfUpdateError(error);
+        vTaskDelete(NULL);
+        return;
+    }
+
+    selfUpdatePercent = 100;
+    selfUpdateState = SelfUpdateState::Staging;
+    setSelfUpdateMessage("Validating and staging update package");
+
+    // Same checks as the manual upload path: only a ZIP package (firmware + WebUI) is accepted
+    if (detectPackageType(FILE_OTA_STAGED_PACKAGE) != "ZIP") {
+        deleteAllFilesInDirectory(DIR_OTA_STAGED, true);
+        setSelfUpdateError("Downloaded file is not a valid ZIP package");
+        vTaskDelete(NULL);
+        return;
+    }
+
+    LogFile.writeToFile(ESP_LOG_INFO, TAG,
+                        "Self update package downloaded | Size: " + std::to_string(getFileSize(FILE_OTA_STAGED_PACKAGE)));
+
+    setSelfUpdateMessage("Download complete. Device reboots to install update");
+    selfUpdateState = SelfUpdateState::Done;
+
+    vTaskDelay(pdMS_TO_TICKS(1500)); // Give the WebUI the chance to poll the final state
+    doReboot();                      // Mandatory reboot: Package is processed by checkOtaUpdate() during next boot (as for manual upload)
+    vTaskDelete(NULL);
+}
+
+
+static esp_err_t sendOtaTextResponse(httpd_req_t *req, const char *status, const char *text)
+{
+    httpd_resp_set_status(req, status);
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_sendstr(req, text);
+    return ESP_OK;
+}
+
+
+// GET /ota?task=selfupdate&url=<urlencoded>  |  GET /ota?task=selfupdate_status
+esp_err_t handler_ota_selfupdate(httpd_req_t *req)
+{
+    char query[1100];
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) != ESP_OK) {
+        return sendOtaTextResponse(req, "400 Bad Request", "002: Missing parameter 'task' (selfupdate | selfupdate_status)");
+    }
+
+    char task[24];
+    if (httpd_query_key_value(query, "task", task, sizeof(task)) != ESP_OK) {
+        return sendOtaTextResponse(req, "400 Bad Request", "002: Missing or invalid parameter 'task' (selfupdate | selfupdate_status)");
+    }
+
+    if (strcmp(task, "selfupdate_status") == 0) {
+        static const char *const stateNames[] = {"idle", "downloading", "staging", "done", "error"};
+
+        char message[sizeof(selfUpdateMessage)];
+        portENTER_CRITICAL(&selfUpdateMux);
+        strlcpy(message, selfUpdateMessage, sizeof(message));
+        portEXIT_CRITICAL(&selfUpdateMux);
+
+        cJSON *json = cJSON_CreateObject();
+        if (!json) {
+            return sendOtaTextResponse(req, "500 Internal Server Error", "003: Out of memory");
+        }
+        cJSON_AddStringToObject(json, "state", stateNames[(int)selfUpdateState.load()]);
+        cJSON_AddNumberToObject(json, "percent", selfUpdatePercent.load());
+        cJSON_AddStringToObject(json, "message", message);
+        char *jsonStr = cJSON_PrintUnformatted(json);
+        cJSON_Delete(json);
+        if (!jsonStr) {
+            return sendOtaTextResponse(req, "500 Internal Server Error", "003: Out of memory");
+        }
+
+        httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, jsonStr);
+        cJSON_free(jsonStr);
+        return ESP_OK;
+    }
+
+    if (strcmp(task, "selfupdate") != 0) {
+        return sendOtaTextResponse(req, "400 Bad Request", "002: Unknown task (selfupdate | selfupdate_status)");
+    }
+
+    // Encoded value may be up to 3x longer than the decoded URL
+    constexpr size_t encodedBufSize = SELFUPDATE_MAX_URL_LENGTH * 3 + 1;
+    char *encodedUrl = (char *)malloc(encodedBufSize);
+    if (!encodedUrl) {
+        return sendOtaTextResponse(req, "500 Internal Server Error", "003: Out of memory");
+    }
+    const esp_err_t keyErr = httpd_query_key_value(query, "url", encodedUrl, encodedBufSize);
+    if (keyErr == ESP_ERR_HTTPD_RESULT_TRUNC) {
+        free(encodedUrl);
+        return sendOtaTextResponse(req, "400 Bad Request", "002: Parameter 'url' too long");
+    }
+    if (keyErr != ESP_OK) {
+        free(encodedUrl);
+        return sendOtaTextResponse(req, "400 Bad Request", "002: Missing parameter 'url'");
+    }
+    const std::string url = urlDecode(encodedUrl);
+    free(encodedUrl);
+
+    if (url.empty() || url.size() > SELFUPDATE_MAX_URL_LENGTH) {
+        return sendOtaTextResponse(req, "400 Bad Request", "002: Parameter 'url' empty or too long");
+    }
+
+    std::string error;
+    if (!validateSelfUpdateUrl(url, error)) {
+        LogFile.writeToFile(ESP_LOG_WARN, TAG, "Self update rejected: " + error);
+        return sendOtaTextResponse(req, "400 Bad Request", ("002: " + error).c_str());
+    }
+
+    if (!getTimeIsSet()) {
+        return sendOtaTextResponse(req, "409 Conflict", "004: Device time not set (NTP). Certificate validation requires a valid time");
+    }
+
+    // Claim the update slot atomically (only one update at a time). A previous error state may be retried.
+    SelfUpdateState expected = selfUpdateState.load();
+    if (expected != SelfUpdateState::Idle && expected != SelfUpdateState::Error) {
+        return sendOtaTextResponse(req, "409 Conflict", "005: Another update is already running");
+    }
+    if (!selfUpdateState.compare_exchange_strong(expected, SelfUpdateState::Downloading)) {
+        return sendOtaTextResponse(req, "409 Conflict", "005: Another update is already running");
+    }
+    selfUpdatePercent = 0;
+    setSelfUpdateMessage("Download started");
+
+    SelfUpdateParams *params = (SelfUpdateParams *)malloc(sizeof(SelfUpdateParams));
+    if (!params) {
+        selfUpdateState = SelfUpdateState::Idle;
+        return sendOtaTextResponse(req, "500 Internal Server Error", "003: Out of memory");
+    }
+    strlcpy(params->url, url.c_str(), sizeof(params->url));
+
+    // Modest stack (TLS handshake), low priority: runs next to camera / flow tasks
+    if (xTaskCreate(&taskSelfUpdate, "taskSelfUpdate", 10240, params, tskIDLE_PRIORITY + 2, NULL) != pdPASS) {
+        free(params);
+        setSelfUpdateError("Failed to create update task");
+        return sendOtaTextResponse(req, "500 Internal Server Error", "003: Failed to create update task");
+    }
+
+    return sendOtaTextResponse(req, "200 OK", "001: Self update started");
+}
+
+
 static void forceReboot()
 {
     const esp_task_wdt_config_t twdtConfig = {
@@ -744,6 +1203,12 @@ void registerOtaRebootUri(httpd_handle_t server)
     camuri.uri = "/ota/*";
     camuri.handler = HTTP_AUTH_BASIC(handler_ota);
     camuri.user_ctx = httpServerData;
+    httpd_register_uri_handler(server, &camuri);
+
+    camuri.method = HTTP_GET;
+    camuri.uri = "/ota";
+    camuri.handler = HTTP_AUTH_BASIC(handler_ota_selfupdate);
+    camuri.user_ctx = NULL;
     httpd_register_uri_handler(server, &camuri);
 
     camuri.method = HTTP_GET;
