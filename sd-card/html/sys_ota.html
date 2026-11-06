@@ -23,51 +23,92 @@
   <link rel="stylesheet" href="style-iframe.css?v=$COMMIT_HASH" />
 
   <style>
-    .card-body {
-      padding: 10px;
-    }
-
     .badge-board {
-      background: var(--text-secondary);
-      color: var(--bg);
-      padding: 4px 12px;
+      display: inline-block;
+      max-width: 100%;
+      padding: 3px 12px;
       border-radius: 999px;
-      font-family: monospace;
-      font-size: 0.9rem;
+      background: var(--surface);
+      color: var(--text-main);
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+      font-size: 0.85rem;
+      overflow-wrap: anywhere;
     }
 
-    .info-block {
+    .header-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-weight: normal;
+    }
+
+    .header-actions .button {
+      width: auto;
+      padding: 6px 16px;
+    }
+
+    .update-box {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 16px 20px 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .update-line {
       display: flex;
       align-items: center;
-      gap: 10px;
-      font-weight: 600;
-      margin: 20px 0 10px;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+    }
+
+    .update-line .button {
+      width: auto;
+      padding: 8px 20px;
+    }
+
+    #su_text a {
+      color: var(--primary);
+    }
+
+    .progress-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    progress {
+      width: 100%;
+      height: 10px;
+      accent-color: var(--primary);
+    }
+
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
     }
 
     input[type='file'] {
+      width: 100%;
       font-family: inherit;
       font-size: inherit;
-      width: 100%;
+      color: var(--text-secondary);
     }
 
-    .update-check-row {
+    .hint {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    .manual-body {
       display: flex;
       flex-direction: column;
-      align-items: flex-start;
-      gap: 8px;
-      margin-top: 20px;
-    }
-
-    #updateCheckStatus {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      min-height: 2.7em;
-    }
-
-    #updateCheckStatus a {
-      color: var(--primary);
-      text-decoration: underline;
+      gap: 12px;
+      padding: 4px 20px 20px;
     }
   </style>
 
@@ -78,60 +119,224 @@
 <body>
   <div class="container">
     <div class="container-header">
-      <div class="container-title"><span>🚀</span>OTA Update</div>
+      <div class="container-title">Update</div>
+      <div class="page-sub">Install new firmware and WebUI versions.</div>
     </div>
+
     <div class="container-content">
-      <div class="card">
-        <div class="card-header"><span>Installation</span></div>
-        <div class="card-body">
-          <div class="info-box">
-            <strong>💡 Tip: </strong>Update everything in one step using the latest board firmware from
-            <a href="https://github.com/Slider0007/AI-on-the-edge-device/releases/latest" target="_blank" rel="noopener noreferrer">GitHub Releases</a>.<br><br>
-            Your settings will be preserved during the OTA update. However, it's recommended creating a full configuration backup (<strong>System > Backup /
-              Restore</strong>) from time to time.
+      <div class="card" id="cardFirmware">
+        <div class="card-header">
+          <span>Firmware</span>
+          <div class="header-actions">
+            <button class="button" id="checkBtn" type="button" onclick="checkForUpdate()">Check for update</button>
           </div>
-
-          <div class="info-block">
-            <span>Installed Firmware:</span>
-            <span id="firmware_version" class="badge-board">Unknown</span>
-          </div>
-
-          <div class="info-block">
-            <span>Detected Board Type:</span>
-            <span id="board_type" class="badge-board">Unknown</span>
-          </div>
-
-          <br><br><br>
-
-          <form id="uploadForm" enctype="multipart/form-data" method="post">
-            <input type="file" accept=".bin,.zip" name="fileSelector" id="fileSelector" onchange="validateFile()" />
-            <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 5px; margin-bottom: 30px">
-              Supported File Types (max. 8MB): *.bin, *.zip
-            </div>
-            <button class="button btn-wide btn-action" id="startOtaButton" type="button" onclick="startOTA()" disabled>Install</button>
-            <div style="margin-top: 20px">
-              <progress id="progressBar" value="0" max="100" style="width: 100%; accent-color: var(--primary)"></progress>
-              <div style="display: flex; justify-content: space-between; margin-top: 8px; color: var(--text-secondary)">
-                <span id="status">Status: Idle</span>
-                <span id="loadedBytes"></span>
-              </div>
-            </div>
-          </form>
         </div>
+        <table class="card-table">
+          <tr>
+            <td class="label">Installed version</td>
+            <td class="val"><span id="firmware_version" class="badge-board">Unknown</span></td>
+          </tr>
+          <tr>
+            <td class="label">Board</td>
+            <td class="val"><span id="board_type" class="badge-board">Unknown</span></td>
+          </tr>
+          <tr>
+            <td class="label">Latest release</td>
+            <td class="val"><span id="su_latest" class="badge-board">Not checked</span></td>
+          </tr>
+        </table>
+
+        <div class="update-box" id="su_box" hidden>
+          <div class="update-line">
+            <div id="su_text"></div>
+            <button class="button btn-action" id="su_start" type="button" onclick="startSelfUpdate()" hidden>Update now</button>
+          </div>
+          <div class="progress-wrap" id="su_progress" hidden>
+            <progress id="su_bar" value="0" max="100"></progress>
+            <div class="progress-meta"><span id="su_state">Idle</span><span id="su_percent"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><span>Manual update</span></div>
+        <form id="uploadForm" enctype="multipart/form-data" method="post" class="manual-body">
+          <div class="hint">
+            Select a release package for your board (<b>*.zip</b>) or a <b>firmware.bin</b>. Your settings are kept during the update. Create a
+            configuration backup under <b>System &rarr; Backup / Restore</b> from time to time.
+          </div>
+          <input type="file" accept=".bin,.zip" name="fileSelector" id="fileSelector" onchange="validateFile()" />
+          <div class="hint">Supported file types (max. 8 MB): *.bin, *.zip</div>
+          <button class="button btn-wide btn-action" id="startOtaButton" type="button" onclick="startOTA()" disabled>Install</button>
+          <div class="progress-wrap">
+            <progress id="progressBar" value="0" max="100"></progress>
+            <div class="progress-meta">
+              <span id="status">Status: Idle</span>
+              <span id="loadedBytes"></span>
+            </div>
+          </div>
+        </form>
       </div>
     </div>
   </div>
 
   <script src="global.js?v=$COMMIT_HASH"></script>
   <script>
-    // Max size of an individual file. Make sure this value is same as that set in server_file.c
-    const RELEASE_NOTES_URL = 'https://github.com/Slider0007/AI-on-the-edge-device/releases/latest';
+    // ------------------------------------------------------------------------
+    // One-click update: the device downloads the release package from GitHub itself
+    // ------------------------------------------------------------------------
+    const UPDATE_REPO = 'Grrzzz/AI-on-the-edge-device'; // GitHub repository that publishes the release packages
 
-    let updateTimer = null;
+    let latestRelease = null;
 
     function _(el) {
       return document.getElementById(el);
     }
+
+    function parseVersion(v) {
+      const m = /(\d+)\.(\d+)\.(\d+)/.exec(String(v || ''));
+      return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+    }
+
+    function isNewer(candidate, installed) {
+      const a = parseVersion(candidate);
+      const b = parseVersion(installed);
+      if (!a || !b) return false;
+      for (let i = 0; i < 3; i++) {
+        if (a[i] !== b[i]) return a[i] > b[i];
+      }
+      return false;
+    }
+
+    function setUpdateText(html, showStart = false) {
+      _('su_box').hidden = false;
+      _('su_text').innerHTML = html;
+      _('su_start').hidden = !showStart;
+    }
+
+    function escapeHtml(t) {
+      return String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    }
+
+    async function checkForUpdate() {
+      const btn = _('checkBtn');
+      btn.disabled = true;
+      setUpdateText('Checking GitHub ...');
+      latestRelease = null;
+
+      try {
+        // the browser asks GitHub, the device does not need internet access for this step
+        const res = await fetch(`https://api.github.com/repos/${UPDATE_REPO}/releases/latest`, {
+          headers: { Accept: 'application/vnd.github+json' },
+          cache: 'no-store',
+        });
+        if (res.status === 404) {
+          _('su_latest').textContent = 'None published';
+          setUpdateText('No release has been published yet.');
+          return;
+        }
+        if (!res.ok) throw new Error(`GitHub answered HTTP ${res.status}`);
+
+        const rel = await res.json();
+        _('su_latest').textContent = rel.tag_name;
+
+        const board = _('board_type').textContent.trim().toLowerCase();
+        const asset = (rel.assets || []).find((a) => {
+          const n = a.name.toLowerCase();
+          return n.startsWith('ai-on-the-edge-device__' + board + '__') && n.endsWith('.zip');
+        });
+        const link = `<a href="${escapeHtml(rel.html_url)}" target="_blank" rel="noopener noreferrer">release notes</a>`;
+
+        if (!isNewer(rel.tag_name, _('firmware_version').textContent)) {
+          setUpdateText(`You are up to date. (${link})`);
+          return;
+        }
+        if (!asset) {
+          setUpdateText(`<b>${escapeHtml(rel.tag_name)}</b> is available, but it has no package for board <b>${escapeHtml(board)}</b>. (${link})`);
+          return;
+        }
+
+        latestRelease = { tag: rel.tag_name, url: asset.browser_download_url, size: asset.size };
+        const mb = asset.size ? ` &middot; ${(asset.size / 1048576).toFixed(1)} MB` : '';
+        setUpdateText(`Update available: <b>${escapeHtml(rel.tag_name)}</b>${mb} (${link})`, true);
+      } catch (e) {
+        console.error('Update check failed:', e);
+        setUpdateText('Could not reach GitHub. This browser needs internet access to look for updates. You can still install a package manually.');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function startSelfUpdate() {
+      if (!latestRelease) return;
+      if (!confirm(`Install ${latestRelease.tag}? The device downloads the package itself and restarts afterwards.`)) return;
+
+      _('su_start').hidden = true;
+      _('checkBtn').disabled = true;
+      _('fileSelector').disabled = true;
+      _('startOtaButton').disabled = true;
+      _('su_progress').hidden = false;
+      _('su_state').textContent = 'Starting ...';
+      firework.launch('Do not reload this page or switch to another page while the update is in progress', 'warning', 90000);
+
+      const res = await apiCall(`/ota?task=selfupdate&url=${encodeURIComponent(latestRelease.url)}`);
+      if (!res.ok) {
+        const detail = typeof res.data === 'string' && res.data.trim() ? res.data.trim() : `HTTP ${res.status ?? 'error'}`;
+        const unsupported = res.status === 400 || res.status === 404;
+        setUpdateText(unsupported
+          ? 'This firmware does not support one-click updates yet. Install the package manually below.'
+          : `Update could not be started: ${escapeHtml(detail)}`);
+        _('su_progress').hidden = true;
+        _('checkBtn').disabled = false;
+        _('fileSelector').disabled = false;
+        return;
+      }
+
+      pollSelfUpdate();
+    }
+
+    async function pollSelfUpdate() {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      let failures = 0;
+
+      while (true) {
+        await sleep(1500);
+        const res = await apiCall('/ota?task=selfupdate_status', { timeout: 4000 }, { parseType: 'json' });
+        if (!res.ok || !res.data) {
+          // the device may already be restarting
+          if (++failures >= 4) {
+            _('su_state').textContent = 'Restarting ...';
+            checkStatus(); // existing helper: waits for the device and opens the dashboard
+            return;
+          }
+          continue;
+        }
+        failures = 0;
+
+        const { state, percent, message } = res.data;
+        _('su_bar').value = percent || 0;
+        _('su_percent').textContent = percent ? `${percent} %` : '';
+        _('su_state').textContent = message || state;
+
+        if (state === 'done' || state === 'staging') {
+          _('su_state').textContent = 'Installing ... the device restarts';
+          checkStatus();
+          return;
+        }
+        if (state === 'error') {
+          setUpdateText(`Update failed: ${escapeHtml(message || 'unknown error')}`);
+          _('su_progress').hidden = true;
+          _('checkBtn').disabled = false;
+          _('fileSelector').disabled = false;
+          return;
+        }
+      }
+    }
+
+    // ------------------------------------------------------------------------
+    // Manual update (upload a package from this computer)
+    // ------------------------------------------------------------------------
+    let updateTimer = null;
 
     function resetControls() {
       _('fileSelector').disabled = false;

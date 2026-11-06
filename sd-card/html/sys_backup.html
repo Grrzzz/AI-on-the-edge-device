@@ -23,33 +23,69 @@
   <link rel="stylesheet" href="style-iframe.css?v=$COMMIT_HASH" />
 
   <style>
-    .card-body {
-      padding: 10px;
-    }
-
     #progress-backup {
-      font-family: monospace;
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
       font-size: 0.8rem;
-      margin-top: 10px;
-      height: 58px;
-      max-height: 58px;
+      height: 96px;
       overflow-y: auto;
-      padding: 8px;
-      border-radius: var(--card-radius);
-      border: 1px solid var(--border);
+      padding: 12px 14px;
+      border-radius: 0.65rem;
+      background: #0a0f1c;
+      color: #cbd5e1;
       display: flex;
       flex-direction: column-reverse;
     }
 
-    input[type="file"] {
-      font-family: inherit;
-      font-size: inherit;
-      width: 100%;
+    #progress-backup:empty {
+      display: none;
     }
 
-    #progress-restore {
+    input[type='file'] {
       width: 100%;
+      font-family: inherit;
+      font-size: inherit;
+      color: var(--text-secondary);
+    }
+
+    progress {
+      width: 100%;
+      height: 10px;
       accent-color: var(--primary);
+    }
+
+    .hint {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    .restore-part {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 16px 20px 20px;
+    }
+
+    .restore-part + .restore-part {
+      border-top: 1px solid var(--border);
+    }
+
+    .restore-part h3 {
+      margin: 0;
+      font-size: 0.95rem;
+    }
+
+    .restore-part .info-box,
+    .restore-part .warning-box {
+      margin: 0;
+    }
+
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 6px;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
     }
   </style>
 
@@ -60,48 +96,45 @@
 <body>
   <div class="container">
     <div class="container-header">
-      <div class="container-title"><span>💾</span>Backup / Restore</div>
+      <div class="container-title">Backup / Restore</div>
+      <div class="page-sub">Save the device configuration to your computer and bring it back.</div>
     </div>
 
     <div class="container-content">
       <div class="card">
-        <div class="card-header"><span>Backup Configuration</span></div>
-        <div class="card-body">
-          <div style="border-bottom: 1px solid var(--border)">
-            <button class="button btn-wide btn-action" id="startBackupButton" onclick="startBackup()">
-              Create Backup
-            </button>
-            <div id="progress-backup"></div>
+        <div class="card-header"><span>Backup</span></div>
+        <div class="side-body">
+          <div class="hint">Downloads all configuration files (settings, reference image, markers, models) as one ZIP file.</div>
+          <div class="btn-row">
+            <button class="button btn-action" id="startBackupButton" onclick="startBackup()">Create backup</button>
           </div>
+          <div id="progress-backup"></div>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-header"><span>Restore Configuration</span></div>
-        <div class="card-body">
-          <div style="font-weight: bold"><span>A. Partial Restore</span></div>
+        <div class="card-header"><span>Restore</span></div>
+
+        <div class="restore-part">
+          <h3>Partial restore</h3>
           <div class="info-box">
-            <strong>💡 Tip: </strong>To restore specific configuration files, upload them individually via the
+            To restore individual configuration files, upload them in the
             <a href="/fileserver/config/" target="_self">File Explorer</a>.
           </div>
-          <div style="font-weight: bold; padding-top: 10px; border-top: 1px solid var(--border);">
-            <span>B. Full Restore</span>
-          </div>
-          <div class="warning-box">
-            <strong>⚠️ Warning: </strong>Full restore overwrites existing
-            configuration!
-          </div>
-          <form id="uploadForm" enctype="multipart/form-data" method="post">
+        </div>
+
+        <div class="restore-part">
+          <h3>Full restore</h3>
+          <div class="warning-box"><strong>Warning:</strong> A full restore overwrites the existing configuration.</div>
+          <form id="uploadForm" enctype="multipart/form-data" method="post" style="display: flex; flex-direction: column; gap: 12px">
             <input type="file" accept=".zip" name="fileSelector" id="fileSelector" onchange="validateFile()" />
-            <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 5px; margin-bottom: 30px;">
-              Supported File Type (max. 16MB): *.zip
+            <div class="hint">Supported file type (max. 16 MB): *.zip</div>
+            <div class="btn-row">
+              <button class="button btn-action" id="startRestoreButton" type="button" onclick="startRestore()" disabled>Restore</button>
             </div>
-            <button class="button btn-wide btn-action" id="startRestoreButton" type="button" onclick="startRestore()" disabled>
-              Restore
-            </button>
-            <div style="margin-top: 20px">
+            <div>
               <progress id="progress-restore" value="0" max="100"></progress>
-              <div style="display: flex; justify-content: space-between; margin-top: 8px; color: var(--text-secondary);">
+              <div class="progress-meta">
                 <span id="status">Status: Idle</span>
                 <span id="loadedBytes"></span>
               </div>

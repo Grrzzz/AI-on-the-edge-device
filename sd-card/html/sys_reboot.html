@@ -29,22 +29,27 @@
 <body onload="checkRebootTriggeredByHash()">
   <div class="container">
     <div class="container-header">
-      <div class="container-title"><span>🔄</span>Reboot Device</div>
+      <div class="container-title">Reboot</div>
+      <div class="page-sub">Restart the device. Your settings are kept.</div>
     </div>
 
     <div class="container-content">
-      <div id="rebootRequest">
-        <div style="font-weight: bold; margin-block-end: 1rem">
-          <span>Do you really want to reboot now?</span>
+      <div id="rebootRequest" class="card">
+        <div class="card-header"><span>Reboot device</span></div>
+        <div class="side-body">
+          <div style="color: var(--text-secondary)">The device is not reachable for about 10 to 20 seconds. This page opens the dashboard again as soon as it is back.</div>
+          <div class="btn-row">
+            <button class="button btn-action" id="reboot" type="button" onclick="doReboot()">Reboot now</button>
+          </div>
         </div>
-        <button class="button btn-wide btn-action" id="reboot" type="button" onclick="doReboot()">Reboot</button>
       </div>
 
-      <div id="rebootChecker" style="display: none">
-        <p style="font-weight: bold">
-          <span id="rebootCheckerText"><br /><br />Status: Rebooting</span>
-        </p>
-        <span style="color: var(--text-secondary); font-size: 0.85rem">The device usually reboots in 10 to 20 seconds.</span>
+      <div id="rebootChecker" class="card" style="display: none">
+        <div class="card-header"><span>Rebooting</span></div>
+        <div class="side-body">
+          <div style="font-weight: 600"><span id="rebootCheckerText">Waiting for the device</span></div>
+          <div style="color: var(--text-secondary); font-size: 0.85rem">The device usually reboots in 10 to 20 seconds.</div>
+        </div>
       </div>
     </div>
   </div>
