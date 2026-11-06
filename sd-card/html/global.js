@@ -32,14 +32,15 @@ function getTestEnvironmentActive() {
 // Theme syncronization listener
 window.addEventListener('storage', (e) => {
   if (e.key !== 'theme') return;
-  const theme = e.newValue;
-  if (theme !== 'light' && theme !== 'dark') return;
+  // Value removed = mode 'auto' --> follow the OS setting
+  let theme = e.newValue;
+  if (theme !== 'light' && theme !== 'dark') {
+    theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
   const d = document.documentElement;
   if (d.classList.contains(theme)) return;
   d.classList.remove('light', 'dark');
   d.classList.add(theme);
-  const t = document.getElementById('themeToggle'); // exists only in index.html
-  if (t) t.checked = theme === 'light';
   if (typeof refreshTheme === 'function') refreshTheme();
 });
 

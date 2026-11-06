@@ -23,54 +23,14 @@
   <link rel="stylesheet" href="style-iframe.css?v=$COMMIT_HASH" />
 
   <style>
-    .card-table {
-      width: 100%;
-      border-collapse: collapse;
+    .container-content {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
+      align-items: start;
     }
 
-    .card-table tr td {
-      padding: 8px 16px;
-      font-size: 1rem;
-      color: var(--text-main);
-    }
-
-    .card-table tr:last-child td {
-      border-bottom: none;
-    }
-
-    .label {
-      width: 40%;
-      color: var(--text-secondary);
-    }
-
-    .val {
-      text-align: left;
-      word-break: break-all;
-    }
-
-    .badge {
-      padding: 2px 10px;
-      font-size: 0.95rem;
-      font-weight: 700;
-      border-radius: var(--card-radius);
-      color: var(--bg);
-    }
-
-    .badge-success {
-      background-color: var(--success);
-    }
-
-    .badge-warning {
-      background-color: var(--warning);
-      color: var(--text-main);
-    }
-
-    .badge-error {
-      background-color: var(--error);
-    }
-
-    .badge-disabled {
-      background-color: var(--text-secondary);
+    .card-table .val {
+      text-align: right;
     }
 
     .button-group {
@@ -96,7 +56,8 @@
 <body>
   <div class="container">
     <div class="container-header">
-      <div class="container-title"><span>📟</span>System Info</div>
+      <div class="container-title">System Info</div>
+      <div class="page-sub">Status, network, hardware and firmware of this device.</div>
     </div>
 
     <div class="container-content">
@@ -277,6 +238,7 @@
       <div class="card">
         <div class="card-header">SD Card</div>
         <div class="card-body">
+          <div class="stack" id="sd_stack"></div>
           <table class="card-table">
             <tr>
               <td class="label">Name</td>
@@ -312,6 +274,8 @@
       <div class="card">
         <div class="card-header">Memory</div>
         <div class="card-body">
+          <div class="stack" id="heap_internal_stack"></div>
+          <div class="stack" id="heap_spiram_stack"></div>
           <table class="card-table">
             <tr>
               <td class="label">Total Free (Int + Ext)</td>
@@ -476,6 +440,93 @@
       }
     }
 
+    // Stacked bar: segments = [{ label, value, cls }], format(value) -> text
+    function renderStack(id, title, total, segments, format, note) {
+      const host = document.getElementById(id);
+      if (!host) return;
+      host.textContent = '';
+
+      const sum = total || segments.reduce((acc, s) => acc + (s.value > 0 ? s.value : 0), 0);
+      if (!(sum > 0)) return;
+
+      const head = document.createElement('div');
+      head.className = 'stack-title';
+      const t = document.createElement('span');
+      t.textContent = title;
+      const tot = document.createElement('span');
+      tot.textContent = format(sum);
+      head.append(t, tot);
+
+      const bar = document.createElement('div');
+      bar.className = 'stack-bar';
+      const legend = document.createElement('div');
+      legend.className = 'stack-legend';
+
+      for (const seg of segments) {
+        const v = Math.max(0, seg.value);
+        const pct = (v / sum) * 100;
+        const part = document.createElement('div');
+        part.className = `stack-seg ${seg.cls}`;
+        part.style.width = pct + '%';
+        part.title = `${seg.label}: ${format(v)}`;
+        bar.append(part);
+
+        const item = document.createElement('span');
+        const dot = document.createElement('i');
+        dot.className = seg.cls;
+        const strong = document.createElement('b');
+        strong.textContent = format(v);
+        item.append(dot, `${seg.label} `, strong, ` (${pct.toFixed(0)}%)`);
+        legend.append(item);
+      }
+
+      host.append(head, bar, legend);
+      if (note) {
+        const n = document.createElement('div');
+        n.className = 'stack-note';
+        n.textContent = note;
+        host.append(n);
+      }
+    }
+
+    function formatBytes(b) {
+      if (b >= 1048576) return (b / 1048576).toFixed(2) + ' MB';
+      if (b >= 1024) return (b / 1024).toFixed(1) + ' KB';
+      return b + ' B';
+    }
+
+    function formatMB(mb) {
+      return mb >= 1024 ? (mb / 1024).toFixed(2) + ' GB' : mb.toFixed(1) + ' MB';
+    }
+
+    function renderStorageAndMemoryBars(d) {
+      // SD card: partition usage plus capacity which is not part of the partition
+      const cap = Number(d.sd_capacity);
+      const part = Number(d.sd_partition_size);
+      const free = Number(d.sd_partition_free);
+      if (cap > 0 && part > 0 && free >= 0) {
+        const segs = [
+          { label: 'Used', value: Math.max(0, part - free), cls: 'seg-1' },
+          { label: 'Free', value: free, cls: 'seg-2' },
+        ];
+        if (cap - part > 1) segs.push({ label: 'Outside partition', value: cap - part, cls: 'seg-3' });
+        renderStack('sd_stack', 'Card capacity', cap, segs, formatMB);
+      }
+
+      // Heap: free memory split into the largest contiguous block and the fragmented rest
+      const heap = (id, title, free, largest, minFree) => {
+        free = Number(free);
+        largest = Number(largest);
+        if (!(free > 0) || !(largest >= 0)) return;
+        renderStack(id, title, free, [
+          { label: 'Largest free block', value: largest, cls: 'seg-1' },
+          { label: 'Fragmented', value: Math.max(0, free - largest), cls: 'seg-2' },
+        ], formatBytes, `Lowest free level since boot: ${formatBytes(Number(minFree))}`);
+      };
+      heap('heap_internal_stack', 'Internal RAM, free', d.heap_internal_free, d.heap_internal_largest_free, d.heap_internal_min_free);
+      heap('heap_spiram_stack', 'PSRAM, free', d.heap_spiram_free, d.heap_spiram_largest_free, d.heap_spiram_min_free);
+    }
+
     async function loadInfoData() {
       const res = await apiCallNotify('/info', {}, { action: 'Loading info', parseType: 'json' });
       if (!res.ok || !res.data) return;
@@ -595,6 +646,8 @@
       document.getElementById('heap_spiram_free').textContent = _jsonData.heap_spiram_free + ' byte';
       document.getElementById('heap_spiram_largest_free').textContent = _jsonData.heap_spiram_largest_free + ' byte';
       document.getElementById('heap_spiram_min_free').textContent = _jsonData.heap_spiram_min_free + ' byte';
+
+      renderStorageAndMemoryBars(_jsonData);
 
       renderVersionField('firmware_version', _jsonData.firmware_version);
       renderVersionField('html_version', _jsonData.html_version);

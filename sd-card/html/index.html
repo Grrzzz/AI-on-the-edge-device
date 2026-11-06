@@ -4,19 +4,19 @@
 <head>
   <title>AI-on-the-Edge Device</title>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=720" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <script>
-    // Theme Control
+    // Theme Control (mode: auto | light | dark)
+    // Pages inside the content frame only know 'light' / 'dark' (localStorage 'theme').
+    // In mode 'auto' the stored value is removed so every page falls back to the OS setting.
     (function () {
-      let theme;
-      try { theme = localStorage.getItem('theme'); } catch (e) { }
-      if (theme !== 'light' && theme !== 'dark') {
-        try { theme = document.cookie.match(/(?:^|; )theme=(light|dark)/)?.[1]; } catch (e) { }
-        if (!theme) theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      }
+      let mode = 'auto';
+      try { mode = localStorage.getItem('theme') || 'auto'; } catch (e) { }
+      if (mode !== 'light' && mode !== 'dark') mode = 'auto';
+      const dark = mode === 'auto' ? window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches : mode === 'dark';
       document.documentElement.classList.remove('light', 'dark');
-      document.documentElement.classList.add(theme);
+      document.documentElement.classList.add(dark ? 'dark' : 'light');
     })();
   </script>
 
@@ -24,34 +24,56 @@
   <link rel="icon" type="image/svg+xml" href="icon.svg?v=$COMMIT_HASH" />
   <link rel="apple-touch-icon" sizes="180x180" href="/icon-apple-touch.png?v=$COMMIT_HASH" />
   <link rel="manifest" type="application/manifest+json" href="/site.webmanifest?v=$COMMIT_HASH" />
-  <link rel="stylesheet" href="style.css?v=$COMMIT_HASH" type="text/css" />
+  <link rel="stylesheet" href="style-shell.css?v=$COMMIT_HASH" type="text/css" />
 
   <link href="firework.css?v=$COMMIT_HASH" rel="stylesheet" />
   <script src="firework.js?v=$COMMIT_HASH"></script>
   <script src="global.js?v=$COMMIT_HASH"></script>
   <script>
     const UI = {
+      get app() { return document.getElementById('app'); },
       get deviceName() { return document.getElementById('device-name'); },
+      get topbarTitle() { return document.getElementById('topbar-title'); },
       get main() { return document.getElementById('maincontent'); },
-      get submenus() { return document.querySelectorAll('.submenu'); },
       get hasDiscovery() { return document.getElementById('HASendDiscovery'); },
     };
 
-    let streamPopup;
-    let streamFlashlight = false;
-    let streamWindowFeatures =
-      'channelmode=no,directories=no,fullscreen=no,' +
-      'location=no,dependent=yes,menubar=no,resizable=no,scrollbars=no,' +
-      'status=no,toolbar=no,titlebar=no,' +
-      'left=10,top=250,width=640px,height=480px';
 
-    // Theme Control
-    function setTheme(isLight) {
-      const theme = isLight ? 'light' : 'dark';
-      document.documentElement.classList.toggle('light', isLight);
-      document.documentElement.classList.toggle('dark', !isLight);
-      try { localStorage.setItem('theme', theme); } catch (e) { }
-      document.cookie = `theme=${theme};path=/;max-age=${60 * 60 * 24 * 400};SameSite=Lax`;
+    /* ---------------------------------------------------------- theme */
+    function systemPrefersDark() {
+      return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    }
+
+    function getThemeMode() {
+      let mode = null;
+      try { mode = localStorage.getItem('theme'); } catch (e) { }
+      return mode === 'light' || mode === 'dark' ? mode : 'auto';
+    }
+
+    function setThemeMode(mode) {
+      const dark = mode === 'auto' ? systemPrefersDark() : mode === 'dark';
+      document.documentElement.classList.toggle('dark', dark);
+      document.documentElement.classList.toggle('light', !dark);
+
+      try {
+        if (mode === 'auto') localStorage.removeItem('theme');
+        else localStorage.setItem('theme', mode);
+      } catch (e) { }
+
+      if (mode === 'auto') document.cookie = 'theme=;path=/;max-age=0;SameSite=Lax';
+      else document.cookie = `theme=${mode};path=/;max-age=${60 * 60 * 24 * 400};SameSite=Lax`;
+
+      document.querySelectorAll('.theme-seg button').forEach((b) => b.classList.toggle('on', b.dataset.mode === mode));
+
+      // Pages inside the frame do not receive 'storage' events for removals reliably: apply directly
+      try {
+        const d = UI.main.contentDocument?.documentElement;
+        if (d) {
+          d.classList.toggle('dark', dark);
+          d.classList.toggle('light', !dark);
+          UI.main.contentWindow.refreshTheme?.();
+        }
+      } catch (e) { }
     }
 
     function getCookie(cname) {
@@ -62,9 +84,23 @@
       return cookie ? cookie.trim().substring(name.length) : '';
     }
 
+    /* ----------------------------------------------------- navigation */
+    function setActive(page) {
+      let base = (page || '').split('?')[0];
+      if (/^https?:\/\//.test(base)) base = new URL(base).pathname.replace(/^\//, '').replace(/\/$/, '');
+
+      let activeGroup = null;
+      document.querySelectorAll('[data-page]').forEach((el) => {
+        const on = !!base && el.dataset.page === base;
+        el.classList.toggle('active', on);
+        if (on) activeGroup = el.closest('.nav-group');
+      });
+
+      // Accordion: keep only the group of the current page open
+      document.querySelectorAll('.nav-group').forEach((g) => g.classList.toggle('open', g === activeGroup));
+    }
+
     function loadPage(page) {
-      // Ensure that stream popup is closed because it's blocking web interface
-      if (typeof streamPopup !== 'undefined' && streamPopup) streamPopup.close();
 
       document.cookie = `page=${page};path=/;SameSite=Lax`;
 
@@ -73,175 +109,114 @@
         UI.main.src = page;
       }
 
-      closeMenu();
+      setActive(page);
+      closeNav();
     }
 
-    function closeMenu() {
-      document.querySelectorAll('.menu ul ul').forEach((el) => {
-        el.style.visibility = 'hidden';
-      });
-      document.querySelectorAll('.menu li.is-open').forEach((el) => {
-        el.classList.remove('is-open');
-      });
+    function openNav() { UI.app.classList.add('nav-open'); }
+    function closeNav() { UI.app.classList.remove('nav-open'); }
+    function toggleNav() { UI.app.classList.toggle('nav-open'); }
+
+    function toggleGroup(btn) {
+      const group = btn.closest('.nav-group');
+      const willOpen = !group.classList.contains('open');
+      document.querySelectorAll('.nav-group').forEach((g) => g.classList.remove('open'));
+      group.classList.toggle('open', willOpen);
     }
-
-    function closeMenuBranch(li) {
-      li.classList.remove('is-open');
-      li.querySelectorAll('li.is-open').forEach((el) => el.classList.remove('is-open'));
-      li.querySelectorAll('ul').forEach((el) => {
-        el.style.visibility = 'hidden';
-      });
-    }
-
-    function resetMenu() {
-      document.querySelectorAll('.menu ul ul').forEach((el) => {
-        el.style.visibility = '';
-      });
-    }
-
-    // Mobile submenu tap-to-expand
-    function initMobileSubmenus() {
-      document.querySelectorAll('.menu li').forEach((li) => {
-        const link = li.querySelector(':scope > a');
-        const sub = li.querySelector(':scope > ul');
-        if (!sub || !link) return;
-
-        link.addEventListener('click', (e) => {
-          // Allow standard hover on desktop devices that support true hover with a fine pointer
-          if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
-
-          e.preventDefault();
-          e.stopPropagation();
-
-          const willOpen = !li.classList.contains('is-open');
-
-          // Close sibling branches
-          li.parentElement.querySelectorAll(':scope > li.is-open').forEach((el) => {
-            if (el !== li) closeMenuBranch(el);
-          });
-
-          if (willOpen) {
-            sub.style.visibility = 'visible';
-            li.classList.add('is-open');
-          } else {
-            closeMenuBranch(li);
-          }
-        });
-      });
-
-      // Close menu when clicking a leaf link or somewhere outside of menu tree
-      const menu = document.querySelector('.menu');
-      if (menu) {
-        menu.addEventListener('click', (e) => {
-          const a = e.target.closest('a');
-          if (!a || a.parentElement.querySelector(':scope > ul')) return;
-          closeMenu();
-        });
-        document.addEventListener('click', (e) => {
-          if (menu && !menu.contains(e.target)) {
-            closeMenu();
-          }
-        });
-      }
-    }
-    window.addEventListener('DOMContentLoaded', initMobileSubmenus);
   </script>
 </head>
 
 <body>
-  <div class="main">
-    <header class="header">
-      <div class="header-main">
-        <img src="favicon.ico" alt="ico" class="brand-logo" />
+  <!-- Icon sprite -->
+  <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v10a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z" /></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></symbol>
+      <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></symbol>
+      <symbol id="i-table" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 10h18M9 4v16" /></symbol>
+      <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1" /><circle cx="15" cy="6" r="2" /><circle cx="9" cy="12" r="2" /><circle cx="17" cy="18" r="2" /></symbol>
+      <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="10" r="1.5" /><path d="M21 16l-5-5L5 20" /></symbol>
+      <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></symbol>
+      <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5 9-5z" /><path d="M3 13l9 5 9-5" /></symbol>
+      <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4z" /></symbol>
+      <symbol id="i-save" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 21h16" /></symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M4 21h16" /></symbol>
+      <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z" /><path d="M14 3v6h6M9 13h6M9 17h6" /></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6h6l2 2h10v12H3z" /></symbol>
+      <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.5h.01" /></symbol>
+      <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v9M6.3 6.3a8 8 0 1011.4 0" /></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" /></symbol>
+      <symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" /></symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" /></symbol>
+      <symbol id="i-server" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="7" rx="2" /><rect x="3" y="13" width="18" height="7" rx="2" /><path d="M7 7.5h.01M7 16.5h.01" /></symbol>
+      <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" /></symbol>
+    </defs>
+  </svg>
+
+  <div class="app" id="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <img src="favicon.ico" alt="" class="brand-logo" />
         <div class="brand-text">
-          <h1 class="brand-font">AI-on-the-Edge Device</h1>
-          <div class="device-name">
-            <span>Device Name: </span>
-            <span id="device-name">Loading...</span>
-          </div>
+          <h1 class="brand-title">AI-on-the-Edge</h1>
+          <div class="brand-sub" id="device-name">Loading...</div>
         </div>
       </div>
-      <label class="theme-switch">
-        <input type="checkbox" id="themeToggle" onchange="setTheme(this.checked)" />
-        <span class="track">
-          <span class="thumb">
-            <svg class="icon-sun" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="4" />
-              <path d="M12 3v1.5M12 19.5V21M4.9 4.9l1.1 1.1M18 18l1.1 1.1M3 12h1.5M19.5 12H21M4.9 19.1l1.1-1.1M18 6l1.1-1.1" />
-            </svg>
-            <svg class="icon-moon" viewBox="0 0 24 24">
-              <path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" />
-            </svg>
-          </span>
-        </span>
-      </label>
-    </header>
 
-    <nav class="menu" onmouseover="resetMenu()">
-      <ul>
-        <li><a onclick="loadPage('dashboard.html?v=$COMMIT_HASH')">Dashboard</a></li>
-
-        <li>
-          <a>Data<i class="arrow down"></i></a>
-          <ul class="submenu">
-            <li><a onclick="loadPage(getDomainname() + '/recognition_details')">Recognition Details</a></li>
-            <li><a onclick="loadPage('data_charts.html?v=$COMMIT_HASH')">Data Charts</a></li>
-            <li><a onclick="loadPage('data_table.html?v=$COMMIT_HASH')">Data Table</a></li>
+      <nav class="nav" aria-label="Main navigation">
+        <ul class="nav-top"><li><button class="nav-item" data-page="dashboard.html" onclick="loadPage('dashboard.html?v=$COMMIT_HASH')"><svg><use href="#i-home" /></svg>Dashboard</button></li></ul>
+        <div class="nav-group" data-group="data">
+          <button class="nav-item nav-parent" onclick="toggleGroup(this)"><svg><use href="#i-chart" /></svg>Data<svg class="chev" viewBox="0 0 24 24"><use href="#i-chev" /></svg></button>
+          <ul class="nav-sub">
+            <li><button class="nav-sub-item" data-page="recognition_details" onclick="loadPage(getDomainname() + '/recognition_details')">Recognition Details</button></li>
+            <li><button class="nav-sub-item" data-page="data_charts.html" onclick="loadPage('data_charts.html?v=$COMMIT_HASH')">Charts</button></li>
+            <li><button class="nav-sub-item" data-page="data_table.html" onclick="loadPage('data_table.html?v=$COMMIT_HASH')">Table</button></li>
           </ul>
-        </li>
-
-        <li>
-          <a>Settings<i class="arrow down"></i></a>
-          <ul class="submenu">
-            <li><a onclick="loadPage('edit_fallbackvalue.html?v=$COMMIT_HASH')">Set Fallback Value</a></li>
-            <li><a onclick="loadPage('edit_configuration.html?v=$COMMIT_HASH')">Configuration</a></li>
-            <li><a onclick="loadPage('edit_reference.html?v=$COMMIT_HASH')">Reference Image</a></li>
-            <li><a onclick="loadPage('edit_alignment.html?v=$COMMIT_HASH')">Alignment Marker</a></li>
-            <li><a onclick="loadPage('edit_sequence.html?v=$COMMIT_HASH')">Number Sequences</a></li>
+        </div>
+        <div class="nav-group" data-group="settings">
+          <button class="nav-item nav-parent" onclick="toggleGroup(this)"><svg><use href="#i-sliders" /></svg>Settings<svg class="chev" viewBox="0 0 24 24"><use href="#i-chev" /></svg></button>
+          <ul class="nav-sub">
+            <li><button class="nav-sub-item" data-page="edit_configuration.html" onclick="loadPage('edit_configuration.html?v=$COMMIT_HASH')">Configuration</button></li>
+            <li><button class="nav-sub-item" data-page="edit_reference.html" onclick="loadPage('edit_reference.html?v=$COMMIT_HASH')">Reference Image</button></li>
+            <li><button class="nav-sub-item" data-page="edit_alignment.html" onclick="loadPage('edit_alignment.html?v=$COMMIT_HASH')">Alignment Marker</button></li>
+            <li><button class="nav-sub-item" data-page="edit_sequence.html" onclick="loadPage('edit_sequence.html?v=$COMMIT_HASH')">Number Sequences</button></li>
           </ul>
-        </li>
-
-        <li>
-          <a>System<i class="arrow down"></i></a>
-          <ul class="submenu">
-            <li><a onclick="loadPage('sys_backup.html?v=$COMMIT_HASH')">Backup / Restore</a></li>
-            <li><a onclick="loadPage('sys_ota.html?v=$COMMIT_HASH')">OTA Update</a></li>
-            <li><a onclick="loadPage('sys_log.html?v=$COMMIT_HASH')">Log Viewer</a></li>
-            <li><a onclick="loadPage(getDomainname() + '/fileserver/')">File Explorer</a></li>
-            <li>
-              <a>Livestream <i class="arrow right"></i></a>
-              <ul>
-                <li><a onclick="startLivestream(false)">Livestream (Flash off)</a></li>
-                <li><a onclick="startLivestream(true)">Livestream (Flash on)</a></li>
-              </ul>
-            </li>
-            <li><a onclick="loadPage('sys_reboot.html?v=$COMMIT_HASH')">Reboot</a></li>
-            <li><a onclick="loadPage('sys_info.html?v=$COMMIT_HASH')">System Info</a></li>
-            <li>
-              <a>Documentation<i class="arrow right"></i></a>
-              <ul>
-                <li><a onclick="loadPage('doc_api_rest.html?v=$COMMIT_HASH')">REST API</a></li>
-                <li><a onclick="loadPage('doc_api_mqtt.html?v=$COMMIT_HASH')">MQTT API</a></li>
-                <li><a onclick="loadPage('doc_api_prometheus.html?v=$COMMIT_HASH')">Prometheus API</a></li>
-                <li><a onclick="loadPage('doc_api_webhook.html?v=$COMMIT_HASH')">Webhook API</a></li>
-              </ul>
-            </li>
+        </div>
+        <div class="nav-group" data-group="system">
+          <button class="nav-item nav-parent" onclick="toggleGroup(this)"><svg><use href="#i-server" /></svg>System<svg class="chev" viewBox="0 0 24 24"><use href="#i-chev" /></svg></button>
+          <ul class="nav-sub">
+            <li><button class="nav-sub-item" data-page="sys_info.html" onclick="loadPage('sys_info.html?v=$COMMIT_HASH')">System Info</button></li>
+            <li><button class="nav-sub-item" data-page="sys_ota.html" onclick="loadPage('sys_ota.html?v=$COMMIT_HASH')">OTA Update</button></li>
+            <li><button class="nav-sub-item" data-page="sys_log.html" onclick="loadPage('sys_log.html?v=$COMMIT_HASH')">Log Viewer</button></li>
+            <li><button class="nav-sub-item" data-page="sys_backup.html" onclick="loadPage('sys_backup.html?v=$COMMIT_HASH')">Backup / Restore</button></li>
+            <li><button class="nav-sub-item" data-page="fileserver" onclick="loadPage(getDomainname() + '/fileserver/')">File Explorer</button></li>
+            <li><button class="nav-sub-item" data-page="sys_reboot.html" onclick="loadPage('sys_reboot.html?v=$COMMIT_HASH')">Reboot</button></li>
           </ul>
-        </li>
+        </div>
+      </nav>
 
-        <li>
-          <a>Control<i class="arrow down"></i></a>
-          <ul class="submenu">
-            <li><a onclick="manualCycleStart()">Start Cycle</a></li>
-            <li id="HASendDiscovery" style="display: none">
-              <a onclick="homeAssistantPublishDiscoveryTopics()">Publish Discovery Topics</a>
-            </li>
-          </ul>
-        </li>
-      </ul>
-    </nav>
+      <div class="sidebar-footer">
+        <div class="theme-seg" role="group" aria-label="Theme">
+          <button data-mode="auto" onclick="setThemeMode('auto')">Auto</button>
+          <button data-mode="light" onclick="setThemeMode('light')">Light</button>
+          <button data-mode="dark" onclick="setThemeMode('dark')">Dark</button>
+        </div>
+        <div class="foot-meta">
+          <span id="fw-version">&nbsp;</span>
+          <a href="https://github.com/Grrzzz/AI-on-the-edge-device" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </div>
+      </div>
+    </aside>
 
-    <iframe title="maincontent" class="iframe" id="maincontent"></iframe>
+    <div class="scrim" onclick="closeNav()"></div>
+
+    <main class="content">
+      <div class="topbar">
+        <button class="icon-btn" onclick="toggleNav()" aria-label="Open menu"><svg viewBox="0 0 24 24"><use href="#i-menu" /></svg></button>
+        <div class="topbar-title" id="topbar-title">AI-on-the-Edge</div>
+      </div>
+      <iframe title="maincontent" class="iframe" id="maincontent"></iframe>
+    </main>
   </div>
 
   <script>
@@ -253,6 +228,7 @@
     };
 
     async function manualCycleStart() {
+      closeNav();
       const res = await apiCallNotify('/cycle_start', {}, { action: 'Cycle start request', resultMsg: CYCLE_START_NOTIFY });
       if (!res.ok) return;
 
@@ -279,21 +255,13 @@
     }
 
     async function homeAssistantPublishDiscoveryTopics() {
+      closeNav();
       const res = await apiCallNotify('/mqtt?task=publish_ha_discovery', {}, { action: 'HA discovery request' });
       if (!res.ok) return;
 
       firework.launch("Publishing Home Assistant discovery topics scheduled. Will be processed during state 'Publish to MQTT'", 'success', 5000);
     }
 
-    function startLivestream(streamFlashlight) {
-      if (streamPopup) streamPopup.close();
-
-      const task = streamFlashlight ? 'stream_flashlight' : 'stream';
-      const name = streamFlashlight ? 'LivestreamWithLight' : 'Livestream';
-
-      streamPopup = window.open(`${getDomainname()}/camera?task=${task}`, name, streamWindowFeatures);
-      streamPopup?.focus();
-    }
 
     async function loadHostname() {
       const res = await apiCall('/info?type=hostname');
@@ -302,6 +270,7 @@
       const hostname = res.data.trim();
       document.title = `${hostname} | AI-on-the-Edge Device`;
       if (UI.deviceName) UI.deviceName.innerText = hostname;
+      if (UI.topbarTitle) UI.topbarTitle.innerText = hostname;
     }
 
     async function fetchFwVersion(type) {
@@ -314,6 +283,9 @@
         fetchFwVersion('firmware_version'),
         fetchFwVersion('html_version')
       ]);
+
+      const label = document.getElementById('fw-version');
+      if (label && fwVersion) label.textContent = fwVersion;
 
       if (!fwVersion || !uiVersion || uiVersion.startsWith('?')) {
         console.error('Failed to fetch firmware or WebUI version strings.');
@@ -328,8 +300,14 @@
 
     async function init() {
       // Theme Control
-      const themeToggle = document.getElementById('themeToggle');
-      if (themeToggle) themeToggle.checked = document.documentElement.classList.contains('light');
+      setThemeMode(getThemeMode());
+
+      // Follow the OS setting while mode is 'auto'
+      if (window.matchMedia) {
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => {
+          if (getThemeMode() === 'auto') setThemeMode('auto');
+        });
+      }
 
       // Fallback: Reveal on load for pages that never post 'iframe-ready'
       if (UI.main) { UI.main.addEventListener('load', () => { UI.main.classList.add('ready'); }); }
@@ -338,13 +316,14 @@
       let page = getCookie('page');
 
       //@Deprecated: Keep for migration purpose
-      const removedPages = ['overview.html', 'data_graph.html', 'data_viewer.html', 'edit_config_param.html', 'sys_ota_page.html', 'sys_reboot_page.html'];
+      const removedPages = ['overview.html', 'data_graph.html', 'data_viewer.html', 'edit_config_param.html', 'sys_ota_page.html', 'sys_reboot_page.html', 'edit_fallbackvalue.html'];
 
       if (!page || page.includes('sys_reboot.html') || removedPages.some((p) => page.includes(p))) {
         page = 'dashboard.html?v=$COMMIT_HASH';
         document.cookie = `page=${page};path=/;SameSite=Lax`;
       }
       UI.main.src = page;
+      setActive(page);
 
       loadHostname();
       loadConfig().then(homeAssistantSendDiscoveryVisibility).catch((e) => console.error('Failed to load config', e));
@@ -356,7 +335,6 @@
       if (event.source !== UI.main?.contentWindow) return;
       if (event.data?.type === 'iframe-ready') UI.main.classList.add('ready');
     });
-
 
     // Initialize as soon as DOM is ready
     window.addEventListener('DOMContentLoaded', init);

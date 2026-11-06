@@ -26,94 +26,103 @@
     html,
     body {
       width: unset;
-      max-width: unset;
+      max-width: var(--content-max-width);
     }
 
     input[type='number'] {
       font-size: inherit;
     }
 
-    .container {
-      margin: 0;
+    .page-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 12px 24px;
+      padding: 4px 0 18px;
     }
 
-    .container-content {
-      flex-direction: row;
-      align-items: flex-start;
-      gap: 12px;
+    .dash {
+      display: grid;
+      grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+      gap: var(--card-gap);
+      align-items: start;
     }
 
-    .card-header {
-      padding: 8px 5px;
-    }
-
-    .data-panel {
-      flex: 0 0 340px;
+    .dash-side {
       display: flex;
       flex-direction: column;
       gap: var(--card-gap);
+      min-width: 0;
     }
 
-    .value-table {
-      width: 100%;
-      border-collapse: collapse;
+    /* Hero: one card per sequence */
+    .hero {
+      padding: 22px 24px 22px;
+      gap: 4px;
     }
 
-    .value-table tr td {
-      padding: 5px 7px;
+    .hero-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
     }
 
-    .label {
-      font-size: inherit;
-      width: 110px;
+    .hero-value {
+      margin-top: 4px;
+      font-size: 2.6rem;
+      line-height: 1.1;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums;
+      word-break: break-all;
     }
 
-    .val {
-      font-size: inherit;
-      text-align: right;
+    .hero-status {
+      margin: 6px 0 14px;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--success);
     }
 
-    .actual-value {
-      font-weight: bold;
+    .hero-status small {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 400;
+      color: var(--text-secondary);
     }
 
-    .tooltip {
-      position: relative;
-      cursor: help;
+    .hero.status-err .hero-status {
+      color: var(--error);
     }
 
-    .tooltip .tooltiptext {
-      font-family: inherit;
-      font-size: inherit;
-      visibility: hidden;
-      width: 170px;
-      background-color: var(--bg-tooltip);
-      color: var(--text-main);
-      text-align: center;
-      border-radius: var(--input-radius);
-      padding: 5px;
-      position: absolute;
-      z-index: 1;
-      bottom: 125%;
-      right: 0;
-      opacity: 0;
-      transition:
-        opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1),
-        visibility 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-      transition-delay: 0.75s;
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--card-gap);
     }
 
-    .tooltip:hover .tooltiptext {
-      visibility: visible;
-      opacity: 1;
-      transition-delay: 0.3s;
+    .stat.wide {
+      grid-column: 1 / -1;
     }
 
     #processerror {
-      padding-left: 10px;
+      margin-top: 8px;
       color: var(--error);
-      margin-bottom: 5px;
-      font-weight: bold;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    #processerror:empty {
+      display: none;
+    }
+
+    .image-card .card-body {
+      padding: 0 12px 12px;
+      display: flex;
+      justify-content: center;
     }
 
     #img:not([src]),
@@ -123,32 +132,153 @@
 
     #img {
       min-width: 0;
-      max-width: 640px;
       width: 100%;
       height: auto;
       display: block;
+      border-radius: 0.6rem;
     }
 
     #img.is-loading {
       width: 50px;
       height: 50px;
-      margin: 20px auto;
+      margin: 40px auto;
       object-fit: contain;
     }
 
-    .status-err .status-text {
-      color: var(--error);
+    /* Inline fallback value editor inside the hero card */
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
     }
 
-    @media screen and (max-width: 720px) {
-      .container-content {
-        flex-direction: column-reverse;
-        align-items: normal;
-        gap: 20px;
-      }
+    .fallback-edit {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
 
-      #img {
-        min-height: 440px;
+    .fallback-edit label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .fallback-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .fallback-row input {
+      flex: 1 1 140px;
+      min-width: 0;
+      max-width: none;
+      appearance: textfield;
+      -moz-appearance: textfield;
+    }
+
+    .fallback-row input::-webkit-outer-spin-button,
+    .fallback-row input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    .fallback-row .button {
+      width: auto;
+      padding: 8px 16px;
+    }
+
+    .fallback-hint {
+      margin-top: 6px;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+    }
+
+    /* Activity: latest log messages */
+    .activity {
+      margin-top: var(--card-gap);
+    }
+
+    .activity-sub {
+      padding: 0 20px 12px;
+      margin-top: -4px;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .link-btn {
+      border: 0;
+      background: none;
+      padding: 0;
+      font: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--primary);
+      cursor: pointer;
+    }
+
+    .link-btn:hover {
+      text-decoration: underline;
+    }
+
+    .console {
+      margin: 0 16px 16px;
+      padding: 14px 16px;
+      min-height: 120px;
+      max-height: 300px;
+      overflow: auto;
+      border-radius: 0.65rem;
+      background: #0a0f1c;
+      color: #cbd5e1;
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
+      font-size: 0.8rem;
+      line-height: 1.65;
+    }
+
+    .log-line {
+      display: flex;
+      gap: 10px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .log-ts {
+      flex: none;
+      color: #64748b;
+    }
+
+    .log-lvl {
+      flex: none;
+      width: 3ch;
+      font-weight: 700;
+    }
+
+    .log-line.lvl-ERR .log-lvl,
+    .log-line.lvl-ERR .log-msg {
+      color: #f87171;
+    }
+
+    .log-line.lvl-WRN .log-lvl,
+    .log-line.lvl-WRN .log-msg {
+      color: #fbbf24;
+    }
+
+    .log-line.lvl-INF .log-lvl {
+      color: #60a5fa;
+    }
+
+    .log-empty {
+      color: #64748b;
+    }
+
+    @media screen and (max-width: 900px) {
+      .dash {
+        grid-template-columns: minmax(0, 1fr);
       }
     }
   </style>
@@ -159,113 +289,77 @@
 
 <body>
   <div class="container">
-    <header class="container-header">
-      <div style="display: flex; flex-direction: row; justify-content: space-between; align-items: center; width: 100%">
-        <div class="container-title"><span>🏠</span>Dashboard</div>
-        <div class="refresh-group">
-          <div class="refresh-loader">
-            <button id="refreshButton" class="button btn-action" style="width: 135px" onclick="refreshContent()">Refresh</button>
-            <div id="refreshLoadingImg" class="loader">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" class="spinner-svg">
-                <path d="M12 3a9 9 0 1 1-6.36 2.64"></path>
-              </svg>
-            </div>
+    <header class="page-head">
+      <div>
+        <div class="container-title">Dashboard</div>
+        <div class="page-sub">Live reading and process state of your meter.</div>
+      </div>
+      <div class="refresh-group">
+        <div class="refresh-loader">
+          <div id="refreshLoadingImg" class="loader">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" class="spinner-svg">
+              <path d="M12 3a9 9 0 1 1-6.36 2.64"></path>
+            </svg>
           </div>
-
-          <div id="autoRefreshSettings" class="refresh-settings">
-            <input type="checkbox" id="autoRefreshCtrl" onchange="autoRefreshContent()" checked />
-            <label for="autoRefreshCtrl">Auto Refresh</label>
-            <span>(</span>
-            <span class="timer-wrap">
-              <input type="number" id="autoRefreshTime" min="1" onchange="if (value < 1) value = 1; autoRefreshContent();" />
-            </span>
-            <span>) s</span>
-          </div>
-
-          <div class="refresh-timestamp">
-            <span style="font-size: 14px">↻</span>
-            <output id="refreshTimestamp">--:--:--</output>
-          </div>
+          <button id="refreshButton" class="button btn-action" style="width: 120px" onclick="refreshContent()">Refresh</button>
         </div>
       </div>
     </header>
-    <main class="container-content">
-      <div class="data-panel">
+
+    <main class="dash">
+      <div class="dash-side">
         <div id="dynamic-sequences" style="display: contents">
-          <div class="card" id="sequence-placeholder-card">
-            <div class="card-header">Sequence: --</div>
-            <div class="card-body">
-              <table class="value-table">
-                <tr>
-                  <td class="label">Actual Value</td>
-                  <td class="val">--</td>
-                </tr>
-                <tr>
-                  <td class="label">Fallback Value</td>
-                  <td class="val">--</td>
-                </tr>
-                <tr>
-                  <td class="label">Raw Value</td>
-                  <td class="val">--</td>
-                </tr>
-                <tr>
-                  <td class="label">Value Status</td>
-                  <td class="val">--</td>
-                </tr>
-              </table>
+          <div class="card hero" id="sequence-placeholder-card">
+            <div class="hero-label">Sequence</div>
+            <div class="hero-value">--</div>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat wide">
+            <div class="stat-label">Process state</div>
+            <div class="stat-value small" id="statusflow">--</div>
+            <div id="processerror"></div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Uptime</div>
+            <div class="stat-value"><output id="device_uptime">--</output></div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Cycles</div>
+            <div class="stat-value"><output id="cycle_counter">--</output></div>
+          </div>
+          <div class="stat wide" id="wlan_rssi_info">
+            <div class="stat-label">Wi-Fi signal</div>
+            <div class="stat-value small">
+              <svg id="rssi_svg" width="20" height="16" viewBox="0 0 24 16" fill="currentColor" style="overflow: visible">
+                <rect class="bar" x="1" y="12" width="3" height="4" rx="1" />
+                <rect class="bar" x="7" y="8" width="3" height="8" rx="1" />
+                <rect class="bar" x="13" y="4" width="3" height="12" rx="1" />
+                <rect class="bar" x="19" y="0" width="3" height="16" rx="1" />
+              </svg>
+              <output id="wlan_rssi">-</output>
             </div>
           </div>
         </div>
-        <div class="card" id="process-state-card">
-          <div class="card-header">Process State</div>
-          <div class="card-body">
-            <table class="value-table">
-              <tr>
-                <td class="label" id="statusflow">--</td>
-              </tr>
-            </table>
-            <div id="processerror"></div>
-          </div>
-        </div>
-        <div class="card" id="system-info-card">
-          <div class="card-header">System Info</div>
-          <div class="card-body">
-            <table class="value-table">
-              <tr>
-                <td class="label">Device Uptime</td>
-                <td class="val"><output id="device_uptime">--</output></td>
-              </tr>
-              <tr>
-                <td class="label">Cycle Counter</td>
-                <td class="val"><output id="cycle_counter">--</output></td>
-              </tr>
-              <tr id="wlan_rssi_info">
-                <td class="label">WLAN Signal</td>
-                <td class="val">
-                  <div style="display: flex; align-items: center; gap: 6px; justify-content: flex-end">
-                    <output id="wlan_rssi">-</output>
-                    <span>
-                      <svg id="rssi_svg" width="20" height="16" viewBox="0 0 24 16" fill="currentColor" style="overflow: visible">
-                        <rect class="bar" x="1" y="12" width="3" height="4" rx="1" />
-                        <rect class="bar" x="7" y="8" width="3" height="8" rx="1" />
-                        <rect class="bar" x="13" y="4" width="3" height="12" rx="1" />
-                        <rect class="bar" x="19" y="0" width="3" height="16" rx="1" />
-                      </svg>
-                    </span>
-                  </div>
-                </td>
-              </tr>
-            </table>
-          </div>
-        </div>
       </div>
-      <div class="card">
-        <div class="card-header">Image View</div>
-        <div class="card-body" style="display: flex; justify-content: center">
+
+      <div class="card image-card">
+        <div class="card-header">Image view</div>
+        <div class="card-body">
           <img class="is-loading" id="img" src="" />
         </div>
       </div>
     </main>
+
+    <section class="card activity">
+      <div class="card-header">
+        <span>Activity</span>
+        <button class="link-btn" onclick="openLogViewer()">Open log viewer</button>
+      </div>
+      <div class="activity-sub">Latest messages from the device.</div>
+      <div class="console" id="activityLog" aria-live="polite"><span class="log-empty">Loading ...</span></div>
+    </section>
   </div>
 
   <script src="global.js?v=$COMMIT_HASH"></script>
@@ -311,57 +405,181 @@
       container.textContent = '';
 
       const show = (v) => (v === null || v === undefined || v === '' ? '--' : String(v));
-
-      const makeRow = (label, content, extraClass = '') => {
-        const tr = document.createElement('tr');
-        const labelTd = tr.insertCell();
-        labelTd.className = 'label';
-        labelTd.textContent = label;
-        const valTd = tr.insertCell();
-        valTd.className = `val ${extraClass}`.trim();
-        if (content instanceof Node) valTd.appendChild(content);
-        else valTd.textContent = show(content);
-        return tr;
+      const el = (tag, cls, text) => {
+        const e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (text !== undefined) e.textContent = text;
+        return e;
+      };
+      const chip = (label, value, title) => {
+        const c = el('span', 'chip');
+        c.append(el('b', '', label), document.createTextNode(value));
+        if (title) c.title = title;
+        return c;
       };
 
       for (const seq of Object.keys(data.actual_value ?? {})) {
         const fallback = show(data.fallback_value?.[seq]);
         const fbTime = String(data.timestamp_fallbackvalue?.[seq] ?? '');
         const statusCode = String(data.value_status?.[seq] ?? '').substring(0, 3);
-        const statusClass = ['', '000', 'E91'].includes(statusCode) ? 'status-valid' : 'status-err';
+        const isOk = ['', '000', 'E91'].includes(statusCode);
 
-        let fallbackContent = fallback;
-        if (fallback !== '--' && fallback !== 'Disabled' && fbTime.length >= 19) {
-          const tooltip = document.createElement('div');
-          tooltip.className = 'tooltip';
-          tooltip.textContent = fallback;
-          const tip = document.createElement('span');
-          tip.className = 'tooltiptext';
-          tip.textContent = `${fbTime.substring(0, 10)} ${fbTime.substring(11, 19)}`;
-          tooltip.appendChild(tip);
-          fallbackContent = tooltip;
-        }
+        const card = el('div', `card hero ${isOk ? 'status-valid' : 'status-err'}`);
+        const status = el('div', 'hero-status');
+        status.append(statusContent(data.value_status?.[seq]));
 
-        const table = document.createElement('table');
-        table.className = `value-table ${statusClass}`;
-        table.createTBody().append(
-          makeRow('Actual Value', data.actual_value[seq], 'actual-value'),
-          makeRow('Fallback Value', fallbackContent),
-          makeRow('Raw Value', data.raw_value?.[seq]),
-          makeRow('Value Status', statusContent(data.value_status?.[seq]), 'status-text'),
-        );
+        const chips = el('div', 'chips');
+        chips.append(chip('Raw', show(data.raw_value?.[seq])));
+        const fbTitle = fallback !== '--' && fallback !== 'Disabled' && fbTime.length >= 19 ? `Set ${fbTime.substring(0, 10)} ${fbTime.substring(11, 19)}` : '';
+        chips.append(chip('Fallback', fallback, fbTitle));
 
-        const header = document.createElement('div');
-        header.className = 'card-header';
-        header.textContent = `Sequence: ${seq}`;
-        const body = document.createElement('div');
-        body.className = 'card-body';
-        body.appendChild(table);
+        const actions = el('div', 'hero-actions');
+        const edit = el('button', 'link-btn', 'Set fallback value');
+        edit.type = 'button';
+        const rawNum = parseFloat(String(data.raw_value?.[seq] ?? '').replace(',', '.'));
+        const actNum = parseFloat(String(data.actual_value?.[seq] ?? '').replace(',', '.'));
+        const prefill = !Number.isNaN(rawNum) ? rawNum : !Number.isNaN(actNum) ? actNum : '';
+        edit.onclick = () => openFallbackEditor(card, seq, prefill);
+        actions.append(chips, edit);
 
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.append(header, body);
+        card.append(el('div', 'hero-label', `Sequence \u00b7 ${seq}`), el('div', 'hero-value', show(data.actual_value[seq])), status, actions);
         container.appendChild(card);
+      }
+    }
+
+    // ------------------------------------------------------------------
+    // Fallback value: set directly from the dashboard
+    // ------------------------------------------------------------------
+    let fallbackEditingSeq = null; // while set, the automatic refresh does not re-render the cards
+
+    function closeFallbackEditor(card) {
+      card.querySelector('.fallback-edit')?.remove();
+      fallbackEditingSeq = null;
+    }
+
+    function openFallbackEditor(card, seq, prefill) {
+      if (card.querySelector('.fallback-edit')) {
+        closeFallbackEditor(card);
+        return;
+      }
+      document.querySelectorAll('.fallback-edit').forEach((e) => e.remove()); // only one editor at a time
+      fallbackEditingSeq = seq;
+
+      const box = document.createElement('div');
+      box.className = 'fallback-edit';
+
+      const id = `fb_input_${Math.random().toString(36).slice(2, 8)}`;
+      const label = document.createElement('label');
+      label.htmlFor = id;
+      label.textContent = 'New fallback value';
+
+      const row = document.createElement('div');
+      row.className = 'fallback-row';
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.step = 'any';
+      input.id = id;
+      input.value = prefill;
+      input.required = true;
+
+      const apply = document.createElement('button');
+      apply.type = 'button';
+      apply.className = 'button btn-action';
+      apply.textContent = 'Apply';
+
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'button';
+      cancel.textContent = 'Cancel';
+      cancel.onclick = () => closeFallbackEditor(card);
+
+      const submit = async () => {
+        const value = parseFloat(String(input.value).replace(',', '.'));
+        if (Number.isNaN(value)) return firework.launch('Invalid number entered', 'warning', 2000);
+
+        apply.disabled = true;
+        const endpoint = `/set_fallbackvalue?sequence=${encodeURIComponent(seq)}&value=${encodeURIComponent(value)}`;
+        const res = await apiCallNotify(endpoint, {}, {
+          action: 'Fallback value update',
+          loadingMsg: 'Updating fallback value...',
+          resultMsg: 'Fallback value successfully updated',
+        });
+        apply.disabled = false;
+        if (!res.ok) return;
+
+        closeFallbackEditor(card);
+        refreshContent();
+      };
+      apply.onclick = submit;
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') submit();
+        if (e.key === 'Escape') closeFallbackEditor(card);
+      });
+
+      const hint = document.createElement('div');
+      hint.className = 'fallback-hint';
+      hint.textContent = 'Pre-filled with the current raw value. The fallback value is the last valid reading the device falls back to.';
+
+      row.append(input, apply, cancel);
+      box.append(label, row, hint);
+      card.append(box);
+      input.focus();
+      input.select();
+    }
+
+    // Activity log: newest message first, debug messages hidden
+    const LOG_REGEX = /^(\[.*?\])\s+(.*?)\s+<(.*?)>\s+\[(.*?)\]\s+(.*)/;
+    const LOG_MAX_LINES = 40;
+
+    function openLogViewer() {
+      try {
+        window.parent.loadPage('sys_log.html?v=$COMMIT_HASH');
+      } catch (e) {
+        window.location.href = 'sys_log.html?v=$COMMIT_HASH';
+      }
+    }
+
+    async function loadActivity() {
+      const box = document.getElementById('activityLog');
+      if (!box) return;
+
+      const res = await apiCall('/log');
+      if (!res.ok || typeof res.data !== 'string') {
+        if (res.error !== 'aborted') box.innerHTML = '<span class="log-empty">Log not available</span>';
+        return;
+      }
+
+      const entries = [];
+      const lines = res.data.split('\n');
+      for (let i = lines.length - 1; i >= 0 && entries.length < LOG_MAX_LINES; i--) {
+        const m = lines[i].match(LOG_REGEX);
+        if (!m || m[3] === 'DBG') continue;
+        entries.push({ ts: m[2].replace('T', ' ').substring(0, 19), lvl: m[3], mod: m[4], msg: m[5] });
+      }
+
+      box.textContent = '';
+      if (!entries.length) {
+        const empty = document.createElement('span');
+        empty.className = 'log-empty';
+        empty.textContent = 'No messages yet';
+        box.append(empty);
+        return;
+      }
+
+      for (const e of entries) {
+        const row = document.createElement('div');
+        row.className = `log-line lvl-${e.lvl}`;
+        const ts = document.createElement('span');
+        ts.className = 'log-ts';
+        ts.textContent = e.ts;
+        const lvl = document.createElement('span');
+        lvl.className = 'log-lvl';
+        lvl.textContent = e.lvl;
+        const msg = document.createElement('span');
+        msg.className = 'log-msg';
+        msg.textContent = `[${e.mod}] ${e.msg}`;
+        row.append(ts, lvl, msg);
+        box.append(row);
       }
     }
 
@@ -371,8 +589,6 @@
         if (res.error !== 'aborted') console.warn('Process data request failed:', res.error ?? res.status);
         return null;
       }
-
-      document.getElementById('refreshTimestamp').value = new Date().toLocaleTimeString([], { hour12: false });
 
       const d = res.data;
       try {
@@ -428,6 +644,7 @@
 
     async function refreshContent(auto = false) {
       if (refreshRunning) return;
+      if (auto && fallbackEditingSeq !== null) return; // keep an open editor untouched
       refreshRunning = true;
 
       const btn = document.getElementById('refreshButton');
@@ -442,6 +659,7 @@
       try {
         const key = await loadProcessData();
         if (key === null) return; // device not answering: skip the image
+        loadActivity();
 
         // Manual refresh always reloads the image; auto refresh only when cycle or step changed
         if (!auto || key !== lastImageKey) {
@@ -459,31 +677,15 @@
       }
     }
 
+    // Fixed refresh interval (no user setting)
+    const AUTO_REFRESH_MS = 5000;
+
     function autoRefreshContent() {
-      const isAutoRefresh = document.getElementById('autoRefreshCtrl').checked;
-      const autoRefreshSettings = document.getElementById('autoRefreshSettings');
-      const autoRefreshTime = document.getElementById('autoRefreshTime');
+      if (autoRefreshTimeoutHandle) clearTimeout(autoRefreshTimeoutHandle);
 
-      autoRefreshSettings.classList.toggle('is-disabled', !isAutoRefresh);
-      autoRefreshTime.disabled = !isAutoRefresh;
-
-      if (autoRefreshTimeoutHandle) {
-        clearTimeout(autoRefreshTimeoutHandle);
-        autoRefreshTimeoutHandle = null;
-      }
-
-      if (isAutoRefresh) {
-        const delayMs = parseInt(autoRefreshTime.value) * 1000;
-
-        if (!delayMs || delayMs <= 0) {
-          document.getElementById('autoRefreshCtrl').checked = false;
-          autoRefreshSettings.classList.add('is-disabled');
-          return;
-        }
-        autoRefreshTimeoutHandle = setTimeout(() => {
-          refreshContent(true).then(autoRefreshContent);
-        }, delayMs);
-      }
+      autoRefreshTimeoutHandle = setTimeout(() => {
+        refreshContent(true).then(autoRefreshContent);
+      }, AUTO_REFRESH_MS);
     }
 
     async function init() {
@@ -492,15 +694,7 @@
 
       lastImageKey = await loadProcessData();
       loadImage();
-
-      try {
-        await loadConfig();
-        const { enabled, refreshtime } = getConfigFromStorage().webui.autorefresh.dashboard;
-        document.getElementById('autoRefreshCtrl').checked = enabled;
-        document.getElementById('autoRefreshTime').value = refreshtime;
-      } catch (e) {
-        console.error('Failed to load config | Error: ', e);
-      }
+      loadActivity();
 
       autoRefreshContent();
     }
