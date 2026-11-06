@@ -1147,21 +1147,21 @@
             manualRefreshImage();
             break;
           case 2:
-            this.loadIframe('edit_reference.html');
+            this.loadIframe('edit_setup.html', 'image');
             break;
           case 3:
-            this.loadIframe('edit_alignment.html');
+            this.loadIframe('edit_setup.html', 'markers');
             break;
           case 4:
-            this.loadIframe('edit_sequence.html');
+            this.loadIframe('edit_setup.html', 'digit');
             break;
         }
         this.loadRSSI();
       },
-      loadIframe(url) {
+      loadIframe(url, tab) {
         UI.main.classList.remove('ready');
         this.el.mainContent.style.display = 'block';
-        this.el.mainContent.src = `${url}?v=$COMMIT_HASH#description`;
+        this.el.mainContent.src = `${url}?v=$COMMIT_HASH#${tab},description`;
       },
       // Data & Completion Logic
       syncConfigToUI() {

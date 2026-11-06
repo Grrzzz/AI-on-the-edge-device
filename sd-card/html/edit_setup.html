@@ -2,7 +2,7 @@
 <html lang="en" xml:lang="en">
 
 <head>
-  <title>Number Sequences</title>
+  <title>Setup</title>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=720" />
 
@@ -23,6 +23,70 @@
   <link rel="stylesheet" href="style-iframe.css?v=$COMMIT_HASH" />
 
   <style>
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 16px;
+      padding: 4px;
+      width: fit-content;
+      max-width: 100%;
+      border-radius: 0.8rem;
+      background: var(--surface);
+    }
+
+    .tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border: 0;
+      border-radius: 0.6rem;
+      background: none;
+      color: var(--text-secondary);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background var(--transition-speed), color var(--transition-speed);
+    }
+
+    .tab:hover {
+      color: var(--text-main);
+    }
+
+    .tab.active {
+      background: var(--bg-card);
+      color: var(--primary);
+      box-shadow: 0 1px 3px rgba(17, 24, 39, 0.12);
+    }
+
+    .tab-count {
+      min-width: 20px;
+      padding: 1px 7px;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-size: 0.74rem;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .tab-count.off {
+      background: var(--surface);
+      color: var(--text-secondary);
+    }
+
+    .editor-main {
+      display: flex;
+      flex-direction: column;
+      gap: var(--card-gap);
+      min-width: 0;
+    }
+
+    .editor-layout.single {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
     #div_input_el:not([hidden]) {
       display: contents;
     }
@@ -30,10 +94,16 @@
     .canvas-options {
       display: flex;
       flex-wrap: wrap;
+      align-items: center;
       gap: 4px 16px;
       font-size: 0.82rem;
       font-weight: 500;
       color: var(--text-secondary);
+    }
+
+    .canvas-options .button {
+      width: auto;
+      padding: 6px 14px;
     }
 
     .multiplier-info {
@@ -65,63 +135,524 @@
       padding: 3px 6px;
       vertical-align: middle;
     }
+
+    #marker_image {
+      max-width: 100%;
+      height: auto;
+      border-radius: 0.4rem;
+      align-self: flex-start;
+    }
+
+    .header-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-weight: normal;
+    }
+
+    .header-actions .button {
+      width: auto;
+      margin: 0;
+    }
+
+    .param-scroll {
+      overflow-x: auto;
+      padding: 0 12px 12px;
+    }
+
+    .camParameter-table {
+      width: 100%;
+      min-width: 640px;
+      table-layout: fixed;
+      border-collapse: collapse;
+    }
+
+    .camParameter-table td {
+      height: 46px;
+      padding: 4px 6px;
+    }
+
+    .camParameter-table tr + tr td {
+      border-top: 1px solid var(--border);
+    }
+
+    .camParameter-table td > span {
+      color: var(--text-secondary);
+    }
+
+    .camParameter form {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      clear: both;
+    }
+
+    .camParameter output {
+      min-width: 36px;
+      text-align: right;
+      flex-shrink: 0;
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+      font-size: 0.85rem;
+    }
+
+    .camParameter input[type='range'],
+    .camParameter select {
+      flex-grow: 1;
+      width: 100%;
+      min-width: 0;
+      margin: 0;
+    }
+
+    #tooltip-portal {
+      min-width: 325px !important;
+      width: 325px !important;
+      max-width: 325px !important;
+    }
+
+    td:has(.tooltip-trigger) {
+      text-align: right;
+      padding-right: 5px;
+    }
   </style>
 
   <link href="firework.css?v=$COMMIT_HASH" rel="stylesheet" />
   <script src="firework.js?v=$COMMIT_HASH"></script>
+  <link href="tooltips.css?v=$COMMIT_HASH" rel="stylesheet" />
+  <script src="tooltips.js?v=$COMMIT_HASH"></script>
 </head>
 
 <body>
   <div class="container">
     <div class="container-header">
-      <div class="container-title">Number Sequences</div>
-      <div class="page-sub">Group digit and analog ROIs into the sequences that make up your reading.</div>
+      <div class="container-title">Setup</div>
+      <div class="page-sub">Reference image, alignment markers and the digit and analog regions of your meter.</div>
       <details id="desc_details">
         <summary id="desc_details_summary">How it works</summary>
         <div class="info-box">
-          <p>
-            Define your number sequences by grouping digit and analog ROIs (<b>R</b>egion <b>O</b>f <b>I</b>nterest) for processing. Use
-            the dropdown to manage sequences or create new ones; a <b>main</b> sequence is provided by default. You can toggle between ROI
-            types and individual regions using the selection boxes, or click
-            <b>New</b>
-            to automatically generate a new ROI.
-          </p>
-          <p>
-            Position ROIs by dragging them with your mouse or manually entering coordinates. Their order determines their multiplication
-            factor in the final reading—use the <b>Move Lower</b> and <b>Move Higher</b> buttons to adjust this sequence. The resulting
-            decimal scaling is displayed below the selection boxes for verification.<br />
-            Once finished, click <b>Save And Apply</b> to activate your changes immediately without a reboot.
-          </p>
-          <p>
-            For detailed placement rules, refer to the
-            <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/ROI-Configuration/" target="_blank">ROI Configuration Documentation</a>.
-          </p>
+          <p><b>Image</b> &ndash; capture a new reference image with your camera settings, or keep the current one. Make sure the image is level; use <i>Image Rotation</i> to pre-rotate it. Markers and ROIs are placed on this image.</p>
+          <p><b>Markers</b> &ndash; two alignment markers let the device correct small shifts and rotations. Pick a marker, drag its area on the image or enter coordinates and click <b>Update Marker</b>. Keep markers small, sharp and high-contrast.</p>
+          <p><b>Digits / Analog</b> &ndash; group ROIs (<b>R</b>egions <b>O</b>f <b>I</b>nterest) into number sequences. Drag ROIs or enter coordinates; their order defines the decimal place. Use <b>Move higher / lower</b> to reorder.</p>
+          <p>Markers, digits and analog share one <b>Save And Apply</b>. A new image is saved separately on the Image tab. For placement rules see the <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/ROI-Configuration/" target="_blank">ROI configuration documentation</a>.</p>
         </div>
       </details>
+      <div class="tabs" id="setupTabs" role="tablist">
+        <button class="tab" data-tab="image" role="tab" onclick="setTab('image')">Image</button>
+        <button class="tab" data-tab="markers" role="tab" onclick="setTab('markers')">Markers</button>
+        <button class="tab" data-tab="digit" role="tab" onclick="setTab('digit')">Digits <span class="tab-count" id="countDigit"></span></button>
+        <button class="tab" data-tab="analog" role="tab" onclick="setTab('analog')">Analog <span class="tab-count" id="countAnalog"></span></button>
+      </div>
     </div>
 
     <div class="container-content">
-      <div class="editor-layout">
-        <div class="card">
-          <div class="card-header">
-            <span>Reference image</span>
-            <div class="canvas-options">
-              <label class="check visibilityDigitAnalog">
-                <input type="checkbox" id="showDigitAnalogROI" onclick="RefreshDraw()" checked />Show digit + analog ROIs
-              </label>
-              <label class="check visibilityRoiOnly">
-                <input type="checkbox" id="showSelectedROIOnly" onclick="RefreshDraw()" />Selected ROI only
-              </label>
+      <div class="editor-layout" id="editorLayout">
+        <div class="editor-main">
+          <div class="card">
+            <div class="card-header">
+              <span id="canvasTitle">Reference image</span>
+              <div class="header-actions" id="optsImage" hidden>
+              <input id="createreference" class="button" type="button" value="Create New Image" onclick="loadRawImage()" />
+              <input id="showactualimage" class="button" type="button" value="Show Actual Image" onclick="showReference()" disabled />
+              </div>
+              <div class="canvas-options" id="optsRoi" hidden>
+                <label class="check visibilityDigitAnalog">
+                  <input type="checkbox" id="showDigitAnalogROI" onclick="RefreshDraw()" checked />Show digit + analog ROIs
+                </label>
+                <label class="check visibilityRoiOnly">
+                  <input type="checkbox" id="showSelectedROIOnly" onclick="RefreshDraw()" />Selected ROI only
+                </label>
+              </div>
+            </div>
+            <div class="canvas-wrap">
+              <img id="img_loading" alt="Loading..." />
+              <canvas id="canvas" hidden></canvas>
             </div>
           </div>
-          <div class="canvas-wrap">
-            <img id="img_loading" alt="Loading..." />
-            <canvas id="canvas" hidden></canvas>
+
+          <div id="panel-image" hidden>
+            <div class="card">
+        <div class="card-header">
+          <span>Parametrization</span>
+          <div class="header-actions">
+            <input class="button" type="button" id="take" onclick="doTake()" value="Update Image" disabled />
+            <input class="button btn-action" type="button" id="savereference" value="Save And Apply" onclick="saveReference()" disabled />
+          </div>
+        </div>
+        <div class="param-scroll">
+          <table class="camParameter-table">
+            <colgroup>
+              <col span="1" style="width: 4%" />
+              <col span="1" style="width: 21%" />
+              <col span="1" style="width: 23%" />
+              <col span="1" style="width: 8%" />
+              <col span="1" style="width: 21%" />
+              <col span="1" style="width: 23%" />
+            </colgroup>
+
+            <tr>
+              <td style="visibility: hidden">$TOOLTIP_takeimage_camera_zoomfactor</td>
+              <td>
+                <span>Zoom Factor</span>
+              </td>
+              <td class="camParameter">
+                <form id="takeimage_camera_zoomfactor_form">
+                  <output>1.00x</output>
+                  <input class="classvisibility_init" type="range" min="1000" max="4000" value="1000" name="takeimage.camera.zoomfactor"
+                    id="takeimage_camera_zoomfactor_value" onchange="
+                        setVariableInputLimits();
+                        setClassEnabled('classvisibility_takeimage_zoomfactor', this.value > 1000);
+                        this.previousElementSibling.value = (this.value / 1000.0).toFixed(2) + 'x';
+                        gatherChangedParameter(this.form, true);
+                      " />
+                </form>
+              </td>
+              <td style="visibility: hidden">$TOOLTIP_takeimage_camera_brightness</td>
+              <td>
+                <span>Brightness</span>
+              </td>
+              <td class="camParameter">
+                <form id="takeimage_camera_brightness_form">
+                  <output>0</output>
+                  <input class="classvisibility_init" type="range" min="-2" max="2" value="0" name="takeimage.camera.brightness" id="takeimage_camera_brightness_value"
+                    onchange="
+                        this.previousElementSibling.value = this.value;
+                        gatherChangedParameter(this.form, true);
+                      " />
+                </form>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="visibility: hidden">$TOOLTIP_takeimage_camera_zoomoffsetx</td>
+              <td>
+                <span>Zoom Offset X</span>
+              </td>
+              <td class="camParameter classvisibility_takeimage_zoomfactor">
+                <form id="takeimage_camera_zoomoffsetx_form">
+                  <output>0</output>
+                  <input class="classvisibility_init" type="range" min="-960" max="960" value="0" name="takeimage.camera.zoomoffsetx"
+                    id="takeimage_camera_zoomoffsetx_value" onchange="
+                        this.previousElementSibling.value = this.value;
+                        gatherChangedParameter(this.form, true);
+                      " />
+                </form>
+              </td>
+
+              <td style="visibility: hidden">$TOOLTIP_takeimage_camera_contrast</td>
+              <td>
+                <span>Contrast</span>
+              </td>
+              <td class="camParameter">
+                <form id="takeimage_camera_contrast_form">
+                  <output>0</output>
+                  <input class="classvisibility_init" type="range" min="-2" max="2" value="0" name="takeimage.camera.contrast" id="takeimage_camera_contrast_value"
+                    onchange="
+                        this.previousElementSibling.value = this.value;
+                        gatherChangedParameter(this.form, true);
+                      " />
+                </form>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="visibility: hidden">$TOOLTIP_takeimage_camera_zoomoffsety</td>
+              <td>
+                <span>Zoom Offset Y</span>
+              </td>
+              <td class="camParameter classvisibility_takeimage_zoomfactor">
+                <form id="takeimage_camera_zoomoffsety_form">
+                  <output>0</output>
+                  <input class="classvisibility_init" type="range" min="-720" max="720" value="0" name="takeimage.camera.zoomoffsety"
+                    id="takeimage_camera_zoomoffsety_value" onchange="
+                        this.previousElementSibling.value = this.value;
+                        gatherChangedParameter(this.form, true);
+                      " />
+                </form>
+              </td>
+
+              <td style="visibility: hidden">$TOOLTIP_takeimage_camera_saturation</td>
+              <td>
+                <span>Saturation</span>
+              </td>
+              <td class="camParameter">
+                <form id="takeimage_camera_saturation_form">
+                  <output>0</output>
+                  <input class="classvisibility_init" type="range" min="-2" max="2" value="0" name="takeimage.camera.saturation" id="takeimage_camera_saturation_value"
+                    onchange="
+                        this.previousElementSibling.value = this.value;
+                        gatherChangedParameter(this.form, true);
+                      " />
+                </form>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="visibility: hidden">$TOOLTIP_takeimage_camera_mirrorimage</td>
+              <td>
+                <span>Mirror Image</span>
+              </td>
+              <td class="camParameter">
+                <form id="takeimage_camera_mirrorimage_form">
+                  <select name="takeimage.camera.mirrorimage" id="takeimage_camera_mirrorimage_value" onchange="gatherChangedParameter(this.form)">
+                    <option value="false" selected>Disabled</option>
+                    <option value="true">Enabled</option>
+                  </select>
+                </form>
+              </td>
+
+              <td style="visibility: hidden">$TOOLTIP_takeimage_camera_sharpness</td>
+              <td>
+                <span>Sharpness</span>
+              </td>
+              <td class="camParameter">
+                <form id="takeimage_camera_sharpness_form">
+                  <output>0</output>
+                  <input class="classvisibility_init" type="range" min="-3" max="3" value="0" name="takeimage.camera.sharpness" id="takeimage_camera_sharpness_value"
+                    onchange="
+                        this.previousElementSibling.value = this.value;
+                        gatherChangedParameter(this.form, true);
+                      " />
+                </form>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="visibility: hidden">$TOOLTIP_takeimage_camera_flipimage</td>
+              <td>
+                <span>Flip Image</span>
+              </td>
+              <td class="camParameter">
+                <form id="takeimage_camera_flipimage_form">
+                  <select name="takeimage.camera.flipimage" id="takeimage_camera_flipimage_value" onchange="gatherChangedParameter(this.form)">
+                    <option value="false" selected>Disabled</option>
+                    <option value="true">Enabled</option>
+                  </select>
+                </form>
+              </td>
+
+              <td style="visibility: hidden">$TOOLTIP_takeimage_camera_specialeffect</td>
+              <td>
+                <span>Special Effect</span>
+              </td>
+              <td class="camParameter">
+                <form id="takeimage_camera_specialeffect_form">
+                  <select name="takeimage.camera.specialeffect" id="takeimage_camera_specialeffect_value" onchange="gatherChangedParameter(this.form, true)">
+                    <option value="0" selected>None</option>
+                    <option value="1">Negative</option>
+                    <option value="2">Grayscale</option>
+                    <option value="7">Gray+Negative</option>
+                  </select>
+                </form>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="visibility: hidden">$TOOLTIP_takeimage_camera_gaincontrolmode</td>
+              <td>
+                <span>Gain Control</span>
+              </td>
+              <td class="camParameter">
+                <form id="takeimage_camera_gaincontrolmode_form">
+                  <select class="classvisibility_init" name="takeimage.camera.gaincontrolmode" id="takeimage_camera_gaincontrolmode_value" onchange="
+                        setClassEnabled('classvisibility_takeimage_gaincontrolmode_manual', this.value == 0);
+                        gatherChangedParameter(this.form, true);
+                      ">
+                    <option value="0">Manual</option>
+                    <option value="1" selected>Auto</option>
+                  </select>
+                </form>
+              </td>
+
+              <td style="visibility: hidden">$TOOLTIP_takeimage_camera_exposurecontrolmode</td>
+              <td>
+                <span>Exposure Control</span>
+              </td>
+              <td class="camParameter">
+                <form id="takeimage_camera_exposurecontrolmode_form">
+                  <select class="classvisibility_init" name="takeimage.camera.exposurecontrolmode" id="takeimage_camera_exposurecontrolmode_value" onchange="
+                        setClassEnabled('classvisibility_takeimage_exposurecontrolmode_auto', this.value > 0);
+                        setClassEnabled('classvisibility_takeimage_exposurecontrolmode_manual', this.value == 0);
+                        gatherChangedParameter(this.form, true);
+                      ">
+                    <option value="0">Manual</option>
+                    <option value="1" selected>Auto</option>
+                    <option value="2">Auto (AEC2)</option>
+                  </select>
+                </form>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="visibility: hidden">$TOOLTIP_takeimage_camera_manualgainvalue</td>
+              <td>
+                <span>Manual Gain Value</span>
+              </td>
+              <td class="camParameter classvisibility_takeimage_gaincontrolmode_manual">
+                <form id="takeimage_camera_manualgainvalue_form">
+                  <output>0</output>
+                  <input class="classvisibility_init" type="range" min="0" max="30" value="0" name="takeimage.camera.manualgainvalue"
+                    id="takeimage_camera_manualgainvalue_value" onchange="
+                        this.previousElementSibling.value = this.value;
+                        gatherChangedParameter(this.form, true);
+                      " />
+                </form>
+              </td>
+
+              <td style="visibility: hidden">$TOOLTIP_takeimage_camera_autoexposurelevel</td>
+              <td>
+                <span>Auto Exposure Level</span>
+              </td>
+              <td class="camParameter classvisibility_takeimage_exposurecontrolmode_auto">
+                <form id="takeimage_camera_autoexposurelevel_form">
+                  <output>0</output>
+                  <input class="classvisibility_init" type="range" min="-2" max="2" value="0" name="takeimage.camera.autoexposurelevel"
+                    id="takeimage_camera_autoexposurelevel_value" onchange="
+                        this.previousElementSibling.value = this.value;
+                        gatherChangedParameter(this.form, true);
+                      " />
+                </form>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="visibility: hidden">$TOOLTIP_takeimage_flashlight_flashtime</td>
+              <td>
+                <span>Flash Time</span>
+              </td>
+              <td class="camParameter">
+                <form id="takeimage_flashlight_flashtime_form">
+                  <input required type="number" min="100" step="100" value="2000" name="takeimage.flashlight.flashtime" id="takeimage_flashlight_flashtime_value"
+                    onchange="
+                        (!validity.rangeUnderflow || (value = 100)) && (!validity.stepMismatch || (value = parseInt(this.value)));
+                        gatherChangedParameter(this.form, true);
+                      " oninput="" />ms
+                </form>
+              </td>
+
+              <td style="visibility: hidden">$TOOLTIP_takeimage_camera_manualexposurevalue</td>
+              <td>
+                <span>Manual Exposure Value</span>
+              </td>
+              <td class="camParameter classvisibility_takeimage_exposurecontrolmode_manual">
+                <form id="takeimage_camera_manualexposurevalue_form">
+                  <output>300</output>
+                  <input class="classvisibility_init" type="range" min="0" max="1920" value="0" name="takeimage.camera.manualexposurevalue"
+                    id="takeimage_camera_manualexposurevalue_value" onchange="
+                        this.previousElementSibling.value = this.value;
+                        gatherChangedParameter(this.form, true);
+                      " />
+                </form>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="visibility: hidden">$TOOLTIP_takeimage_flashlight_flashintensity</td>
+              <td>
+                <span>Flash Intensity</span>
+              </td>
+              <td class="camParameter">
+                <form id="takeimage_flashlight_flashintensity_form">
+                  <input required type="number" min="0" max="100" value="50" name="takeimage.flashlight.flashintensity" id="takeimage_flashlight_flashintensity_value"
+                    onchange="
+                        (!validity.rangeUnderflow || (value = 0)) && (!validity.rangeOverflow || (value = 100));
+                        gatherChangedParameter(this.form, true);
+                      " />%
+                </form>
+              </td>
+
+              <td style="visibility: hidden">$TOOLTIP_imagealignment_imagerotation</td>
+              <td>
+                <span>Image Rotation</span>
+              </td>
+              <td class="camParameter">
+                <form id="imagealignment_imagerotation_form">
+                  <input required type="number" min="-180.0" max="180.0" step="0.1" value="0.0" name="imagealignment.imagerotation"
+                    id="imagealignment_imagerotation_value" onchange="
+                        (!validity.rangeUnderflow || (value = -180.0)) &&
+                          (!validity.rangeOverflow || (value = 180.0)) &&
+                          (!validity.stepMismatch || (value = this.value));
+                        drawRotated();
+                        gatherChangedParameter(this.form);
+                      " />°
+                </form>
+              </td>
+            </tr>
+          </table>
+        </div>
+      </div>
           </div>
         </div>
 
-        <div class="editor-side">
-          <div class="card">
+        <div class="editor-side" id="editorSide">
+          <div id="panel-markers" hidden>
+                      <div class="card">
+            <div class="card-header"><span>Marker</span></div>
+            <div class="side-body">
+              <div class="field">
+                <label for="marker_selection">Selected marker</label>
+                <select id="marker_selection" onchange="markerSelectionChanged()">
+                    <option value="0" selected>Marker 1</option>
+                    <option value="1">Marker 2</option>
+                  </select>
+              </div>
+
+              <div class="field-grid">
+                <form class="form_alignment_marker field" id="imagealignment_marker_x_form">
+                    <label for="imagealignment_marker_x_value">X</label>
+                    <input type="number" min="1" name="imagealignment.marker.0.x" id="imagealignment_marker_x_value" onchange="
+                          !validity.rangeUnderflow || (value = 1);
+                          markerValueChanged();
+                          
+                        " />
+                  </form>
+                <form class="form_alignment_marker field" id="imagealignment_marker_y_form">
+                    <label for="imagealignment_marker_y_value">Y</label>
+                    <input type="number" min="1" name="imagealignment.marker.0.y" id="imagealignment_marker_y_value" onchange="
+                          !validity.rangeUnderflow || (value = 1);
+                          markerValueChanged();
+                          
+                        " />
+                  </form>
+                <form class="form_alignment_marker field" id="imagealignment_marker_dx_form">
+                    <label for="imagealignment_marker_dx_value">Width</label>
+                    <input type="number" min="1" name="imagealignment.marker.0.dx" id="imagealignment_marker_dx_value" onchange="
+                          !validity.rangeUnderflow || (value = 1);
+                          markerValueChanged();
+                        " />
+                  </form>
+                <form class="form_alignment_marker field" id="imagealignment_marker_dy_form">
+                    <label for="imagealignment_marker_dy_value">Height</label>
+                    <input type="number" min="1" name="imagealignment.marker.0.dy" id="imagealignment_marker_dy_value" onchange="
+                          !validity.rangeUnderflow || (value = 1);
+                          markerValueChanged();
+                        " />
+                  </form>
+              </div>
+
+              <div class="field-grid">
+                <div class="field">
+                  <span class="field-label">Marker image</span>
+                  <img id="marker_image" alt="" />
+                </div>
+                <div class="field">
+                  <span class="field-label">Histogram</span>
+                  <canvas height="60" width="190" id="canvasHistogram" style="max-width: 100%"></canvas>
+                </div>
+              </div>
+              <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.85rem">
+                <label class="check"><input name="rHistogramType" id="HistogramTypeValue" type="radio" checked />Value</label>
+                <label class="check"><input name="rHistogramType" id="HistogramTypeRed" type="radio" />Red</label>
+                <label class="check"><input name="rHistogramType" id="HistogramTypeRGB" type="radio" />RGB</label>
+              </div>
+
+              <div class="btn-row">
+                <input disabled class="button" type="button" id="updatemarker" value="Update Marker" onclick="RequestMarkerCut()" />
+              </div>
+            </div>
+          </div>
+          </div>
+
+          <div id="panel-roi" hidden style="display: contents">
+                      <div class="card">
             <div class="card-header"><span>Processing</span></div>
             <div class="side-body">
               <label class="check">
@@ -153,13 +684,10 @@
             <div class="side-body">
               <div id="div_input_el" hidden>
                 <div class="field-grid">
-                  <div class="field">
-                    <label for="roiTypeSelection">Type</label>
-                    <select id="roiTypeSelection" onchange="onTypeChanged()">
+                  <select id="roiTypeSelection" onchange="onTypeChanged()" hidden>
                       <option value="digit" selected>Digit ROI</option>
                       <option value="analog">Analog ROI</option>
                     </select>
-                  </div>
                   <div class="field">
                     <label for="ROISelect">ROI</label>
                     <select id="ROISelect" onchange="onROIChanged()"></select>
@@ -212,10 +740,16 @@
                   </label>
                 </div>
               </div>
+            </div>
+          </div>
+          </div>
 
+          <div class="card" id="saveCard">
+            <div class="side-body">
               <div class="btn-row">
-                <input disabled class="button btn-action" type="submit" id="saveconfig" onclick="saveToConfig()" value="Save And Apply" />
+                <input disabled class="button btn-action" type="submit" id="saveconfig" onclick="saveAll()" value="Save And Apply" />
               </div>
+              <div style="font-size: 0.8rem; color: var(--text-secondary)">Saves markers, digit and analog ROIs and number sequences together.</div>
             </div>
           </div>
         </div>
@@ -225,11 +759,41 @@
 
   <script src="global.js?v=$COMMIT_HASH"></script>
   <script>
+    // ============================================================================
+    // Shared state: one canvas / one reference image for all tabs
+    // ============================================================================
     let canvas = document.getElementById('canvas');
     let context = canvas.getContext('2d');
     let imageObj = new Image();
     let rect = {};
     let drag = false;
+    let mode = 'image'; // image | markers | digit | analog
+    let currentTab = null;
+
+    // Pointer position in canvas pixels (also correct while the canvas is scaled down by CSS)
+    function pointerPos(e, elem) {
+      const r = elem.getBoundingClientRect();
+      return {
+        x: Math.round(((e.clientX - r.left) * elem.width) / r.width),
+        y: Math.round(((e.clientY - r.top) * elem.height) / r.height),
+      };
+    }
+
+    function getCoords(elem) {
+      // crossbrowser version
+      let box = elem.getBoundingClientRect();
+      let body = document.body;
+      let docEl = document.documentElement;
+      let scrollTop = window.pageYOffset || docEl.scrollTop || body.scrollTop;
+      let scrollLeft = window.pageXOffset || docEl.scrollLeft || body.scrollLeft;
+      let clientTop = docEl.clientTop || body.clientTop || 0;
+      let clientLeft = docEl.clientLeft || body.clientLeft || 0;
+      return { top: Math.round(box.top + scrollTop - clientTop), left: Math.round(box.left + scrollLeft - clientLeft) };
+    }
+
+    // ============================================================================
+    // Number sequences + ROIs (digit / analog)
+    // ============================================================================
     let roiSelected = 0;
     let lockAspectRatio = true;
     let lockAspectRatioAnalog = true;
@@ -1037,7 +1601,7 @@
       }
     }
 
-    function RefreshDraw() {
+    function seqRefreshDraw() {
       // Draw reference image
       // ************************
       context.clearRect(0, 0, canvas.width, canvas.height);
@@ -1238,32 +1802,9 @@
     }
 
     // Pointer position in canvas pixels (also correct while the canvas is scaled down by CSS)
-    function pointerPos(e, elem) {
-      const r = elem.getBoundingClientRect();
-      return {
-        x: Math.round(((e.clientX - r.left) * elem.width) / r.width),
-        y: Math.round(((e.clientY - r.top) * elem.height) / r.height),
-      };
-    }
 
-    function getCoords(elem) {
-      // crossbrowser version
-      let box = elem.getBoundingClientRect();
-      let body = document.body;
-      let docEl = document.documentElement;
-      let scrollTop = window.pageYOffset || docEl.scrollTop || body.scrollTop;
-      let scrollLeft = window.pageXOffset || docEl.scrollLeft || body.scrollLeft;
-      let clientTop = docEl.clientTop || body.clientTop || 0;
-      let clientLeft = docEl.clientLeft || body.clientLeft || 0;
-      let top = box.top + scrollTop - clientTop;
-      let left = box.left + scrollLeft - clientLeft;
-      return {
-        top: Math.round(top),
-        left: Math.round(left)
-      };
-    }
 
-    function mouseDown(e) {
+    function seqMouseDown(e) {
       const coords = getCoords(this);
       rect.startX = pointerPos(e, this).x;
       rect.startY = pointerPos(e, this).y;
@@ -1274,7 +1815,7 @@
       drag = true;
     }
 
-    function mouseUp() {
+    function seqMouseUp() {
       drag = false;
       if (rect.w < 0) {
         rect.w = -rect.w;
@@ -1291,7 +1832,7 @@
       RefreshROI();
     }
 
-    function mouseMove(e) {
+    function seqMouseMove(e) {
       if (drag) {
         if (jsonConfigModifiedDelta[typeSelection.value].sequence[sequenceSelection.selectedIndex].roi.length == 0) {
           return;
@@ -1343,35 +1884,12 @@
     }
 
 
-    function saveToConfig() {
-      if (confirm("Are you sure you want to save and apply the new configuration?")) {
-        document.getElementById("saveconfig").disabled = true;
-
-        saveConfig(JSON.stringify(jsonConfigModifiedDelta), true).then(() => {
-          setTimeout(function () {
-            loadConfigData();
-            RefreshROI();
-          }, 500);
-        });
-      }
-    }
 
 
     // hash #description open the details part of the page
-    function openDescription() {
-      if (window.location.hash) {
-        let hash = window.location.hash.substring(1); //Puts hash in variable, and removes the # character
-        if (hash == 'description') document.getElementById('desc_details').open = true;
-      }
-    }
 
-    function loadReferenceImage() {
-      loadCanvas(getDomainname() + '/fileserver/config/reference.jpg?' + Math.floor(Math.random() * 1000000 + 1));
-    }
 
-    function loadConfigData() {
-      jsonConfig = getConfigFromStorage(); // Get config
-      jsonConfigModifiedDelta = {}; // Reset modified parameter container
+    function seqInit() {
       jsonConfigModifiedDelta.numbersequences = new Object();
       jsonConfigModifiedDelta.numbersequences = structuredClone(jsonConfig.numbersequences);
       jsonConfigModifiedDelta.digit = new Object();
@@ -1384,7 +1902,828 @@
       digitProcessingChanged(true);
       onTypeChanged();
 
+    }
+
+    // ============================================================================
+    // Alignment markers
+    // ============================================================================
+    let marker_selected = 0;
+    let markerRoi;
+    let noReferenceImage = false;
+    let img1px = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==';
+
+    function markerSelectionChanged() {
+      const markerSelect = document.getElementById('marker_selection');
+      marker_selected = parseInt(markerSelect.value);
+
+      // Get all children of elements with class .form_alignment_marker
+      const markerInputs = document.querySelectorAll('.form_alignment_marker > [name]');
+
+      markerInputs.forEach((input) => {
+        const parts = input.name.split('.marker.');
+        if (parts.length === 2) {
+          const fieldName = parts[1].split('.')[1];
+          input.name = `${parts[0]}.marker.${marker_selected}.${fieldName}`;
+        }
+      });
+
+      if (!Array.isArray(markerRoi) || !markerRoi[marker_selected]) return;
+      RefreshMarker();
+    }
+
+    function markerValueChanged() {
+      if (!drag) {
+        rect.startX = markerRoi[marker_selected].x = parseInt(document.getElementById('imagealignment_marker_x_value').value);
+        rect.startY = markerRoi[marker_selected].y = parseInt(document.getElementById('imagealignment_marker_y_value').value);
+        rect.w = markerRoi[marker_selected].dx = parseInt(document.getElementById('imagealignment_marker_dx_value').value);
+        rect.h = markerRoi[marker_selected].dy = parseInt(document.getElementById('imagealignment_marker_dy_value').value);
+      }
+
+      // Validate ROI position
+      ROIPositionValidation(markerRoi[marker_selected]);
+
+      // Update ROI coordinates
+      rect.startX = document.getElementById('imagealignment_marker_x_value').value = markerRoi[marker_selected].x;
+      rect.startY = document.getElementById('imagealignment_marker_y_value').value = markerRoi[marker_selected].y;
+
+      RefreshDraw();
+    }
+
+    async function RequestMarkerCut() {
+      if (!Array.isArray(markerRoi) || !markerRoi[marker_selected]) {
+        firework.launch('Marker data not initialized yet. Please wait a moment and retry.', 'warning', 4000);
+        return;
+      }
+
+      const roi = markerRoi[marker_selected];
+      roi.x = parseInt(document.getElementById('imagealignment_marker_x_value').value);
+      roi.y = parseInt(document.getElementById('imagealignment_marker_y_value').value);
+      roi.dx = parseInt(document.getElementById('imagealignment_marker_dx_value').value);
+      roi.dy = parseInt(document.getElementById('imagealignment_marker_dy_value').value);
+
+      const endpoint = `/editflow?task=cutref&in=/config/reference.jpg&out=/img_tmp/marker${marker_selected + 1}.jpg` +
+        `&x=${roi.x}&y=${roi.y}&dx=${roi.dx}&dy=${roi.dy}`;
+
+      const res = await apiCallNotify(endpoint, {}, {
+        action: 'Marker update', loadingMsg: 'Request marker update...', resultMsg: 'Marker successfully updated',
+        httpObj: {
+          405: (r) => ({
+            msg: `Marker update available in IDLE state only. Please retry shortly. [${String(r.data).split(' | ')[1]?.trim() || 'Unknown State'}]`,
+            type: 'warning',
+            time: 2000,
+          }),
+        }
+      });
+
+      document.getElementById('saveconfig').disabled = false;
+      if (!res.ok) return;
+
+      roi.modified = true;
+      RefreshMarker();
+    }
+
+    function RefreshMarker() {
+      // Load marker image
+      let filenameurl = '/config/marker' + (marker_selected + 1).toString() + '.jpg';
+      if (markerRoi[marker_selected].modified) filenameurl = '/img_tmp/marker' + (marker_selected + 1).toString() + '.jpg';
+
+      document.getElementById('marker_image').src =
+        getDomainname() + '/fileserver' + filenameurl + '?' + Math.floor(Math.random() * 1000000 + 1);
+
+      // Load x,y coordinates from config
+      rect.startX = document.getElementById('imagealignment_marker_x_value').value = markerRoi[marker_selected].x;
+      rect.startY = document.getElementById('imagealignment_marker_y_value').value = markerRoi[marker_selected].y;
+
+      // Execute after marker image gets loaded
+      document.getElementById('marker_image').onload = function () {
+        if (mode !== 'markers') return;
+        // Load ROI dx, dy data derived from image size
+        rect.w = markerRoi[marker_selected].dx = document.getElementById('imagealignment_marker_dx_value').value = parseInt(this.width);
+        rect.h = markerRoi[marker_selected].dy = document.getElementById('imagealignment_marker_dy_value').value = parseInt(this.height);
+
+        // Validate ROI position
+        ROIPositionValidation(markerRoi[marker_selected]);
+
+        // Update ROI coordinates
+        rect.startX = document.getElementById('imagealignment_marker_x_value').value = markerRoi[marker_selected].x;
+        rect.startY = document.getElementById('imagealignment_marker_y_value').value = markerRoi[marker_selected].y;
+
+        RefreshDraw();
+        HistogramUpdate();
+      };
+
+      document.getElementById('marker_image').onerror = function () {
+        this.src = img1px; // Use 1px image if image loading failed
+        RefreshDraw();
+      };
+    }
+
+    function markerRefreshDraw() {
+      if (noReferenceImage) return;
+
+      // Draw reference image
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(imageObj, 0, 0);
+
+      // During init, markerRoi is not defined yet OR no marker defined
+      if (typeof markerRoi === 'undefined' || markerRoi.length == 0) {
+        return;
+      }
+
+      // Draw alignment marker overlay
+      let lw = 2;
+      context.lineWidth = lw;
+      context.strokeStyle = 'rgb(255, 51, 51)';
+      let x0 = parseInt(rect.startX) - parseInt(lw / 2);
+      let y0 = parseInt(rect.startY) - parseInt(lw / 2);
+      let dx = parseInt(rect.w) + parseInt(lw);
+      let dy = parseInt(rect.h) + parseInt(lw);
+      context.strokeRect(x0, y0, dx, dy);
+    }
+
+
+
+    // Pointer position in canvas pixels (also correct while the canvas is scaled down by CSS)
+
+
+    function markerMouseDown(e) {
+      let zw = getCoords(this);
+      rect.startX = pointerPos(e, this).x;
+      rect.startY = pointerPos(e, this).y;
+      document.getElementById('imagealignment_marker_x_value').value = rect.startX;
+      document.getElementById('imagealignment_marker_y_value').value = rect.startY;
+      drag = true;
+    }
+
+    function markerMouseUp() {
+      drag = false;
+
+      if (rect.w < 0) {
+        rect.w = -rect.w;
+        rect.startX -= rect.w;
+      }
+      if (rect.h < 0) {
+        rect.h = -rect.h;
+        rect.startY -= rect.h;
+      }
+      document.getElementById('imagealignment_marker_dx_value').value = rect.w;
+      document.getElementById('imagealignment_marker_dy_value').value = rect.h;
+      document.getElementById('imagealignment_marker_x_value').value = rect.startX;
+      document.getElementById('imagealignment_marker_y_value').value = rect.startY;
+
+      markerValueChanged();
+    }
+
+    function markerMouseMove(e) {
+      if (drag) {
+        let zw = getCoords(this);
+        rect.w = pointerPos(e, this).x - rect.startX;
+        rect.h = pointerPos(e, this).y - rect.startY;
+        document.getElementById('imagealignment_marker_dx_value').value = rect.w;
+        document.getElementById('imagealignment_marker_dy_value').value = rect.h;
+        RefreshDraw();
+      } else {
+        RefreshDraw();
+
+        let zw = getCoords(this);
+        let x = pointerPos(e, this).x;
+        let y = pointerPos(e, this).y;
+
+        context.lineWidth = 1;
+        context.strokeStyle = 'rgb(160, 160, 160)';
+        context.beginPath();
+        context.moveTo(0, y);
+        context.lineTo(canvas.width, y);
+        context.moveTo(x, 0);
+        context.lineTo(x, canvas.height);
+        context.stroke();
+      }
+    }
+
+    function processImageHistogram(inImg) {
+      const width = inImg.width;
+      const height = inImg.height;
+      const src = new Uint32Array(inImg.data.buffer);
+      const isValueHistogram = document.getElementById('HistogramTypeValue').checked;
+      const isRedChannel = document.getElementById('HistogramTypeRed').checked;
+
+      let histBrightness = new Array(256).fill(0);
+      let histR = new Array(256).fill(0);
+      let histG = new Array(256).fill(0);
+      let histB = new Array(256).fill(0);
+      for (let i = 0; i < src.length; i++) {
+        let r = src[i] & 0xff;
+        let g = (src[i] >> 8) & 0xff;
+        let b = (src[i] >> 16) & 0xff;
+        histBrightness[r]++;
+        histBrightness[g]++;
+        histBrightness[b]++;
+        histR[r]++;
+        histG[g]++;
+        histB[b]++;
+      }
+
+      let maxBrightness = 0;
+      if (isValueHistogram) {
+        for (let i = 1; i < 256; i++) {
+          if (maxBrightness < histBrightness[i]) {
+            maxBrightness = histBrightness[i];
+          }
+        }
+      } else {
+        for (let i = 0; i < 256; i++) {
+          if (maxBrightness < histR[i]) {
+            maxBrightness = histR[i];
+          } else if (maxBrightness < histG[i]) {
+            maxBrightness = histG[i];
+          } else if (maxBrightness < histB[i]) {
+            maxBrightness = histB[i];
+          }
+        }
+      }
+
+      const canvas = document.getElementById('canvasHistogram');
+      const ctx = canvas.getContext('2d');
+
+      // Get colors
+      const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+      const valueColor = getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim();
+
+      let guideHeight = 4;
+      let startY = canvas.height - guideHeight;
+      let dx = canvas.width / 256;
+      let dy = startY / maxBrightness;
+      ctx.lineWidth = dx;
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = 0; i < 256; i++) {
+        let x = i * dx;
+        if (isValueHistogram) {
+          // Value
+          ctx.strokeStyle = valueColor;
+          ctx.beginPath();
+          ctx.moveTo(x, startY);
+          ctx.lineTo(x, startY - histBrightness[i] * dy);
+          ctx.closePath();
+          ctx.stroke();
+        } else {
+          // Red
+          ctx.strokeStyle = 'rgba(220,0,0,0.5)';
+          ctx.beginPath();
+          ctx.moveTo(x, startY);
+          ctx.lineTo(x, startY - histR[i] * dy);
+          ctx.closePath();
+          ctx.stroke();
+          if (!isRedChannel) {
+            // Green
+            ctx.strokeStyle = 'rgba(0,210,0,0.5)';
+            ctx.beginPath();
+            ctx.moveTo(x, startY);
+            ctx.lineTo(x, startY - histG[i] * dy);
+            ctx.closePath();
+            ctx.stroke();
+            // Blue
+            ctx.strokeStyle = 'rgba(0,0,255,0.5)';
+            ctx.beginPath();
+            ctx.moveTo(x, startY);
+            ctx.lineTo(x, startY - histB[i] * dy);
+            ctx.closePath();
+            ctx.stroke();
+          }
+        }
+
+        // Guide
+        ctx.strokeStyle = 'rgb(' + i + ', ' + i + ', ' + i + ')';
+        ctx.beginPath();
+        ctx.moveTo(x, startY);
+        ctx.lineTo(x, canvas.height);
+        ctx.closePath();
+        ctx.stroke();
+      }
+    }
+
+    function getImageData(el) {
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      const img = document.getElementById(el);
+
+      if (getTestEnvironmentActive()) {
+        // Avoid error in testing mode: The canvas has been tainted by cross-origin data.
+        img.crossOrigin = 'use-credentials';
+      }
+
+      canvas.width = img.width;
+      canvas.height = img.height;
+      context.drawImage(img, 0, 0);
+      return context.getImageData(0, 0, img.width, img.height);
+    }
+
+    function HistogramUpdate(e) {
+      processImageHistogram(getImageData('marker_image'));
+    }
+
+    // Called from setTheme() function in index.html to detect mode change
+    function refreshTheme() {
+      if (!document.getElementById('canvasHistogram')) return;
+
+      HistogramUpdate();
+    }
+
+    // Update histogram when radio button 'rHistogramType' changed
+    document.querySelectorAll('input[name="rHistogramType"]').forEach((radio) => {
+      radio.addEventListener('change', HistogramUpdate);
+    });
+
+
+    // hash #description open the details part of the page
+
+    function markerInit() {
+      jsonConfigModifiedDelta.imagealignment = new Object();
+      jsonConfigModifiedDelta.imagealignment.marker = structuredClone(jsonConfig.imagealignment.marker);
+      markerRoi = jsonConfigModifiedDelta.imagealignment.marker; // Use shorter name variable
+
+      if (mode === 'markers') RefreshMarker();
+    }
+
+
+
+
+  
+    // ============================================================================
+    // Reference image (camera capture)
+    // ============================================================================
+    let isActReference = false;
+    let specialeffect = '0';
+    let currentBlobUrl = null;
+
+    function setVariableInputLimits() {
+      let sensorFrameSizeWidth = 1600; // Default
+      let sensorFrameSizeHeight = 1200; // Default
+      let autoExposureLimit = 2; // Default
+
+      // Logic for camera models remains the same
+      const cameraModel = jsonConfig.takeimage.camera.cameramodel;
+
+      if (cameraModel == 1) {
+        // OV2640
+        sensorFrameSizeWidth = 1600;
+        sensorFrameSizeHeight = 1200;
+        autoExposureLimit = 2;
+      } else if (cameraModel == 2) {
+        // OV3660
+        sensorFrameSizeWidth = 2048;
+        sensorFrameSizeHeight = 1536;
+        autoExposureLimit = 5;
+      } else if (cameraModel == 3) {
+        // OV5640
+        sensorFrameSizeWidth = 2560;
+        sensorFrameSizeHeight = 1920;
+        autoExposureLimit = 5;
+      } else {
+        firework.launch('Camera model unknown. Zoom factor range / limits may be wrong', 'warning', 5000);
+      }
+
+      // Helper to select elements and trigger change events
+      const zoomValEl = document.getElementById('takeimage_camera_zoomfactor_value');
+      const offsetXEl = document.getElementById('takeimage_camera_zoomoffsetx_value');
+      const offsetYEl = document.getElementById('takeimage_camera_zoomoffsety_value');
+      const aeLevelEl = document.getElementById('takeimage_camera_autoexposurelevel_value');
+      const manualExEl = document.getElementById('takeimage_camera_manualexposurevalue_value');
+
+      // Update Zoom Factor Max
+      zoomValEl.setAttribute('max', (sensorFrameSizeWidth * 1000) / 640);
+
+      // X Offset Calculation
+      let imageWidthZoomed = Math.floor((sensorFrameSizeWidth * 1000) / parseFloat(zoomValEl.value));
+      imageWidthZoomed += imageWidthZoomed % 4;
+
+      let imageZoomOffsetXMax = (sensorFrameSizeWidth - imageWidthZoomed) / 2;
+      offsetXEl.setAttribute('max', imageZoomOffsetXMax);
+      offsetXEl.setAttribute('min', -1 * imageZoomOffsetXMax);
+      offsetXEl.dispatchEvent(new Event('change'));
+
+      // Y Offset Calculation
+      let imageHeightZoomed = Math.floor((sensorFrameSizeHeight * 1000) / parseFloat(zoomValEl.value));
+      imageHeightZoomed += imageHeightZoomed % 4;
+
+      let imageZoomOffsetYMax = (sensorFrameSizeHeight - imageHeightZoomed) / 2;
+      offsetYEl.setAttribute('max', imageZoomOffsetYMax);
+      offsetYEl.setAttribute('min', -1 * imageZoomOffsetYMax);
+      offsetYEl.dispatchEvent(new Event('change'));
+
+      // Auto Exposure Limits
+      aeLevelEl.setAttribute('max', autoExposureLimit);
+      aeLevelEl.setAttribute('min', -1 * autoExposureLimit);
+      aeLevelEl.dispatchEvent(new Event('change'));
+
+      // Manual Exposure Limits
+      manualExEl.setAttribute('max', sensorFrameSizeHeight);
+      manualExEl.dispatchEvent(new Event('change'));
+    }
+
+    async function doTake() {
+      // Helper to get value or return default
+      const getVal = (id, def) => {
+        const val = document.getElementById(id).value;
+        return val === '' ? def : val;
+      };
+
+      const params = {
+        task: 'capture',
+        flashtime: getVal('takeimage_flashlight_flashtime_value', '2000'),
+        flashintensity: getVal('takeimage_flashlight_flashintensity_value', '50'),
+        brightness: getVal('takeimage_camera_brightness_value', '0'),
+        contrast: getVal('takeimage_camera_contrast_value', '0'),
+        saturation: getVal('takeimage_camera_saturation_value', '0'),
+        sharpness: getVal('takeimage_camera_sharpness_value', '0'),
+        exposurecontrolmode: getVal('takeimage_camera_exposurecontrolmode_value', '1'),
+        autoexposurelevel: getVal('takeimage_camera_autoexposurelevel_value', '0'),
+        manualexposurevalue: getVal('takeimage_camera_manualexposurevalue_value', '300'),
+        gaincontrolmode: getVal('takeimage_camera_gaincontrolmode_value', '1'),
+        manualgainvalue: getVal('takeimage_camera_manualgainvalue_value', '0'),
+        specialeffect: getVal('takeimage_camera_specialeffect_value', '0'),
+        mirror: getVal('takeimage_camera_mirrorimage_value', 'false'),
+        flip: getVal('takeimage_camera_flipimage_value', 'false'),
+        zoomfactor: getVal('takeimage_camera_zoomfactor_value', '1000'),
+        zoomx: getVal('takeimage_camera_zoomoffsetx_value', '0'),
+        zoomy: getVal('takeimage_camera_zoomoffsety_value', '0'),
+      };
+
+      specialeffect = params.specialeffect;
+
+      const flashTime = parseInt(params.flashtime, 10) || 1000;
+      const timeoutMs = Math.max(flashTime + 10000, 15000);
+      const res = await apiCallNotify(`/camera?${new URLSearchParams(params)}`, { timeout: timeoutMs }, {
+        action: 'Setting image parameter',
+        loadingMsg: 'Capturing image...',
+        parseType: 'blob',
+      });
+
+      if (!res.ok) {
+        document.getElementById('createreference').disabled = false;
+        showReference();
+        return;
+      }
+
+      if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
+      currentBlobUrl = URL.createObjectURL(res.data);
+      refLoadCanvas(currentBlobUrl, true);
+      isActReference = false;
+
+      document.getElementById('showactualimage').disabled = false;
+      document.getElementById('createreference').disabled = true;
+      document.getElementById('savereference').disabled = false;
+    }
+
+    function loadRawImage() {
+      setClassEnabled('camParameter', true); // Release input for all camera parameter
+      triggerClassElementOnChange('classvisibility_init'); // Init subparameter lock
+      jsonConfigModifiedDelta = {}; // Reset modified parameter container after visibility update
+
+      doTake();
+    }
+
+    function drawRotated(_grid = true) {
+      context.fillStyle = 'rgb(250, 250, 250)';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.save();
+
+      // Handle rotation
+      let degrees = parseFloat(document.getElementById('imagealignment_imagerotation_value').value);
+
+      if (isActReference) {
+        context.drawImage(imageObj, 0, 0);
+      } else {
+        context.translate(canvas.width / 2, canvas.height / 2);
+        context.rotate((degrees * Math.PI) / 180);
+
+        // Handle special effect case 7 (grayscale + negative)
+        // Both effects together are not working when processed on camera
+        // Workaround: Process grayscale on camera + negative on MCU (processing) / browser (preview)
+        if (specialeffect == '7') context.filter = 'invert(1)';
+
+        context.drawImage(imageObj, -imageObj.width / 2, -imageObj.height / 2);
+      }
+
+      context.restore();
+
+      if (_grid) drawGrid();
+    }
+
+    function drawGrid() {
+      let w = canvas.width;
+      let h = canvas.height;
+
+      context.save();
+      context.lineWidth = 0.25;
+      context.strokeStyle = 'rgb(160, 160, 160)'; //'#00FF00';
+
+      for (let i = h / 2; i < h; i += 100) {
+        context.moveTo(0, i);
+        context.lineTo(w, i);
+        context.stroke();
+        context.moveTo(0, h - i);
+        context.lineTo(w, h - i);
+        context.stroke();
+      }
+
+      for (let i = w / 2; i < w; i += 100) {
+        context.moveTo(i, 0);
+        context.lineTo(i, h);
+        context.stroke();
+        context.moveTo(w - i, 0);
+        context.lineTo(w - i, h);
+        context.stroke();
+      }
+
+      context.restore();
+    }
+
+    function refLoadCanvas(dataURL, grid) {
+      document.getElementById('canvas').style.display = 'none';
+      document.getElementById('img_loading').style.display = 'block';
+
+      imageObj.onload = function () {
+        canvas.width = this.width;
+        canvas.height = this.height;
+
+        if (grid) {
+          drawRotated(true);
+          document.getElementById('take').disabled = false;
+        } else {
+          drawRotated(false);
+        }
+
+        // Ensure exactly one listener even after repeated image loads
+        canvas.removeEventListener('mousemove', mouseMove, false);
+        canvas.addEventListener('mousemove', mouseMove, false);
+
+        document.getElementById('canvas').style.display = 'block';
+        document.getElementById('img_loading').style.display = 'none';
+      };
+
+      imageObj.onerror = function () {
+        imageObj.onerror = null;
+        canvas.removeEventListener('mousemove', mouseMove, false);
+        imageObj.src = noImageAvailable;
+      };
+
+      imageObj.src = dataURL;
+    }
+
+
+    function refMouseMove(e) {
+      if (isActReference) drawRotated(false);
+      else drawRotated(true);
+
+      const pp = pointerPos(e, this);
+      let x = pp.x;
+      let y = pp.y;
+
+      context.lineWidth = 1;
+      context.strokeStyle = 'rgb(160, 160, 160)';
+      context.beginPath();
+      context.moveTo(0, y);
+      context.lineTo(canvas.width, y);
+      context.moveTo(x, 0);
+      context.lineTo(x, canvas.height);
+      context.stroke();
+    }
+
+    async function saveCanvasToFile(canvas, destFile) {
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.95));
+      if (!blob) return false;
+
+      const res = await apiCallNotify(withDomain(getDomainname(), '/upload' + destFile + '?overwrite=true'), { method: 'POST', body: blob }, { action: 'Image save request' });
+      return res.ok;
+    }
+
+    async function saveReference() {
+      if (!confirm('Are you sure you want to save and apply the new camera configuration and reference image?')) return;
+
+      const saveBtn = document.getElementById('savereference');
+      saveBtn.disabled = true;
+
+      try {
+        drawRotated(false);
+
+        const res = await saveCanvasToFile(canvas, '/config/reference.jpg');
+        if (!res) throw new Error('Reference image upload failed');
+
+        await saveConfig(JSON.stringify(jsonConfigModifiedDelta), true);
+      } catch (error) {
+        console.error('Save reference failed:', error);
+      }
+      finally {
+        saveBtn.disabled = false;
+      }
+    }
+
+    function showReference() {
+      if (currentBlobUrl) {
+        URL.revokeObjectURL(currentBlobUrl);
+        currentBlobUrl = null;
+      }
+      let url = getDomainname() + '/fileserver/config/reference.jpg?' + Math.floor(Math.random() * 1000000 + 1);
+      refLoadCanvas(url, false);
+      isActReference = true;
+
+      document.getElementById('savereference').disabled = true;
+      document.getElementById('createreference').disabled = false;
+      document.getElementById('showactualimage').disabled = true;
+      document.getElementById('take').disabled = true;
+
+      let jsonConfigKeyified = []; // Config: array as key-value pairs
+      [jsonConfig, jsonConfigKeyified] = getConfigFromStorage(2); // Get config
+      parseCurrentParametrization(jsonConfigKeyified);
+
+      triggerClassElementOnChange('classvisibility_init'); // Init subparameter lock
+      setClassEnabled('camParameter', false); // Lock input for all camera parameter
+    }
+
+    function refInit() {
+      setVariableInputLimits();
+    }
+
+    // hash #description open the details part of the page
+
+
+
+  
+    // ============================================================================
+    // Dispatch: mouse and drawing depend on the active tab
+    // ============================================================================
+    function mouseDown(e) {
+      if (mode === 'markers') markerMouseDown.call(this, e);
+      else if (mode === 'digit' || mode === 'analog') seqMouseDown.call(this, e);
+    }
+
+    function mouseUp(e) {
+      if (mode === 'markers') markerMouseUp.call(this, e);
+      else if (mode === 'digit' || mode === 'analog') seqMouseUp.call(this, e);
+    }
+
+    function mouseMove(e) {
+      if (mode === 'markers') markerMouseMove.call(this, e);
+      else if (mode === 'digit' || mode === 'analog') seqMouseMove.call(this, e);
+      else refMouseMove.call(this, e);
+    }
+
+    function RefreshDraw() {
+      if (mode === 'markers') markerRefreshDraw();
+      else if (mode === 'digit' || mode === 'analog') seqRefreshDraw();
+      else drawRotated(!isActReference);
+      updateCounts();
+    }
+
+    // ============================================================================
+    // Tabs
+    // ============================================================================
+    const TAB_TITLE = { image: 'Reference image', markers: 'Reference image \u00b7 alignment markers', digit: 'Reference image \u00b7 digit ROIs', analog: 'Reference image \u00b7 analog ROIs' };
+
+    function updateCounts() {
+      try {
+        if (!jsonConfigModifiedDelta.digit || !sequenceSelection || sequenceSelection.selectedIndex < 0) return;
+        const idx = sequenceSelection.selectedIndex;
+        const set = (id, type, enabled) => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          const n = jsonConfigModifiedDelta[type].sequence[idx]?.roi.length ?? 0;
+          el.textContent = enabled ? n : 'off';
+          el.classList.toggle('off', !enabled);
+        };
+        set('countDigit', 'digit', jsonConfigModifiedDelta.digit.enabled);
+        set('countAnalog', 'analog', jsonConfigModifiedDelta.analog.enabled);
+      } catch (e) { /* data not ready yet */ }
+    }
+
+    function updateTabsUI() {
+      document.querySelectorAll('#setupTabs .tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === mode));
+      const isRoi = mode === 'digit' || mode === 'analog';
+      document.getElementById('panel-image').hidden = mode !== 'image';
+      document.getElementById('panel-markers').hidden = mode !== 'markers';
+      document.getElementById('panel-roi').hidden = !isRoi;
+      document.getElementById('editorSide').hidden = mode === 'image';
+      document.getElementById('editorLayout').classList.toggle('single', mode === 'image');
+      document.getElementById('optsImage').hidden = mode !== 'image';
+      document.getElementById('optsRoi').hidden = !isRoi;
+      document.getElementById('canvasTitle').textContent = TAB_TITLE[mode];
+      updateCounts();
+    }
+
+    // The digit / analog switch of the original ROI editor now follows the tabs
+    const _onTypeChanged = onTypeChanged;
+    onTypeChanged = function () {
+      _onTypeChanged();
+      if ((mode === 'digit' || mode === 'analog') && typeSelection.value !== mode) {
+        mode = typeSelection.value;
+        currentTab = mode;
+        updateTabsUI();
+      }
+    };
+
+    function editorDirty() {
+      const b = document.getElementById('saveconfig');
+      return !!b && !b.disabled;
+    }
+
+    async function setTab(tab, initial = false) {
+      if (!initial && tab === currentTab) return;
+
+      if (!initial) {
+        if (currentTab === 'image' && !document.getElementById('savereference').disabled) {
+          if (!confirm('The new image has not been saved yet. Discard it?')) return;
+        } else if (tab === 'image' && editorDirty()) {
+          if (!confirm('Unsaved marker / ROI changes will be discarded. Continue?')) return;
+        }
+      }
+
+      const leavingImage = currentTab === 'image' && tab !== 'image';
+      const keepDirty = !initial && !leavingImage && editorDirty();
+      currentTab = tab;
+      mode = tab;
+      updateTabsUI();
+
+      if (tab === 'image') {
+        showReference();
+        refInit();
+        return;
+      }
+
+      if (leavingImage || initial) {
+        if (leavingImage) {
+          try { await loadConfig(); } catch (e) { console.error(e); }
+        }
+        loadEditorData();
+        loadReferenceImage();
+      }
+
+      if (tab === 'markers') {
+        if (Array.isArray(markerRoi) && markerRoi[marker_selected]) RefreshMarker();
+        RefreshDraw();
+      } else {
+        typeSelection.value = tab;
+        onTypeChanged();
+      }
+      // the ROI editor enables the save button on every redraw: only a real change counts as unsaved
+      document.getElementById('saveconfig').disabled = !keepDirty;
+    }
+
+    function tabFromHash() {
+      const tokens = (window.location.hash || '').replace('#', '').split(',');
+      return ['image', 'markers', 'digit', 'analog'].find((t) => tokens.includes(t));
+    }
+
+    // ============================================================================
+    // Data, saving, init
+    // ============================================================================
+    function openDescription() {
+      if ((window.location.hash || '').split(',').includes('description')) document.getElementById('desc_details').open = true;
+    }
+
+    function loadReferenceImage() {
+      loadCanvas(getDomainname() + '/fileserver/config/reference.jpg?' + Math.floor(Math.random() * 1000000 + 1));
+    }
+
+    function loadEditorData() {
+      jsonConfig = getConfigFromStorage(); // Get config
+      jsonConfigModifiedDelta = {}; // Reset modified parameter container
+      markerInit();
+      seqInit();
       document.getElementById('saveconfig').disabled = true;
+      const upd = document.getElementById('updatemarker');
+      if (upd) upd.disabled = false;
+      updateCounts();
+    }
+
+    async function saveAll() {
+      if (!confirm('Are you sure you want to save and apply the new configuration?')) return;
+
+      const saveBtn = document.getElementById('saveconfig');
+      saveBtn.disabled = true;
+
+      try {
+        if (Array.isArray(markerRoi)) {
+          for (let i = 0; i < markerRoi.length; i++) {
+            if (markerRoi[i].modified) await apiCopy(`/img_tmp/marker${i + 1}.jpg`, `/config/marker${i + 1}.jpg`);
+          }
+        }
+        await saveConfig(JSON.stringify(jsonConfigModifiedDelta), true);
+
+        await new Promise((r) => setTimeout(r, 500));
+        await loadConfig();
+        loadEditorData();
+        if (mode === 'markers') RefreshMarker();
+        else {
+          typeSelection.value = mode;
+          onTypeChanged();
+        }
+        saveBtn.disabled = true;
+      } catch (error) {
+        saveBtn.disabled = false;
+        console.error('Saving setup failed: ', error);
+      }
     }
 
     async function init() {
@@ -1392,17 +2731,19 @@
 
       const loader = document.getElementById('img_loading');
       if (loader) loader.src = loaderSpinner;
-      loadReferenceImage();
 
       try {
         await loadConfig();
-        loadConfigData();
+        jsonConfig = getConfigFromStorage();
+        const start = tabFromHash() || (jsonConfig.digit.enabled ? 'digit' : jsonConfig.analog.enabled ? 'analog' : 'markers');
+        await setTab(start, true);
       } catch (error) {
         firework.launch('Failed to load config. Retry or check logs', 'danger', 5000);
         console.error('Initialization failed:', error);
       }
     }
 
+    // Called from setTheme() function in index.html to detect mode change
     window.addEventListener('DOMContentLoaded', () => {
       window.parent.postMessage({ type: 'iframe-ready' }, '*');
     });

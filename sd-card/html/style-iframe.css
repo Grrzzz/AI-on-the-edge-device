@@ -911,3 +911,7 @@ input[type='radio'] {
 .button.btn-danger {
   color: var(--error);
 }
+
+[hidden]:not(canvas):not(img) {
+  display: none !important;
+}

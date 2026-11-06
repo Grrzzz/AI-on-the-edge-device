@@ -155,14 +155,9 @@
         <li><button class="nav-item" data-page="dashboard.html" onclick="loadPage('dashboard.html?v=$COMMIT_HASH')"><svg><use href="#i-home" /></svg>Dashboard</button></li>
         <li><button class="nav-item" data-page="recognition_details" onclick="loadPage(getDomainname() + '/recognition_details')"><svg><use href="#i-eye" /></svg>Recognition</button></li>
         </ul>
-        <div class="nav-group" data-group="setup">
-          <button class="nav-item nav-parent" onclick="toggleGroup(this)"><svg><use href="#i-target" /></svg>Setup<svg class="chev" viewBox="0 0 24 24"><use href="#i-chev" /></svg></button>
-          <ul class="nav-sub">
-            <li><button class="nav-sub-item" data-page="edit_reference.html" onclick="loadPage('edit_reference.html?v=$COMMIT_HASH')">Reference Image</button></li>
-            <li><button class="nav-sub-item" data-page="edit_alignment.html" onclick="loadPage('edit_alignment.html?v=$COMMIT_HASH')">Alignment Marker</button></li>
-            <li><button class="nav-sub-item" data-page="edit_sequence.html" onclick="loadPage('edit_sequence.html?v=$COMMIT_HASH')">Number Sequences</button></li>
-          </ul>
-        </div>
+        <ul class="nav-top">
+        <li><button class="nav-item" data-page="edit_setup.html" onclick="loadPage('edit_setup.html?v=$COMMIT_HASH')"><svg><use href="#i-target" /></svg>Setup</button></li>
+        </ul>
         <ul class="nav-top">
         <li><button class="nav-item" data-page="edit_configuration.html" onclick="loadPage('edit_configuration.html?v=$COMMIT_HASH')"><svg><use href="#i-sliders" /></svg>Configuration</button></li>
         </ul>
@@ -299,7 +294,7 @@
       let page = getCookie('page');
 
       //@Deprecated: Keep for migration purpose
-      const removedPages = ['overview.html', 'data_graph.html', 'data_viewer.html', 'edit_config_param.html', 'sys_ota_page.html', 'sys_reboot_page.html', 'edit_fallbackvalue.html'];
+      const removedPages = ['overview.html', 'data_graph.html', 'data_viewer.html', 'edit_config_param.html', 'sys_ota_page.html', 'sys_reboot_page.html', 'edit_fallbackvalue.html', 'edit_reference.html', 'edit_alignment.html', 'edit_sequence.html'];
 
       if (!page || page.includes('sys_reboot.html') || removedPages.some((p) => page.includes(p))) {
         page = 'dashboard.html?v=$COMMIT_HASH';
