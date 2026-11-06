@@ -35,59 +35,242 @@
       gap: var(--card-gap);
     }
 
-    .fold-tools {
-      display: flex;
-      justify-content: flex-end;
-      margin: -6px 2px -6px;
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--card-gap);
+      align-items: stretch;
     }
 
-    .link-btn {
-      border: 0;
-      background: none;
-      padding: 4px 2px;
-      font: inherit;
-      font-size: 0.85rem;
+    @media screen and (max-width: 860px) {
+      .info-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .info-card.span2 {
+      grid-column: 1 / -1;
+    }
+
+    .info-card .card-header output.badge {
+      margin-left: 8px;
+    }
+
+    .hero-label,
+    .k {
+      font-size: 0.72rem;
       font-weight: 600;
-      color: var(--primary);
-      cursor: pointer;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
     }
 
-    .link-btn:hover {
+    .hero-num {
+      display: block;
+      margin: 4px 0 10px;
+      font-size: 2rem;
+      line-height: 1.1;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      overflow-wrap: anywhere;
+    }
+
+    .hero-num a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .hero-num a:hover {
+      color: var(--primary);
       text-decoration: underline;
     }
 
-    /* Details as folding cards */
-    .fold > summary {
-      list-style: none;
-      cursor: pointer;
-      user-select: none;
+    .hero-num.mono {
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+      font-size: 2.2rem;
     }
 
-    .fold > summary::-webkit-details-marker {
-      display: none;
+    .hero-num.small {
+      font-size: 1.35rem;
     }
 
-    .fold > summary::after {
-      content: '';
-      width: 16px;
-      height: 16px;
-      background: var(--text-secondary);
-      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
-      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
-      transition: transform var(--transition-speed);
+    .hero-block {
+      padding: 4px 20px 12px;
     }
 
-    .fold[open] > summary::after {
-      transform: rotate(180deg);
+    .hero-block .hero-num {
+      margin-bottom: 8px;
     }
 
-    .fold[open] > summary {
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 4px;
+    .info-card .chips {
+      gap: 6px;
     }
 
-    .fold > summary:hover {
-      color: var(--primary);
+    .chip output + output,
+    .chip b + output {
+      margin-left: 2px;
+    }
+
+    .net-hero {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px 24px;
+      padding: 4px 20px 16px;
+    }
+
+    .net-signal {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 18px;
+      border-radius: 0.8rem;
+      background: var(--surface);
+      font-weight: 600;
+    }
+
+    .kv-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 14px 18px;
+      padding: 14px 20px 18px;
+      border-top: 1px solid var(--border);
+    }
+
+    .kv-grid > div {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+    }
+
+    .kv-grid output {
+      font-weight: 500;
+      overflow-wrap: anywhere;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .info-card .stack {
+      padding: 4px 20px 10px;
+    }
+
+    .temp {
+      padding: 6px 20px 18px;
+      border-top: 1px solid var(--border);
+      margin-top: 4px;
+    }
+
+    .temp-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin: 12px 0 8px;
+    }
+
+    .meter {
+      height: 10px;
+      border-radius: 999px;
+      background: var(--surface);
+      overflow: hidden;
+    }
+
+    .meter i {
+      display: block;
+      height: 100%;
+      width: 0;
+      border-radius: 999px;
+      background: var(--success);
+      transition: width 0.4s ease, background 0.3s ease;
+    }
+
+    .meter i.warm {
+      background: var(--warning);
+    }
+
+    .meter i.hot {
+      background: var(--error);
+    }
+
+    .mini-stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      padding: 4px 16px 18px;
+    }
+
+    .mini {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 12px 14px;
+      border-radius: 0.8rem;
+      background: var(--surface);
+    }
+
+    .mini output {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .svc-list {
+      display: flex;
+      flex-direction: column;
+      padding: 0 20px 12px;
+    }
+
+    .svc {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 0;
+    }
+
+    .svc + .svc {
+      border-top: 1px solid var(--border);
+    }
+
+    .diag {
+      padding: 12px 20px 18px;
+      border-top: 1px solid var(--border);
+    }
+
+    .diag-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .diag-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .diag-actions .button {
+      width: auto;
+      padding: 5px 14px;
+      font-size: 0.82rem;
+    }
+
+    #coreDumpData {
+      margin-top: 10px;
+    }
+
+    #coreDumpDataContent {
+      width: 100%;
+      height: 96px;
+      resize: none;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--input-radius);
+      background: var(--surface);
+      color: var(--text-main);
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+      font-size: 0.8rem;
     }
 
     .card-table .val {
@@ -149,301 +332,162 @@
         </div>
       </div>
 
-      <div class="fold-tools"><button class="link-btn" id="foldToggle" type="button" onclick="toggleAllFolds()">Expand all</button></div>
+      <div class="info-grid">
 
-      <details class="card fold">
-        <summary class="card-header">Firmware</summary>
-        <div class="card-body">
-          <table class="card-table">
-            <tr>
-              <td class="label">Firmware Version</td>
-              <td class="val"><output id="firmware_version"></output></td>
-            </tr>
-            <tr>
-              <td class="label">WebUI Version</td>
-              <td class="val"><output id="html_version"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Build Time</td>
-              <td class="val"><output id="build_time"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Config Version</td>
-              <td class="val"><output id="config_version"></output></td>
-            </tr>
-            <tr>
-              <td class="label">ESP-IDF Version</td>
-              <td class="val"><output id="idf_version"></output></td>
-            </tr>
-            <tr>
-              <td class="label" style="border-bottom: none">Core Dump</td>
-              <td class="val" style="border-bottom: none">
-                <div class="button-group" style="padding: 0; justify-content: flex-start">
-                  <button class="button" id="showCoreDump" type="button" style="width: 100px" onclick="coreDump('show')">Show</button>
-                  <button class="button" id="saveCoreDump" type="button" style="width: 100px" onclick="
-                        window.open(getDomainname() + '/coredump?task=save', '_self');
-                        firework.launch('Core dump info saved', 'success', 2000);
-                      " disabled>
-                    Save
-                  </button>
-                  <button class="button" id="clearCoreDump" type="button" style="width: 100px" onclick="coreDump('clear')" disabled>
-                    Clear
-                  </button>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td id="coreDumpData" colspan="2" style="padding: 10px 16px" hidden>
-                <textarea id="coreDumpDataContent" style="
-                      height: 90px;
-                      width: 100%;
-                      resize: none;
-                      border: 1px solid var(--border);
-                      border-radius: var(--input-radius);
-                      font-family: monospace;
-                      font-size: 0.9rem;
-                      padding: 5px;
-                    " readonly></textarea>
-              </td>
-            </tr>
-          </table>
-        </div>
-      </details>
-      <details class="card fold">
-        <summary class="card-header">Device</summary>
-        <div class="card-body">
-          <table class="card-table">
-            <tr>
-              <td class="label">Board Type</td>
-              <td class="val"><output id="board_type"></output></td>
-            </tr>
-            <tr>
-              <td class="label">SOC Model</td>
-              <td class="val"><output id="chip_model"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Cores</td>
-              <td class="val"><output id="chip_cores"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Revision</td>
-              <td class="val"><output id="chip_revision"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Frequency</td>
-              <td class="val"><output id="chip_frequency"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Temperature</td>
-              <td class="val"><output id="chip_temp"></output></td>
-            </tr>
-          </table>
-        </div>
-      </details>
-      <details class="card fold">
-        <summary class="card-header">Network</summary>
-        <div class="card-body">
-          <table class="card-table">
-            <tr>
-              <td class="label">Operation Mode</td>
-              <td class="val"><output id="network_opmode"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Connection Status</td>
-              <td class="val"><output class="badge" id="connection_status"></output></td>
-            </tr>
-            <tr id="wlan_ssid_info">
-              <td class="label">Network Name (SSID)</td>
-              <td class="val"><output id="wlan_ssid"></output></td>
-            </tr>
-            <tr id="wlan_rssi_info">
-              <td class="label">Signal Strength (RSSI)</td>
-              <td class="val"><output id="wlan_rssi"></output></td>
-            </tr>
-            <tr id="wlan_channel_info">
-              <td class="label">WLAN Channel</td>
-              <td class="val"><output id="wlan_channel"></output></td>
-            </tr>
-            <tr>
-              <td class="label">MAC Address</td>
-              <td class="val"><output id="mac_address"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Network Configuration</td>
-              <td class="val"><output id="network_config"></output></td>
-            </tr>
-            <tr>
-              <td class="label">IPv4 Address</td>
-              <td class="val"><output id="ipv4_address"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Netmask Address</td>
-              <td class="val"><output id="netmask_address"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Gateway Address</td>
-              <td class="val"><output id="gateway_address"></output></td>
-            </tr>
-            <tr>
-              <td class="label">DNS Address</td>
-              <td class="val"><output id="dns_address"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Hostname</td>
-              <td class="val"><output id="hostname"></output></td>
-            </tr>
-          </table>
-        </div>
-      </details>
-      <details class="card fold">
-        <summary class="card-header">Camera</summary>
-        <div class="card-body">
-          <table class="card-table">
-            <tr>
-              <td class="label">Type</td>
-              <td class="val"><output id="camera_type"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Frequency</td>
-              <td class="val"><output id="camera_frequency"></output></td>
-            </tr>
-          </table>
-        </div>
-      </details>
-      <details class="card fold">
-        <summary class="card-header">SD Card</summary>
-        <div class="card-body">
+        <!-- Network -->
+        <section class="card info-card span2">
+          <div class="card-header"><span>Network</span><output class="badge" id="connection_status"></output></div>
+          <div class="net-hero">
+            <div class="net-main">
+              <div class="hero-label">IPv4 address</div>
+              <output class="hero-num mono" id="ipv4_address"></output>
+              <div class="chips">
+                <span class="chip"><b>Host</b><output id="hostname"></output></span>
+                <span class="chip"><b>Mode</b><output id="network_opmode"></output></span>
+                <span class="chip"><b>Config</b><output id="network_config"></output></span>
+              </div>
+            </div>
+            <div class="net-signal" id="wlan_rssi_info">
+              <svg id="rssi_svg" width="34" height="26" viewBox="0 0 24 16" fill="currentColor" style="overflow: visible">
+                <rect class="bar" x="1" y="12" width="3" height="4" rx="1" />
+                <rect class="bar" x="7" y="8" width="3" height="8" rx="1" />
+                <rect class="bar" x="13" y="4" width="3" height="12" rx="1" />
+                <rect class="bar" x="19" y="0" width="3" height="16" rx="1" />
+              </svg>
+              <div>
+                <div class="hero-label">Signal</div>
+                <output id="wlan_rssi"></output>
+              </div>
+            </div>
+          </div>
+          <div class="kv-grid">
+            <div id="wlan_ssid_info"><span class="k">Network name</span><output id="wlan_ssid"></output></div>
+            <div id="wlan_channel_info"><span class="k">Channel</span><output id="wlan_channel"></output></div>
+            <div><span class="k">Netmask</span><output id="netmask_address"></output></div>
+            <div><span class="k">Gateway</span><output id="gateway_address"></output></div>
+            <div><span class="k">DNS</span><output id="dns_address"></output></div>
+            <div><span class="k">MAC address</span><output id="mac_address"></output></div>
+          </div>
+        </section>
+
+        <!-- Firmware -->
+        <section class="card info-card">
+          <div class="card-header"><span>Firmware</span><span class="chip"><b>WebUI</b><output id="html_version"></output></span></div>
+          <div class="hero-block">
+            <div class="hero-label">Version</div>
+            <output class="hero-num" id="firmware_version"></output>
+          </div>
+          <div class="kv-grid">
+            <div><span class="k">Build time</span><output id="build_time"></output></div>
+            <div><span class="k">ESP-IDF</span><output id="idf_version"></output></div>
+            <div><span class="k">Config version</span><output id="config_version"></output></div>
+          </div>
+          <div class="diag">
+            <div class="diag-row">
+              <span class="k">Core dump</span>
+              <span class="diag-actions">
+                <button class="button" id="showCoreDump" type="button" onclick="coreDump('show')">Show</button>
+                <button class="button" id="saveCoreDump" type="button" onclick="
+                      window.open(getDomainname() + '/coredump?task=save', '_self');
+                      firework.launch('Core dump info saved', 'success', 2000);
+                    " disabled>Save</button>
+                <button class="button" id="clearCoreDump" type="button" onclick="coreDump('clear')" disabled>Clear</button>
+              </span>
+            </div>
+            <div id="coreDumpData" hidden>
+              <textarea id="coreDumpDataContent" readonly></textarea>
+            </div>
+          </div>
+        </section>
+
+        <!-- Device -->
+        <section class="card info-card">
+          <div class="card-header"><span>Device</span><span class="chip"><b>Board</b><output id="board_type"></output></span></div>
+          <div class="hero-block">
+            <div class="hero-label">Chip</div>
+            <output class="hero-num" id="chip_model"></output>
+            <div class="chips">
+              <span class="chip"><b>Cores</b><output id="chip_cores"></output></span>
+              <span class="chip"><b>Revision</b><output id="chip_revision"></output></span>
+              <span class="chip"><b>Clock</b><output id="chip_frequency"></output></span>
+            </div>
+          </div>
+          <div class="temp">
+            <div class="temp-head"><span class="k">Temperature</span><output id="chip_temp"></output></div>
+            <div class="meter"><i id="temp_fill"></i></div>
+          </div>
+        </section>
+
+        <!-- SD card -->
+        <section class="card info-card">
+          <div class="card-header"><span>SD card</span><span class="chip"><output id="sd_manufacturer"></output>&nbsp;<output id="sd_name"></output></span></div>
           <div class="stack" id="sd_stack"></div>
-          <table class="card-table">
-            <tr>
-              <td class="label">Name</td>
-              <td class="val"><output id="sd_name"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Manufacturer</td>
-              <td class="val"><output id="sd_manufacturer"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Capacity</td>
-              <td class="val"><output id="sd_capacity"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Sector Size</td>
-              <td class="val"><output id="sd_sector_size"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Partition Allocation Size</td>
-              <td class="val"><output id="sd_partition_alloc_size"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Partition Size</td>
-              <td class="val"><output id="sd_partition_size"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Partition Free Space</td>
-              <td class="val"><output id="sd_partition_free"></output></td>
-            </tr>
-          </table>
-        </div>
-      </details>
-      <details class="card fold">
-        <summary class="card-header">Memory</summary>
-        <div class="card-body">
+          <div class="kv-grid">
+            <div><span class="k">Capacity</span><output id="sd_capacity"></output></div>
+            <div><span class="k">Partition</span><output id="sd_partition_size"></output></div>
+            <div><span class="k">Partition free</span><output id="sd_partition_free"></output></div>
+            <div><span class="k">Sector size</span><output id="sd_sector_size"></output></div>
+            <div><span class="k">Allocation size</span><output id="sd_partition_alloc_size"></output></div>
+          </div>
+        </section>
+
+        <!-- Memory -->
+        <section class="card info-card">
+          <div class="card-header"><span>Memory</span><span class="chip"><b>Free</b><output id="heap_total_free"></output></span></div>
           <div class="stack" id="heap_internal_stack"></div>
           <div class="stack" id="heap_spiram_stack"></div>
-          <table class="card-table">
-            <tr>
-              <td class="label">Total Free (Int + Ext)</td>
-              <td class="val"><output id="heap_total_free"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Ext. RAM - Free</td>
-              <td class="val"><output id="heap_spiram_free"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Ext. RAM - Largest Free Block</td>
-              <td class="val"><output id="heap_spiram_largest_free"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Ext. RAM - Min Free</td>
-              <td class="val"><output id="heap_spiram_min_free"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Int. RAM - Free</td>
-              <td class="val"><output id="heap_internal_free"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Int. RAM - Largest Free Block</td>
-              <td class="val"><output id="heap_internal_largest_free"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Int. RAM - Min Free</td>
-              <td class="val"><output id="heap_internal_min_free"></output></td>
-            </tr>
-          </table>
-        </div>
-      </details>
-      <details class="card fold">
-        <summary class="card-header">Time</summary>
-        <div class="card-body">
-          <table class="card-table">
-            <tr>
-              <td class="label">Time Sync (NTP)</td>
-              <td class="val"><output class="badge" id="ntp_syncstatus"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Start Time</td>
-              <td class="val"><output id="device_starttime"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Current Time</td>
-              <td class="val"><output id="current_time"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Device Uptime</td>
-              <td class="val"><output id="device_uptime"></output></td>
-            </tr>
-          </table>
-        </div>
-      </details>
-      <details class="card fold">
-        <summary class="card-header">Services</summary>
-        <div class="card-body">
-          <table class="card-table">
-            <tr>
-              <td class="label">Data Logging (SD Card)</td>
-              <td class="val"><output class="badge" id="datalogging_sdcard_status"></output></td>
-            </tr>
-            <tr>
-              <td class="label">MQTT</td>
-              <td class="val"><output class="badge" id="mqtt_status"></output></td>
-            </tr>
-          </table>
-        </div>
-      </details>
-      <details class="card fold">
-        <summary class="card-header">Process</summary>
-        <div class="card-body">
-          <table class="card-table">
-            <tr>
-              <td class="label">Process Status</td>
-              <td class="val"><output class="badge" id="process_status"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Process Interval</td>
-              <td class="val"><output id="process_interval"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Process Time</td>
-              <td class="val"><output id="process_time"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Cycle Counter</td>
-              <td class="val"><output id="cycle_counter"></output></td>
-            </tr>
-          </table>
-        </div>
-      </details>
+          <div class="kv-grid">
+            <div><span class="k">Internal free</span><output id="heap_internal_free"></output></div>
+            <div><span class="k">Internal largest block</span><output id="heap_internal_largest_free"></output></div>
+            <div><span class="k">Internal minimum</span><output id="heap_internal_min_free"></output></div>
+            <div><span class="k">External free</span><output id="heap_spiram_free"></output></div>
+            <div><span class="k">External largest block</span><output id="heap_spiram_largest_free"></output></div>
+            <div><span class="k">External minimum</span><output id="heap_spiram_min_free"></output></div>
+          </div>
+        </section>
+
+        <!-- Process -->
+        <section class="card info-card">
+          <div class="card-header"><span>Process</span><output class="badge" id="process_status"></output></div>
+          <div class="mini-stats">
+            <div class="mini"><span class="k">Interval</span><output id="process_interval"></output></div>
+            <div class="mini"><span class="k">Last run</span><output id="process_time"></output></div>
+            <div class="mini"><span class="k">Cycles</span><output id="cycle_counter"></output></div>
+          </div>
+        </section>
+
+        <!-- Time -->
+        <section class="card info-card">
+          <div class="card-header"><span>Time</span><output class="badge" id="ntp_syncstatus"></output></div>
+          <div class="hero-block">
+            <div class="hero-label">Device time</div>
+            <output class="hero-num small" id="current_time"></output>
+          </div>
+          <div class="kv-grid">
+            <div><span class="k">Started</span><output id="device_starttime"></output></div>
+            <div><span class="k">Uptime</span><output id="device_uptime"></output></div>
+          </div>
+        </section>
+
+        <!-- Services -->
+        <section class="card info-card">
+          <div class="card-header"><span>Services</span></div>
+          <div class="svc-list">
+            <div class="svc"><span>Data logging (SD card)</span><output class="badge" id="datalogging_sdcard_status"></output></div>
+            <div class="svc"><span>MQTT</span><output class="badge" id="mqtt_status"></output></div>
+          </div>
+        </section>
+
+        <!-- Camera -->
+        <section class="card info-card">
+          <div class="card-header"><span>Camera</span></div>
+          <div class="kv-grid">
+            <div><span class="k">Sensor</span><output id="camera_type"></output></div>
+            <div><span class="k">Clock</span><output id="camera_frequency"></output></div>
+          </div>
+        </section>
+
+      </div>
     </div>
   </div>
   <div class="footer">
@@ -619,13 +663,24 @@
       set('tile_fw', d.firmware_version ?? '-');
       set('tile_sd', Number(d.sd_partition_free) >= 0 ? formatMB(Number(d.sd_partition_free)) : '-');
       set('tile_mem', Number(d.heap_total_free) > 0 ? formatBytes(Number(d.heap_total_free)) : '-');
-    }
 
-    function toggleAllFolds() {
-      const folds = [...document.querySelectorAll('details.fold')];
-      const open = folds.some((f) => !f.open);
-      folds.forEach((f) => (f.open = open));
-      document.getElementById('foldToggle').textContent = open ? 'Collapse all' : 'Expand all';
+      // memory values in a readable unit
+      ['heap_total_free', 'heap_internal_free', 'heap_internal_largest_free', 'heap_internal_min_free',
+        'heap_spiram_free', 'heap_spiram_largest_free', 'heap_spiram_min_free'].forEach((id) => {
+        const v = Number(d[id]);
+        if (!Number.isNaN(v)) set(id, formatBytes(v));
+      });
+
+      // signal bars + label in the network card
+      if (d.wlan_rssi !== undefined && d.wlan_rssi != -255) renderRssi(Number(d.wlan_rssi));
+
+      // temperature meter (20 - 80 degrees C)
+      const temp = parseFloat(d.chip_temp);
+      const fill = document.getElementById('temp_fill');
+      if (fill && !Number.isNaN(temp)) {
+        fill.style.width = Math.max(4, Math.min(100, ((temp - 20) / 60) * 100)) + '%';
+        fill.className = temp >= 70 ? 'hot' : temp >= 55 ? 'warm' : '';
+      }
     }
 
     async function loadInfoData() {
