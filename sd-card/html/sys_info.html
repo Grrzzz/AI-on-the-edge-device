@@ -24,9 +24,70 @@
 
   <style>
     .container-content {
+      display: flex;
+      flex-direction: column;
+      gap: var(--card-gap);
+    }
+
+    .info-stats {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
-      align-items: start;
+      grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+      gap: var(--card-gap);
+    }
+
+    .fold-tools {
+      display: flex;
+      justify-content: flex-end;
+      margin: -6px 2px -6px;
+    }
+
+    .link-btn {
+      border: 0;
+      background: none;
+      padding: 4px 2px;
+      font: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--primary);
+      cursor: pointer;
+    }
+
+    .link-btn:hover {
+      text-decoration: underline;
+    }
+
+    /* Details as folding cards */
+    .fold > summary {
+      list-style: none;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .fold > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .fold > summary::after {
+      content: '';
+      width: 16px;
+      height: 16px;
+      background: var(--text-secondary);
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+      transition: transform var(--transition-speed);
+    }
+
+    .fold[open] > summary::after {
+      transform: rotate(180deg);
+    }
+
+    .fold[open] > summary {
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 4px;
+    }
+
+    .fold > summary:hover {
+      color: var(--primary);
     }
 
     .card-table .val {
@@ -57,247 +118,41 @@
   <div class="container">
     <div class="container-header">
       <div class="container-title">System Info</div>
-      <div class="page-sub">Status, network, hardware and firmware of this device.</div>
+      <div class="page-sub">The essentials at a glance, all details underneath.</div>
     </div>
 
     <div class="container-content">
-      <div class="card">
-        <div class="card-header">Process</div>
-        <div class="card-body">
-          <table class="card-table">
-            <tr>
-              <td class="label">Process Status</td>
-              <td class="val"><output class="badge" id="process_status"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Process Interval</td>
-              <td class="val"><output id="process_interval"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Process Time</td>
-              <td class="val"><output id="process_time"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Cycle Counter</td>
-              <td class="val"><output id="cycle_counter"></output></td>
-            </tr>
-          </table>
+      <div class="info-stats">
+        <div class="stat">
+          <div class="stat-label">Status</div>
+          <div class="stat-value small"><output class="badge" id="tile_status">-</output></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Uptime</div>
+          <div class="stat-value small"><output id="tile_uptime">-</output></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Wi-Fi signal</div>
+          <div class="stat-value small"><output id="tile_wifi">-</output></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Firmware</div>
+          <div class="stat-value small"><output id="tile_fw">-</output></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">SD card free</div>
+          <div class="stat-value small"><output id="tile_sd">-</output></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Memory free</div>
+          <div class="stat-value small"><output id="tile_mem">-</output></div>
         </div>
       </div>
-      <div class="card">
-        <div class="card-header">Services</div>
-        <div class="card-body">
-          <table class="card-table">
-            <tr>
-              <td class="label">Data Logging (SD Card)</td>
-              <td class="val"><output class="badge" id="datalogging_sdcard_status"></output></td>
-            </tr>
-            <tr>
-              <td class="label">MQTT</td>
-              <td class="val"><output class="badge" id="mqtt_status"></output></td>
-            </tr>
-          </table>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header">Time</div>
-        <div class="card-body">
-          <table class="card-table">
-            <tr>
-              <td class="label">Time Sync (NTP)</td>
-              <td class="val"><output class="badge" id="ntp_syncstatus"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Start Time</td>
-              <td class="val"><output id="device_starttime"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Current Time</td>
-              <td class="val"><output id="current_time"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Device Uptime</td>
-              <td class="val"><output id="device_uptime"></output></td>
-            </tr>
-          </table>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header">Network</div>
-        <div class="card-body">
-          <table class="card-table">
-            <tr>
-              <td class="label">Operation Mode</td>
-              <td class="val"><output id="network_opmode"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Connection Status</td>
-              <td class="val"><output class="badge" id="connection_status"></output></td>
-            </tr>
-            <tr id="wlan_ssid_info">
-              <td class="label">Network Name (SSID)</td>
-              <td class="val"><output id="wlan_ssid"></output></td>
-            </tr>
-            <tr id="wlan_rssi_info">
-              <td class="label">Signal Strength (RSSI)</td>
-              <td class="val"><output id="wlan_rssi"></output></td>
-            </tr>
-            <tr id="wlan_channel_info">
-              <td class="label">WLAN Channel</td>
-              <td class="val"><output id="wlan_channel"></output></td>
-            </tr>
-            <tr>
-              <td class="label">MAC Address</td>
-              <td class="val"><output id="mac_address"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Network Configuration</td>
-              <td class="val"><output id="network_config"></output></td>
-            </tr>
-            <tr>
-              <td class="label">IPv4 Address</td>
-              <td class="val"><output id="ipv4_address"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Netmask Address</td>
-              <td class="val"><output id="netmask_address"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Gateway Address</td>
-              <td class="val"><output id="gateway_address"></output></td>
-            </tr>
-            <tr>
-              <td class="label">DNS Address</td>
-              <td class="val"><output id="dns_address"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Hostname</td>
-              <td class="val"><output id="hostname"></output></td>
-            </tr>
-          </table>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header">Device</div>
-        <div class="card-body">
-          <table class="card-table">
-            <tr>
-              <td class="label">Board Type</td>
-              <td class="val"><output id="board_type"></output></td>
-            </tr>
-            <tr>
-              <td class="label">SOC Model</td>
-              <td class="val"><output id="chip_model"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Cores</td>
-              <td class="val"><output id="chip_cores"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Revision</td>
-              <td class="val"><output id="chip_revision"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Frequency</td>
-              <td class="val"><output id="chip_frequency"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Temperature</td>
-              <td class="val"><output id="chip_temp"></output></td>
-            </tr>
-          </table>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header">Camera</div>
-        <div class="card-body">
-          <table class="card-table">
-            <tr>
-              <td class="label">Type</td>
-              <td class="val"><output id="camera_type"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Frequency</td>
-              <td class="val"><output id="camera_frequency"></output></td>
-            </tr>
-          </table>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header">SD Card</div>
-        <div class="card-body">
-          <div class="stack" id="sd_stack"></div>
-          <table class="card-table">
-            <tr>
-              <td class="label">Name</td>
-              <td class="val"><output id="sd_name"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Manufacturer</td>
-              <td class="val"><output id="sd_manufacturer"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Capacity</td>
-              <td class="val"><output id="sd_capacity"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Sector Size</td>
-              <td class="val"><output id="sd_sector_size"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Partition Allocation Size</td>
-              <td class="val"><output id="sd_partition_alloc_size"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Partition Size</td>
-              <td class="val"><output id="sd_partition_size"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Partition Free Space</td>
-              <td class="val"><output id="sd_partition_free"></output></td>
-            </tr>
-          </table>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header">Memory</div>
-        <div class="card-body">
-          <div class="stack" id="heap_internal_stack"></div>
-          <div class="stack" id="heap_spiram_stack"></div>
-          <table class="card-table">
-            <tr>
-              <td class="label">Total Free (Int + Ext)</td>
-              <td class="val"><output id="heap_total_free"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Ext. RAM - Free</td>
-              <td class="val"><output id="heap_spiram_free"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Ext. RAM - Largest Free Block</td>
-              <td class="val"><output id="heap_spiram_largest_free"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Ext. RAM - Min Free</td>
-              <td class="val"><output id="heap_spiram_min_free"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Int. RAM - Free</td>
-              <td class="val"><output id="heap_internal_free"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Int. RAM - Largest Free Block</td>
-              <td class="val"><output id="heap_internal_largest_free"></output></td>
-            </tr>
-            <tr>
-              <td class="label">Int. RAM - Min Free</td>
-              <td class="val"><output id="heap_internal_min_free"></output></td>
-            </tr>
-          </table>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header">Firmware</div>
+
+      <div class="fold-tools"><button class="link-btn" id="foldToggle" type="button" onclick="toggleAllFolds()">Expand all</button></div>
+
+      <details class="card fold">
+        <summary class="card-header">Firmware</summary>
         <div class="card-body">
           <table class="card-table">
             <tr>
@@ -353,7 +208,242 @@
             </tr>
           </table>
         </div>
-      </div>
+      </details>
+      <details class="card fold">
+        <summary class="card-header">Device</summary>
+        <div class="card-body">
+          <table class="card-table">
+            <tr>
+              <td class="label">Board Type</td>
+              <td class="val"><output id="board_type"></output></td>
+            </tr>
+            <tr>
+              <td class="label">SOC Model</td>
+              <td class="val"><output id="chip_model"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Cores</td>
+              <td class="val"><output id="chip_cores"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Revision</td>
+              <td class="val"><output id="chip_revision"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Frequency</td>
+              <td class="val"><output id="chip_frequency"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Temperature</td>
+              <td class="val"><output id="chip_temp"></output></td>
+            </tr>
+          </table>
+        </div>
+      </details>
+      <details class="card fold">
+        <summary class="card-header">Network</summary>
+        <div class="card-body">
+          <table class="card-table">
+            <tr>
+              <td class="label">Operation Mode</td>
+              <td class="val"><output id="network_opmode"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Connection Status</td>
+              <td class="val"><output class="badge" id="connection_status"></output></td>
+            </tr>
+            <tr id="wlan_ssid_info">
+              <td class="label">Network Name (SSID)</td>
+              <td class="val"><output id="wlan_ssid"></output></td>
+            </tr>
+            <tr id="wlan_rssi_info">
+              <td class="label">Signal Strength (RSSI)</td>
+              <td class="val"><output id="wlan_rssi"></output></td>
+            </tr>
+            <tr id="wlan_channel_info">
+              <td class="label">WLAN Channel</td>
+              <td class="val"><output id="wlan_channel"></output></td>
+            </tr>
+            <tr>
+              <td class="label">MAC Address</td>
+              <td class="val"><output id="mac_address"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Network Configuration</td>
+              <td class="val"><output id="network_config"></output></td>
+            </tr>
+            <tr>
+              <td class="label">IPv4 Address</td>
+              <td class="val"><output id="ipv4_address"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Netmask Address</td>
+              <td class="val"><output id="netmask_address"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Gateway Address</td>
+              <td class="val"><output id="gateway_address"></output></td>
+            </tr>
+            <tr>
+              <td class="label">DNS Address</td>
+              <td class="val"><output id="dns_address"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Hostname</td>
+              <td class="val"><output id="hostname"></output></td>
+            </tr>
+          </table>
+        </div>
+      </details>
+      <details class="card fold">
+        <summary class="card-header">Camera</summary>
+        <div class="card-body">
+          <table class="card-table">
+            <tr>
+              <td class="label">Type</td>
+              <td class="val"><output id="camera_type"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Frequency</td>
+              <td class="val"><output id="camera_frequency"></output></td>
+            </tr>
+          </table>
+        </div>
+      </details>
+      <details class="card fold">
+        <summary class="card-header">SD Card</summary>
+        <div class="card-body">
+          <div class="stack" id="sd_stack"></div>
+          <table class="card-table">
+            <tr>
+              <td class="label">Name</td>
+              <td class="val"><output id="sd_name"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Manufacturer</td>
+              <td class="val"><output id="sd_manufacturer"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Capacity</td>
+              <td class="val"><output id="sd_capacity"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Sector Size</td>
+              <td class="val"><output id="sd_sector_size"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Partition Allocation Size</td>
+              <td class="val"><output id="sd_partition_alloc_size"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Partition Size</td>
+              <td class="val"><output id="sd_partition_size"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Partition Free Space</td>
+              <td class="val"><output id="sd_partition_free"></output></td>
+            </tr>
+          </table>
+        </div>
+      </details>
+      <details class="card fold">
+        <summary class="card-header">Memory</summary>
+        <div class="card-body">
+          <div class="stack" id="heap_internal_stack"></div>
+          <div class="stack" id="heap_spiram_stack"></div>
+          <table class="card-table">
+            <tr>
+              <td class="label">Total Free (Int + Ext)</td>
+              <td class="val"><output id="heap_total_free"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Ext. RAM - Free</td>
+              <td class="val"><output id="heap_spiram_free"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Ext. RAM - Largest Free Block</td>
+              <td class="val"><output id="heap_spiram_largest_free"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Ext. RAM - Min Free</td>
+              <td class="val"><output id="heap_spiram_min_free"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Int. RAM - Free</td>
+              <td class="val"><output id="heap_internal_free"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Int. RAM - Largest Free Block</td>
+              <td class="val"><output id="heap_internal_largest_free"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Int. RAM - Min Free</td>
+              <td class="val"><output id="heap_internal_min_free"></output></td>
+            </tr>
+          </table>
+        </div>
+      </details>
+      <details class="card fold">
+        <summary class="card-header">Time</summary>
+        <div class="card-body">
+          <table class="card-table">
+            <tr>
+              <td class="label">Time Sync (NTP)</td>
+              <td class="val"><output class="badge" id="ntp_syncstatus"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Start Time</td>
+              <td class="val"><output id="device_starttime"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Current Time</td>
+              <td class="val"><output id="current_time"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Device Uptime</td>
+              <td class="val"><output id="device_uptime"></output></td>
+            </tr>
+          </table>
+        </div>
+      </details>
+      <details class="card fold">
+        <summary class="card-header">Services</summary>
+        <div class="card-body">
+          <table class="card-table">
+            <tr>
+              <td class="label">Data Logging (SD Card)</td>
+              <td class="val"><output class="badge" id="datalogging_sdcard_status"></output></td>
+            </tr>
+            <tr>
+              <td class="label">MQTT</td>
+              <td class="val"><output class="badge" id="mqtt_status"></output></td>
+            </tr>
+          </table>
+        </div>
+      </details>
+      <details class="card fold">
+        <summary class="card-header">Process</summary>
+        <div class="card-body">
+          <table class="card-table">
+            <tr>
+              <td class="label">Process Status</td>
+              <td class="val"><output class="badge" id="process_status"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Process Interval</td>
+              <td class="val"><output id="process_interval"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Process Time</td>
+              <td class="val"><output id="process_time"></output></td>
+            </tr>
+            <tr>
+              <td class="label">Cycle Counter</td>
+              <td class="val"><output id="cycle_counter"></output></td>
+            </tr>
+          </table>
+        </div>
+      </details>
     </div>
   </div>
   <div class="footer">
@@ -515,6 +605,29 @@
       heap('heap_spiram_stack', 'PSRAM, free', d.heap_spiram_free, d.heap_spiram_largest_free, d.heap_spiram_min_free);
     }
 
+    // Overview tiles at the top
+    function updateTiles(d) {
+      const set = (id, text) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+      };
+
+      set('tile_status', d.process_status ?? '-');
+      addClassToElement('tile_status', String(d.process_status ?? '').startsWith('Processing') ? 'badge-success' : 'badge-error');
+      set('tile_uptime', formatUptime(d.device_uptime));
+      set('tile_wifi', d.wlan_rssi != -255 && d.wlan_rssi !== undefined ? `${d.wlan_rssi} dBm` : 'n/a');
+      set('tile_fw', d.firmware_version ?? '-');
+      set('tile_sd', Number(d.sd_partition_free) >= 0 ? formatMB(Number(d.sd_partition_free)) : '-');
+      set('tile_mem', Number(d.heap_total_free) > 0 ? formatBytes(Number(d.heap_total_free)) : '-');
+    }
+
+    function toggleAllFolds() {
+      const folds = [...document.querySelectorAll('details.fold')];
+      const open = folds.some((f) => !f.open);
+      folds.forEach((f) => (f.open = open));
+      document.getElementById('foldToggle').textContent = open ? 'Collapse all' : 'Expand all';
+    }
+
     async function loadInfoData() {
       const res = await apiCallNotify('/info', {}, { action: 'Loading info', parseType: 'json' });
       if (!res.ok || !res.data) return;
@@ -615,6 +728,7 @@
       document.getElementById('heap_spiram_min_free').textContent = _jsonData.heap_spiram_min_free + ' byte';
 
       renderStorageAndMemoryBars(_jsonData);
+      updateTiles(_jsonData);
 
       renderVersionField('firmware_version', _jsonData.firmware_version);
       renderVersionField('html_version', _jsonData.html_version);
