@@ -3204,32 +3204,56 @@ a .rst-content .admonition-title {
 }
 
 .dash .dash-image {
-  min-height: 0;
-}
-
-.dash .dash-image .card-body {
   position: relative;
-  flex: 1;
-  min-height: 220px;
-  padding: 0 12px 12px;
-  display: flex;
-  justify-content: center;
+  min-height: 260px;
+  padding: 0;
+  overflow: hidden;
+  isolation: isolate;
+  background: #111;
 }
 
-/* the picture fills the card, the height of the row is given by the left column */
-@media screen and (min-width: 1157px) {
-  .dash .dash-image .dash-img:not(.is-loading),
-  .dash .dash-image .dash-stage {
-    position: absolute;
-    inset: 0 12px 12px;
-    width: calc(100% - 24px);
-    height: calc(100% - 12px);
-    aspect-ratio: auto;
+/* below the desktop layout the card gets its own height */
+@media screen and (max-width: 1156px) {
+  .dash .dash-image {
+    aspect-ratio: 4 / 3;
   }
+}
 
-  .dash .dash-image .dash-img:not(.is-loading) {
-    object-fit: contain;
-  }
+/* blurred, enlarged copy of the picture fills the whole card; the complete picture is shown in front */
+.dash .dash-bg,
+.dash .dash-img,
+.dash .dash-shade {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.dash .dash-bg {
+  object-fit: cover;
+  filter: blur(8px) brightness(0.7);
+  transform: scale(1.1);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.dash .dash-bg[hidden] {
+  display: none;
+}
+
+.dash .dash-shade {
+  z-index: 1;
+  background: rgba(0, 0, 0, 0.08);
+  pointer-events: none;
+}
+
+.dash .dash-img {
+  z-index: 2;
+  object-fit: contain;
+  object-position: center;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
 }
 
 .dash .dash-img:not([src]),
@@ -3237,30 +3261,27 @@ a .rst-content .admonition-title {
   visibility: hidden;
 }
 
-.dash .dash-img {
-  min-width: 0;
-  width: 100%;
-  height: auto;
-  display: block;
-  border-radius: 0.6rem;
-}
-
 .dash .dash-img[hidden] {
   display: none;
 }
 
+/* loading indicator (animated scan icon) and placeholder: natural size, no blurred fill */
+.dash .dash-img.is-loading {
+  object-fit: none;
+  background: linear-gradient(135deg, var(--surface), var(--bg));
+}
+
 /* animated scene while the camera takes the picture */
 .dash .dash-stage {
-  position: relative;
-  width: 100%;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  aspect-ratio: 4 / 3;
   overflow: hidden;
-  border-radius: 0.6rem;
   background: linear-gradient(135deg, var(--surface), var(--bg));
   text-align: center;
 }

@@ -4374,12 +4374,11 @@ const App = (() => {
         </div>
       </div>
 
-      <div class="card dash-image">
-        <div class="card-header">Image view</div>
-        <div class="card-body">
-          <img class="dash-img is-loading" data-ref="img" alt="Image view" />
-          <div class="dash-stage" data-ref="stage" hidden></div>
-        </div>
+      <div class="card dash-image" data-ref="imageCard">
+        <img class="dash-bg" data-ref="imgBg" alt="" aria-hidden="true" />
+        <div class="dash-shade"></div>
+        <img class="dash-img is-loading" data-ref="img" alt="Image view" />
+        <div class="dash-stage" data-ref="stage" hidden></div>
       </div>
     </main>
 
@@ -4631,6 +4630,45 @@ const App = (() => {
         return `${d.cycle_counter}|${d.process_state}`;
       };
 
+      // Soft edges of the foreground image (like the blurred-image-card): the mask fades the outer 10 percent of the visible image
+      const applyFadeMask = () => {
+        const fg = ref.img;
+        const card = ref.imageCard;
+        if (!fg.naturalWidth || fg.classList.contains('is-loading')) {
+          fg.style.maskImage = fg.style.webkitMaskImage = '';
+          return;
+        }
+        const cw = card.clientWidth;
+        const ch = card.clientHeight;
+        if (!cw || !ch) return;
+        const fade = 10;
+        const imgRatio = fg.naturalWidth / fg.naturalHeight;
+        const cardRatio = cw / ch;
+        let left, top, w, h; // position of the contained image in percent of the card
+        if (imgRatio > cardRatio) {
+          w = 100;
+          h = (cardRatio / imgRatio) * 100;
+          left = 0;
+          top = (100 - h) / 2;
+        } else {
+          h = 100;
+          w = (imgRatio / cardRatio) * 100;
+          top = 0;
+          left = (100 - w) / 2;
+        }
+        const fw = (fade * w) / 100;
+        const fh = (fade * h) / 100;
+        const blur = Math.max(fw, fh) / 2;
+        const svg =
+          "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'><defs><filter id='f' x='-50%' y='-50%' width='200%' height='200%'>" +
+          `<feGaussianBlur stdDeviation='${blur}'/></filter></defs><rect x='${left + fw}' y='${top + fh}' width='${w - fw * 2}' height='${h - fh * 2}' fill='white' filter='url(#f)'/></svg>`;
+        const url = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+        fg.style.maskImage = fg.style.webkitMaskImage = url;
+      };
+      const resizeObserver = new ResizeObserver(() => applyFadeMask());
+      resizeObserver.observe(ref.imageCard);
+      st.offResize = () => resizeObserver.disconnect();
+
       const loadRoiImage = () => {
         const img = ref.img;
         return new Promise((resolve) => {
@@ -4640,14 +4678,22 @@ const App = (() => {
             img.classList.remove('is-loading');
             resolve(ok);
           };
-          img.onload = () => done(true);
+          const url = Api.process.imageUrl('alg_roi.jpg');
+          img.onload = () => {
+            ref.imgBg.src = url; // blurred copy fills the card
+            ref.imgBg.hidden = false;
+            done(true);
+            applyFadeMask();
+          };
           img.onabort = () => done(false);
           img.onerror = () => {
             img.onerror = null;
+            ref.imgBg.hidden = true;
             img.src = typeof noImageAvailable !== 'undefined' ? noImageAvailable : '';
             done(false);
+            applyFadeMask();
           };
-          img.src = Api.process.imageUrl('alg_roi.jpg');
+          img.src = url;
         });
       };
 
@@ -4734,6 +4780,7 @@ const App = (() => {
       st.dead = true;
       clearTimeout(st.timer);
       st.offStatus?.();
+      st.offResize?.();
       st.abort.abort();
       dashActive = null;
     },
