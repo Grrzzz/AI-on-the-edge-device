@@ -2467,16 +2467,18 @@ const App = (() => {
   const UPDATE_REPO = 'Grrzzz/AI-on-the-edge-device'; // GitHub repository that publishes the release packages
   const UPDATE_MAX_FILE_SIZE = 8000 * 1024;
 
+  // Versions of the Grrzzz line (e.g. v2.0.0-Grrzzz) rank above all older SLFork versions (v17.x, v18.x), then by number
   function parseVersion(v) {
-    const m = /(\d+)\.(\d+)\.(\d+)/.exec(String(v || ''));
-    return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+    const text = String(v || '');
+    const m = /(\d+)\.(\d+)\.(\d+)/.exec(text);
+    return m ? [/grrzzz/i.test(text) ? 1 : 0, Number(m[1]), Number(m[2]), Number(m[3])] : null;
   }
 
   function isNewer(candidate, installed) {
     const a = parseVersion(candidate);
     const b = parseVersion(installed);
     if (!a || !b) return false;
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       if (a[i] !== b[i]) return a[i] > b[i];
     }
     return false;
