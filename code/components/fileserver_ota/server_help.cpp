@@ -200,6 +200,12 @@ esp_err_t setContentTypeFromFile(httpd_req_t *req, const char *filename)
     else if (endsWith(filename, ".gif")) {
         return httpd_resp_set_type(req, "image/gif");
     }
+    else if (endsWith(filename, ".svg")) {
+        return httpd_resp_set_type(req, "image/svg+xml");
+    }
+    else if (endsWith(filename, ".webmanifest")) {
+        return httpd_resp_set_type(req, "application/manifest+json");
+    }
 
     return httpd_resp_set_type(req, "application/octet-stream");
 }
