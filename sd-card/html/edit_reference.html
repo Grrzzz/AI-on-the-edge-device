@@ -25,57 +25,77 @@
   <style>
     .header-actions {
       display: flex;
+      flex-wrap: wrap;
       gap: 8px;
+      font-weight: normal;
     }
 
     .header-actions .button {
+      width: auto;
       margin: 0;
     }
 
-    th,
-    td {
-      height: 40px;
+    .param-scroll {
+      overflow-x: auto;
+      padding: 0 12px 12px;
     }
 
     .camParameter-table {
       width: 100%;
+      min-width: 640px;
       table-layout: fixed;
-      padding: 0px 10px 0px 0px;
+      border-collapse: collapse;
+    }
+
+    .camParameter-table td {
+      height: 46px;
+      padding: 4px 6px;
+    }
+
+    .camParameter-table tr + tr td {
+      border-top: 1px solid var(--border);
+    }
+
+    .camParameter-table td > span {
+      color: var(--text-secondary);
     }
 
     .camParameter form {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 8px;
       clear: both;
     }
 
     .camParameter output {
-      min-width: 32px;
-      text-align: left;
+      min-width: 36px;
+      text-align: right;
       flex-shrink: 0;
-      font-family: monospace;
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+      font-size: 0.85rem;
     }
 
     .camParameter input[type='range'],
     .camParameter select {
       flex-grow: 1;
       width: 100%;
-      /* Prevents overflow in narrow flex containers */
       min-width: 0;
+      margin: 0;
     }
 
-    input[type='number'],
-    select {
-      font-family: inherit;
-      font-size: inherit;
-      width: 60px;
-      margin-right: 10px;
-      padding: 3px 5px;
-      display: inline-block;
-      border: 1px solid var(--border);
-      vertical-align: middle;
-      border-radius: var(--input-radius);
+    .image-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 320px;
+      padding: 0 12px 12px;
+    }
+
+    .image-stage canvas {
+      max-width: 100%;
+      height: auto;
+      border-radius: 0.6rem;
     }
 
     #tooltip-portal {
@@ -99,9 +119,10 @@
 <body>
   <div class="container">
     <div class="container-header">
-      <div class="container-title"><span>📸</span>Reference Image</div>
+      <div class="container-title">Reference Image</div>
+      <div class="page-sub">Capture and fine-tune the base image used for markers and ROIs.</div>
       <details id="desc_details">
-        <summary id="desc_details_summary">CLICK HERE for usage info</summary>
+        <summary id="desc_details_summary">How it works</summary>
         <div class="info-box">
           <p>
             The reference image serves as the visual base for defining markers and ROIs; it provides feedback during setup but is not used
@@ -124,11 +145,9 @@
             <input id="showactualimage" class="button" type="button" value="Show Actual Image" onclick="showReference()" disabled />
           </div>
         </div>
-        <div class="card-body">
-          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 480px; width: 100%">
-            <img id="img_loading" alt="Loading..." />
-            <canvas id="canvas" hidden></canvas>
-          </div>
+        <div class="image-stage">
+          <img id="img_loading" alt="Loading..." />
+          <canvas id="canvas" hidden></canvas>
         </div>
       </div>
 
@@ -140,7 +159,7 @@
             <input class="button btn-action" type="button" id="savereference" value="Save And Apply" onclick="saveReference()" disabled />
           </div>
         </div>
-        <div class="card-body">
+        <div class="param-scroll">
           <table class="camParameter-table">
             <colgroup>
               <col span="1" style="width: 4%" />

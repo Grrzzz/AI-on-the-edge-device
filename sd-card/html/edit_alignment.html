@@ -23,40 +23,11 @@
   <link rel="stylesheet" href="style-iframe.css?v=$COMMIT_HASH" />
 
   <style>
-    input[type='number'],
-    input[type='text'] {
-      font-size: inherit;
-      width: 60px;
-      padding: 3px 5px;
-      vertical-align: middle;
-      display: inline-block;
-      border: 1px solid var(--border);
-      border-radius: var(--input-radius);
-    }
-
-    input[type='number'] {
-      width: 60px;
-    }
-
-    select {
-      font-size: inherit;
-      padding: 3px 5px;
-      display: inline-block;
-      border: 1px solid var(--border);
-      min-width: 100px;
-      vertical-align: middle;
-      border-radius: var(--input-radius);
-    }
-
-    th,
-    td {
-      padding: 5px 0px 5px 0px;
-    }
-
-    table {
-      width: 100%;
-      padding: 5px 0px 5px 0px;
-      table-layout: fixed;
+    #marker_image {
+      max-width: 100%;
+      height: auto;
+      border-radius: 0.4rem;
+      align-self: flex-start;
     }
   </style>
 
@@ -67,9 +38,10 @@
 <body>
   <div class="container">
     <div class="container-header">
-      <div class="container-title"><span>🎯</span>Alignment Marker</div>
+      <div class="container-title">Alignment Marker</div>
+      <div class="page-sub">Two markers let the device correct small shifts and rotations of the image.</div>
       <details id="desc_details">
-        <summary id="desc_details_summary">CLICK HERE for usage info</summary>
+        <summary id="desc_details_summary">How it works</summary>
         <div class="info-box">
           <p>
             The two alignment marker are required to correct possible small misalignments of the image position. The possible misalignment
@@ -90,96 +62,81 @@
     </div>
 
     <div class="container-content">
-      <div class="card">
-        <div class="card-header"><span>Parametrization</span></div>
-        <div class="card-body" style="padding: 10px">
-          <table>
-            <colgroup>
-              <col span="1" style="width: 19%" />
-              <col span="1" style="width: 21%" />
-              <col span="1" style="width: 30%" />
-              <col span="1" style="width: 30%" />
-            </colgroup>
-            <tbody>
-              <tr>
-                <td colspan="2" style="height: 25px">
-                  Marker:
-                  <select id="marker_selection" onchange="markerSelectionChanged()">
+      <div class="editor-layout">
+        <div class="card">
+          <div class="card-header"><span>Reference image</span></div>
+          <div class="canvas-wrap">
+            <img id="img_loading" alt="Loading..." />
+            <canvas id="canvas" hidden></canvas>
+          </div>
+        </div>
+
+        <div class="editor-side">
+          <div class="card">
+            <div class="card-header"><span>Marker</span></div>
+            <div class="side-body">
+              <div class="field">
+                <label for="marker_selection">Selected marker</label>
+                <select id="marker_selection" onchange="markerSelectionChanged()">
                     <option value="0" selected>Marker 1</option>
                     <option value="1">Marker 2</option>
                   </select>
-                </td>
-                <td rowspan="3" style="vertical-align: top">
-                  <label>Image</label><br />
-                  <img style="padding-top: 5px" id="marker_image" />
-                </td>
-                <td rowspan="3" style="vertical-align: top">
-                  <label>Histogram</label><br />
-                  <canvas style="padding-top: 5px" height="60" width="190" id="canvasHistogram"></canvas><br />
-                  <div>
-                    <label><input name="rHistogramType" id="HistogramTypeValue" type="radio" checked />VALUE</label>
-                    <label><input name="rHistogramType" id="HistogramTypeRed" type="radio" />RED</label>
-                    <label><input name="rHistogramType" id="HistogramTypeRGB" type="radio" />RGB</label>
-                  </div>
-                </td>
-              </tr>
-              <tr>
-                <td style="height: 20px; padding-top: 10px; vertical-align: top">
-                  <form class="form_alignment_marker" id="imagealignment_marker_x_form">
-                    <label for="imagealignment_marker_x_value">x</label>
+              </div>
+
+              <div class="field-grid">
+                <form class="form_alignment_marker field" id="imagealignment_marker_x_form">
+                    <label for="imagealignment_marker_x_value">X</label>
                     <input type="number" min="1" name="imagealignment.marker.0.x" id="imagealignment_marker_x_value" onchange="
                           !validity.rangeUnderflow || (value = 1);
                           onValueManualChanged();
                           gatherChangedParameter(this.form, true);
                         " />
                   </form>
-                </td>
-                <td style="padding-top: 10px; vertical-align: top">
-                  <form class="form_alignment_marker" id="imagealignment_marker_dx_form">
-                    <label for="imagealignment_marker_dx_value">Δx</label>
-                    <input type="number" min="1" name="imagealignment.marker.0.dx" id="imagealignment_marker_dx_value" onchange="
-                          !validity.rangeUnderflow || (value = 1);
-                          onValueManualChanged();
-                        " />
-                  </form>
-                </td>
-              </tr>
-              <tr>
-                <td style="vertical-align: top">
-                  <form class="form_alignment_marker" id="imagealignment_marker_y_form">
-                    <label for="imagealignment_marker_y_value">y</label>
+                <form class="form_alignment_marker field" id="imagealignment_marker_y_form">
+                    <label for="imagealignment_marker_y_value">Y</label>
                     <input type="number" min="1" name="imagealignment.marker.0.y" id="imagealignment_marker_y_value" onchange="
                           !validity.rangeUnderflow || (value = 1);
                           onValueManualChanged();
                           gatherChangedParameter(this.form, true);
                         " />
                   </form>
-                </td>
-                <td style="vertical-align: top">
-                  <form class="form_alignment_marker" id="imagealignment_marker_dy_form">
-                    <label for="imagealignment_marker_dy_value">Δy</label>
+                <form class="form_alignment_marker field" id="imagealignment_marker_dx_form">
+                    <label for="imagealignment_marker_dx_value">Width</label>
+                    <input type="number" min="1" name="imagealignment.marker.0.dx" id="imagealignment_marker_dx_value" onchange="
+                          !validity.rangeUnderflow || (value = 1);
+                          onValueManualChanged();
+                        " />
+                  </form>
+                <form class="form_alignment_marker field" id="imagealignment_marker_dy_form">
+                    <label for="imagealignment_marker_dy_value">Height</label>
                     <input type="number" min="1" name="imagealignment.marker.0.dy" id="imagealignment_marker_dy_value" onchange="
                           !validity.rangeUnderflow || (value = 1);
                           onValueManualChanged();
                         " />
                   </form>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-          <div colspan="4" style="display: flex; justify-content: flex-end; gap: 8px; width: 100%">
-            <input disabled class="button" type="button" id="updatemarker" value="Update Marker" onclick="RequestMarkerCut()" />
-            <input disabled class="button btn-action" type="submit" id="savemarker" onclick="saveToConfig()" value="Save And Apply" />
-          </div>
-        </div>
-      </div>
+              </div>
 
-      <div class="card">
-        <div class="card-header"><span>Reference Image</span></div>
-        <div class="card-body">
-          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 200px; width: 100%">
-            <img id="img_loading" alt="Loading..." />
-            <canvas id="canvas" hidden></canvas>
+              <div class="field-grid">
+                <div class="field">
+                  <span class="field-label">Marker image</span>
+                  <img id="marker_image" alt="" />
+                </div>
+                <div class="field">
+                  <span class="field-label">Histogram</span>
+                  <canvas height="60" width="190" id="canvasHistogram" style="max-width: 100%"></canvas>
+                </div>
+              </div>
+              <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.85rem">
+                <label class="check"><input name="rHistogramType" id="HistogramTypeValue" type="radio" checked />Value</label>
+                <label class="check"><input name="rHistogramType" id="HistogramTypeRed" type="radio" />Red</label>
+                <label class="check"><input name="rHistogramType" id="HistogramTypeRGB" type="radio" />RGB</label>
+              </div>
+
+              <div class="btn-row">
+                <input disabled class="button" type="button" id="updatemarker" value="Update Marker" onclick="RequestMarkerCut()" />
+                <input disabled class="button btn-action" type="submit" id="savemarker" onclick="saveToConfig()" value="Save And Apply" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -403,6 +360,15 @@
       imageObj.src = dataURL;
     }
 
+    // Pointer position in canvas pixels (also correct while the canvas is scaled down by CSS)
+    function pointerPos(e, elem) {
+      const r = elem.getBoundingClientRect();
+      return {
+        x: Math.round(((e.clientX - r.left) * elem.width) / r.width),
+        y: Math.round(((e.clientY - r.top) * elem.height) / r.height),
+      };
+    }
+
     function getCoords(elem) {
       // crossbrowser version
       let box = elem.getBoundingClientRect();
@@ -419,8 +385,8 @@
 
     function mouseDown(e) {
       let zw = getCoords(this);
-      rect.startX = e.pageX - zw.left;
-      rect.startY = e.pageY - zw.top;
+      rect.startX = pointerPos(e, this).x;
+      rect.startY = pointerPos(e, this).y;
       document.getElementById('imagealignment_marker_x_value').value = rect.startX;
       document.getElementById('imagealignment_marker_y_value').value = rect.startY;
       drag = true;
@@ -448,8 +414,8 @@
     function mouseMove(e) {
       if (drag) {
         let zw = getCoords(this);
-        rect.w = e.pageX - zw.left - rect.startX;
-        rect.h = e.pageY - zw.top - rect.startY;
+        rect.w = pointerPos(e, this).x - rect.startX;
+        rect.h = pointerPos(e, this).y - rect.startY;
         document.getElementById('imagealignment_marker_dx_value').value = rect.w;
         document.getElementById('imagealignment_marker_dy_value').value = rect.h;
         RefreshDraw();
@@ -457,8 +423,8 @@
         RefreshDraw();
 
         let zw = getCoords(this);
-        let x = e.pageX - zw.left;
-        let y = e.pageY - zw.top;
+        let x = pointerPos(e, this).x;
+        let y = pointerPos(e, this).y;
 
         context.lineWidth = 1;
         context.strokeStyle = 'rgb(160, 160, 160)';

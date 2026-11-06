@@ -23,86 +23,47 @@
   <link rel="stylesheet" href="style-iframe.css?v=$COMMIT_HASH" />
 
   <style>
-    .header-actions {
-      display: flex;
-      gap: 8px;
+    #div_input_el:not([hidden]) {
+      display: contents;
     }
 
-    .header-actions .button {
-      margin: 0;
+    .canvas-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 16px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--text-secondary);
     }
 
-    .control-group {
+    .multiplier-info {
       display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 8px 12px;
+      border-radius: var(--input-radius);
+      background: var(--surface);
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    .lock-list {
+      display: flex;
+      flex-direction: column;
       gap: 10px;
-      align-items: center;
-      width: 100%;
     }
 
-    input[type='number'] {
-      font-family: inherit;
-      font-size: inherit;
-      width: 60px;
-      margin-right: 10px;
-      padding: 3px 5px;
-      display: inline-block;
-      border: 1px solid var(--border);
-      border-radius: var(--input-radius);
+    .lock-list .check {
+      align-items: flex-start;
     }
 
-    input[type='text'] {
-      font-family: inherit;
-      font-size: inherit;
-      padding: 3px 5px;
-      display: inline-block;
-      border: 1px solid var(--border);
-      border-radius: var(--input-radius);
+    .lock-list .check input[type='checkbox'] {
+      margin-top: 3px;
     }
 
-    select {
-      font-family: inherit;
-      font-size: inherit;
-      padding: 3px 5px;
-      display: inline-block;
-      border: 1px solid var(--border);
-      margin-right: 10px;
-      min-width: 125px;
-      max-width: 100%;
+    .lock-list .check span input {
+      padding: 3px 6px;
       vertical-align: middle;
-      overflow: hidden;
-      border-radius: var(--input-radius);
-    }
-
-    .multiplier {
-      padding: 0px 0px;
-      font-size: 12px;
-    }
-
-    table {
-      width: 100%;
-      table-layout: fixed;
-    }
-
-    td {
-      padding: 5px 0px 5px 0px;
-    }
-
-    .footer-actions {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 5px;
-      padding: 0;
-    }
-
-    .checkbox-group {
-      display: flex;
-      gap: 20px;
-    }
-
-    .checkbox-group label {
-      cursor: pointer;
-      margin-left: 4px;
     }
   </style>
 
@@ -113,9 +74,10 @@
 <body>
   <div class="container">
     <div class="container-header">
-      <div class="container-title"><span>💠</span>Number Sequences</div>
+      <div class="container-title">Number Sequences</div>
+      <div class="page-sub">Group digit and analog ROIs into the sequences that make up your reading.</div>
       <details id="desc_details">
-        <summary id="desc_details_summary">CLICK HERE for usage info</summary>
+        <summary id="desc_details_summary">How it works</summary>
         <div class="info-box">
           <p>
             Define your number sequences by grouping digit and analog ROIs (<b>R</b>egion <b>O</b>f <b>I</b>nterest) for processing. Use
@@ -139,164 +101,122 @@
     </div>
 
     <div class="container-content">
-      <div class="card">
-        <div class="card-header">
-          <span>Global Configuration</span>
-          <div class="header-actions" style="font-weight: normal; text-transform: none">
-            <div class="checkbox-group">
-              <span>
-                <input type="checkbox" id="digitProcessing" onchange="digitProcessingChanged()" />
-                <label for="digitProcessing">Process Digit ROI</label>
-              </span>
-              <span style="margin: 10px"></span>
-              <span>
-                <input type="checkbox" id="analogProcessing" onchange="analogProcessingChanged()" />
-                <label for="analogProcessing">Process Analog ROI</label>
-              </span>
+      <div class="editor-layout">
+        <div class="card">
+          <div class="card-header">
+            <span>Reference image</span>
+            <div class="canvas-options">
+              <label class="check visibilityDigitAnalog">
+                <input type="checkbox" id="showDigitAnalogROI" onclick="RefreshDraw()" checked />Show digit + analog ROIs
+              </label>
+              <label class="check visibilityRoiOnly">
+                <input type="checkbox" id="showSelectedROIOnly" onclick="RefreshDraw()" />Selected ROI only
+              </label>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><span>Number Sequence</span></div>
-        <div class="card-body" style="padding: 10px">
-          <div class="control-group">
-            <select id="sequenceSelection" onchange="onSequenceChanged()" class="input-control"></select>
-            <button class="button" id="newSequence" onclick="onClickNewSequence()">New</button>
-            <button class="button" id="renameSequence" onclick="onClickRenameSequence()">Rename</button>
-            <button class="button btn-danger" id="deleteSequence" onclick="onClickDeleteSequence()">Delete</button>
+          <div class="canvas-wrap">
+            <img id="img_loading" alt="Loading..." />
+            <canvas id="canvas" hidden></canvas>
           </div>
         </div>
-      </div>
 
-      <div class="card">
-        <div class="card-header"><span>Region Of Interest (ROI)</span></div>
-        <div class="card-body" style="padding: 10px">
-          <div class="control-group">
-            <div id="div_input_el" hidden>
-              <table>
-                <colgroup>
-                  <col span="1" style="width: 22%" />
-                  <col span="1" style="width: 27%" />
-                  <col span="1" style="width: 26%" />
-                  <col span="1" />
-                </colgroup>
-                <tr>
-                  <td>
+        <div class="editor-side">
+          <div class="card">
+            <div class="card-header"><span>Processing</span></div>
+            <div class="side-body">
+              <label class="check">
+                <input type="checkbox" id="digitProcessing" onchange="digitProcessingChanged()" />Process digit ROIs
+              </label>
+              <label class="check">
+                <input type="checkbox" id="analogProcessing" onchange="analogProcessingChanged()" />Process analog ROIs
+              </label>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><span>Number sequence</span></div>
+            <div class="side-body">
+              <div class="field">
+                <label for="sequenceSelection">Sequence</label>
+                <select id="sequenceSelection" onchange="onSequenceChanged()" class="input-control"></select>
+              </div>
+              <div class="btn-row">
+                <button class="button" id="newSequence" onclick="onClickNewSequence()">New</button>
+                <button class="button" id="renameSequence" onclick="onClickRenameSequence()">Rename</button>
+                <button class="button btn-danger" id="deleteSequence" onclick="onClickDeleteSequence()">Delete</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><span>Region of interest</span></div>
+            <div class="side-body">
+              <div id="div_input_el" hidden>
+                <div class="field-grid">
+                  <div class="field">
+                    <label for="roiTypeSelection">Type</label>
                     <select id="roiTypeSelection" onchange="onTypeChanged()">
                       <option value="digit" selected>Digit ROI</option>
                       <option value="analog">Analog ROI</option>
                     </select>
-                  </td>
-                  <td>
+                  </div>
+                  <div class="field">
+                    <label for="ROISelect">ROI</label>
                     <select id="ROISelect" onchange="onROIChanged()"></select>
-                  </td>
-                  <td><button class="button" id="newROI" onclick="onClickNewROI()">New</button></td>
-                  <td><button class="button" id="deleteROI" onclick="onClickDeleteROI()">Delete</button></td>
-                </tr>
-                <tr>
-                  <td class="multiplier">
-                    Multiplier: <output id="multiplier"></output><br />
-                    (based on order)
-                  </td>
-                  <td class="multiplier">
-                    Multiplier: <output id="multiplierDecshift"></output><br />
-                    (order + decimal scaling: <output id="decimalShift"></output>)
-                  </td>
-                  <td>
-                    <button class="button" id="moveROIHigher" onclick="onClickMoveROIHigher()">Move Higher</button>
-                  </td>
-                  <td>
-                    <button class="button" id="moveROILower" onclick="onClickMoveROILower()">Move Lower</button>
-                  </td>
-                </tr>
-              </table>
+                  </div>
+                </div>
+                <div class="btn-row grid2">
+                  <button class="button" id="newROI" onclick="onClickNewROI()">New</button>
+                  <button class="button btn-danger" id="deleteROI" onclick="onClickDeleteROI()">Delete</button>
+                  <button class="button" id="moveROIHigher" onclick="onClickMoveROIHigher()">Move higher</button>
+                  <button class="button" id="moveROILower" onclick="onClickMoveROILower()">Move lower</button>
+                </div>
+                <div class="multiplier-info">
+                  <div>Multiplier by order: <output id="multiplier"></output></div>
+                  <div>With decimal scaling (<output id="decimalShift"></output>): <output id="multiplierDecshift"></output></div>
+                </div>
 
-              <table>
-                <colgroup>
-                  <col span="1" style="width: 20%" />
-                  <col span="1" style="width: 20%" />
-                  <col span="1" style="width: 60%" />
-                </colgroup>
-                <tr>
-                  <td>
-                    x
-                    <input type="number" id="refx" min="1" onchange="!validity.rangeUnderflow || (value = 1); onValueManualChanged();" />
-                  </td>
-                  <td>
-                    Δx
-                    <input type="number" id="refdx" min="1" onchange="!validity.rangeUnderflow || (value = 1); onValueManualChangedDx();" />
-                  </td>
-                  <td class="digit">
-                    <input type="checkbox" id="lockAspectRatio" value="1" onclick="onClickLockAspectRatio()" checked />
-                    <label for="lockAspectRatio">Lock aspect ratio</label>
-                  </td>
-                  <td class="analog">
-                    <input type="checkbox" id="lockAspectRatioAnalog" value="1" onclick="onClickLockAspectRatio()" checked />
-                    <label for="lockAspectRatioAnalog">Lock aspect ratio</label>
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    y
-                    <input type="number" id="refy" min="1" onchange="!validity.rangeUnderflow || (value = 1); onValueManualChanged();" />
-                  </td>
-                  <td>
-                    Δy
-                    <input type="number" id="refdy" min="1" onchange="!validity.rangeUnderflow || (value = 1); onValueManualChanged();" />
-                  </td>
-                  <td class="digit">
-                    <input type="checkbox" id="lockSizesDigit" value="1" onclick="onClickLockSizes()" checked />
-                    <label for="lockSizesDigit">Synchronize y, Δx and Δy</label>
-                  </td>
-                  <td class="analog">
-                    <input type="checkbox" id="lockSizesAnalog" value="1" onclick="onClickLockSizes()" checked />
-                    <label for="lockSizesAnalog">Synchronize Δx and Δy</label>
-                  </td>
-                </tr>
-                <tr>
-                  <td colspan="2" style="height: 27px"></td>
-                  <td class="digit">
+                <div class="field-grid">
+                  <div class="field"><label for="refx">X</label>
+                    <input type="number" id="refx" min="1" onchange="!validity.rangeUnderflow || (value = 1); onValueManualChanged();" /></div>
+                  <div class="field"><label for="refy">Y</label>
+                    <input type="number" id="refy" min="1" onchange="!validity.rangeUnderflow || (value = 1); onValueManualChanged();" /></div>
+                  <div class="field"><label for="refdx">Width</label>
+                    <input type="number" id="refdx" min="1" onchange="!validity.rangeUnderflow || (value = 1); onValueManualChangedDx();" /></div>
+                  <div class="field"><label for="refdy">Height</label>
+                    <input type="number" id="refdy" min="1" onchange="!validity.rangeUnderflow || (value = 1); onValueManualChanged();" /></div>
+                </div>
+
+                <div class="lock-list">
+                  <label class="check digit">
+                    <input type="checkbox" id="lockAspectRatio" value="1" onclick="onClickLockAspectRatio()" checked />Lock aspect ratio
+                  </label>
+                  <label class="check analog">
+                    <input type="checkbox" id="lockAspectRatioAnalog" value="1" onclick="onClickLockAspectRatio()" checked />Lock aspect ratio
+                  </label>
+                  <label class="check digit">
+                    <input type="checkbox" id="lockSizesDigit" value="1" onclick="onClickLockSizes()" checked />Synchronize Y, width and height
+                  </label>
+                  <label class="check analog">
+                    <input type="checkbox" id="lockSizesAnalog" value="1" onclick="onClickLockSizes()" checked />Synchronize width and height
+                  </label>
+                  <label class="check digit">
                     <input type="checkbox" id="lockSpaceEquidistant" value="1" onclick="onClickLockSpaceEquidistant()" checked />
-                    <label for="lockSpaceEquidistant">Keep equidistance of
-                      <input style="margin-right: 0px; width: 40px" type="number" id="space" min="0"
+                    <span>Keep spacing of
+                      <input style="width: 56px; margin: 0 4px" type="number" id="space" min="0"
                         onchange="!validity.rangeUnderflow || (value = 0);onValueManualChangedSpace();" />
-                      between all ROIs</label>
-                  </td>
-                  <td class="analog">
-                    <input type="checkbox" id="CCW" value="0" onclick="onClickCCW()" />
-                    <label for="CCW">Counter clockwise rotation (CCW)</label>
-                  </td>
-                </tr>
-              </table>
-            </div>
-          </div>
-          <div class="footer-actions">
-            <div class="checkbox-group">
-              <span class="visibilityDigitAnalog">
-                <input type="checkbox" id="showDigitAnalogROI" onclick="RefreshDraw()" checked />
-                <label for="showDigitAnalogROI">Show Digit + Analog ROI</label>
-              </span>
-              <span class="visibilityRoiOnly">
-                <input type="checkbox" id="showSelectedROIOnly" onclick="RefreshDraw()" />
-                <label for="showSelectedROIOnly">Show selected ROI only</label>
-              </span>
-            </div>
-            <div>
-              <input disabled class="button btn-action" type="submit" id="saveconfig" onclick="saveToConfig()" value="Save And Apply" />
-            </div>
-          </div>
-        </div>
-      </div>
+                      between all ROIs</span>
+                  </label>
+                  <label class="check analog">
+                    <input type="checkbox" id="CCW" value="0" onclick="onClickCCW()" />Counter clockwise rotation (CCW)
+                  </label>
+                </div>
+              </div>
 
-      <div class="card">
-        <div class="card-header"><span>Reference Image</span></div>
-
-        <div class="card-body">
-          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 200px; width: 100%">
-            <img id="img_loading" alt="Loading..." />
-            <canvas id="canvas" hidden></canvas>
+              <div class="btn-row">
+                <input disabled class="button btn-action" type="submit" id="saveconfig" onclick="saveToConfig()" value="Save And Apply" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1317,6 +1237,15 @@
       }
     }
 
+    // Pointer position in canvas pixels (also correct while the canvas is scaled down by CSS)
+    function pointerPos(e, elem) {
+      const r = elem.getBoundingClientRect();
+      return {
+        x: Math.round(((e.clientX - r.left) * elem.width) / r.width),
+        y: Math.round(((e.clientY - r.top) * elem.height) / r.height),
+      };
+    }
+
     function getCoords(elem) {
       // crossbrowser version
       let box = elem.getBoundingClientRect();
@@ -1336,8 +1265,8 @@
 
     function mouseDown(e) {
       const coords = getCoords(this);
-      rect.startX = e.pageX - coords.left;
-      rect.startY = e.pageY - coords.top;
+      rect.startX = pointerPos(e, this).x;
+      rect.startY = pointerPos(e, this).y;
       rect.centerX = rect.startX;
       rect.centerY = rect.startY;
       document.getElementById('refx').value = rect.startX;
@@ -1368,8 +1297,8 @@
           return;
         }
         const coords = getCoords(this);
-        const mouseX = e.pageX - coords.left;
-        const mouseY = e.pageY - coords.top;
+        const mouseX = pointerPos(e, this).x;
+        const mouseY = pointerPos(e, this).y;
 
         if (typeSelection.value == 'digit') {
           if (lockAspectRatio) {
@@ -1400,8 +1329,8 @@
       } else {
         RefreshDraw();
         const coords = getCoords(this);
-        const mouseX = e.pageX - coords.left;
-        const mouseY = e.pageY - coords.top;
+        const mouseX = pointerPos(e, this).x;
+        const mouseY = pointerPos(e, this).y;
         context.lineWidth = 1;
         context.strokeStyle = 'rgb(160, 160, 160)';
         context.beginPath();

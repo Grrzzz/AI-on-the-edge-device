@@ -309,7 +309,7 @@ details {
 }
 
 .hidden {
-  display: none;
+  display: none !important;
 }
 
 /* Data refresh group */
@@ -725,4 +725,189 @@ details {
 
 .notice-state strong {
   color: var(--text-main);
+}
+
+/* ==========================================================================
+   Editor pages (reference image, alignment marker, number sequences)
+   ========================================================================== */
+
+/* "How it works" toggle */
+#desc_details {
+  margin: 12px 0 0;
+  padding: 0;
+  text-align: left;
+  font-size: inherit;
+}
+
+#desc_details summary,
+#desc_details_summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  padding: 5px 12px 5px 6px;
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-main);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+#desc_details summary::-webkit-details-marker {
+  display: none;
+}
+
+#desc_details summary::before {
+  content: '?';
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.72rem;
+}
+
+#desc_details[open] summary {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+#desc_details .info-box {
+  margin: 12px 0 0;
+  text-align: left;
+  line-height: 1.55;
+}
+
+#desc_details .info-box p:first-child {
+  margin-top: 0;
+}
+
+#desc_details .info-box p:last-child {
+  margin-bottom: 0;
+}
+
+/* Native controls follow the accent color */
+input[type='range'],
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--primary);
+}
+
+/* Canvas on the left, controls on the right */
+.editor-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--card-gap);
+  align-items: start;
+}
+
+.editor-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap);
+  position: sticky;
+  top: 12px;
+}
+
+@media screen and (max-width: 1000px) {
+  .editor-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .editor-side {
+    position: static;
+  }
+}
+
+.canvas-wrap {
+  display: flex;
+  justify-content: center;
+  min-height: 200px;
+  padding: 0 12px 12px;
+}
+
+.canvas-wrap canvas {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.6rem;
+  cursor: crosshair;
+}
+
+.canvas-wrap img {
+  max-width: 100%;
+}
+
+.side-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 20px 20px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  margin: 0;
+}
+
+.field > label,
+.field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+}
+
+.field input[type='number'],
+.field input[type='text'],
+.field select {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.btn-row.grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.btn-row .button {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.check input {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.button.btn-danger {
+  color: var(--error);
 }
