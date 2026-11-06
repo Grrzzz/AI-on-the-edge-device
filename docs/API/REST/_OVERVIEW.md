@@ -17,7 +17,7 @@ Further details can be found in the respective REST API endpoint description.
 | [/cycle_start](cycle_start.md)       | Trigger Cycle (Flow) Start                         | HTML        | 
 | [/set_fallbackvalue](set_fallbackvalue.md) | Set Fallback Value                           | HTML        | 
 | [/editflow](editflow.md)             | Parametrization Helper                             | HTML        | 
-| [/recognition_details](recognition_details.md)|Image Recognition Details (WebUI Page)     | HTML        |
+| [/api/recognition](recognition.md)|Image Recognition Details of the last cycle     | JSON        |
 | [/camera](camera.md)                 | Camera Capture, Stream, Parametrization + Flashlight| HTML       | 
 | [/gpio](gpio.md)                     | Read / Control GPIO                                | JSON + HTML | 
 | [/mqtt](mqtt.md)                     | Publish HA discovery topics / Device info topics   | HTML        | 

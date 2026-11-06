@@ -731,137 +731,81 @@ esp_err_t handler_process_data(httpd_req_t *req)
 }
 
 
-// Helper for rendering a single ROI list (Digit or Analog)
-static std::string recognitionDetailsRoiSection(const std::string &title, const auto &roiList, bool enabled)
+// Helper: ROI list of one kind (digit or analog) as JSON object {"enabled":bool,"rois":[...]}
+static void addRecognitionRois(cJSON *parent, const char *key, const auto &roiList, bool enabled)
 {
-    std::string html = "<div class=\"roi-block\"><div class=\"roi-title\">" + title + "</div>";
+    cJSON *group = cJSON_AddObjectToObject(parent, key);
+    cJSON_AddBoolToObject(group, "enabled", enabled);
+    cJSON *rois = cJSON_AddArrayToObject(group, "rois");
 
-    if (enabled && !roiList.empty()) {
-        html += "<div class=\"roi-grid\">";
-        for (const auto &roi : roiList) {
-            html += "<div class=\"roi-tile\">";
-            if (roi->CNNResult > -1) {
-                html += "<div class=\"roi-value\">" + roi->sCNNResult + "</div>";
-                html += "<img class=\"roi-img\" src=\"/img_tmp/" + roi->param->roiName + "_org.jpg\">";
-            }
-            else {
-                html += "<div class=\"roi-value na\">N/A</div><div class=\"roi-noimg\">No image</div>";
-            }
-            html += "</div>";
+    if (!enabled) {
+        return;
+    }
+
+    for (const auto &roi : roiList) {
+        cJSON *item = cJSON_CreateObject();
+        cJSON_AddStringToObject(item, "name", roi->param->roiName.c_str());
+        if (roi->CNNResult > -1) {
+            cJSON_AddBoolToObject(item, "valid", true);
+            cJSON_AddStringToObject(item, "value", roi->sCNNResult.c_str());
+            cJSON_AddStringToObject(item, "image", ("/img_tmp/" + roi->param->roiName + "_org.jpg").c_str());
         }
-        html += "</div>";
+        else {
+            cJSON_AddBoolToObject(item, "valid", false);
+        }
+        cJSON_AddItemToArray(rois, item);
     }
-    else {
-        html += "<div class=\"roi-disabled\">Disabled</div>";
-    }
-    html += "</div>";
-    return html;
 }
 
 
+// GET /api/recognition: Result of the last completed cycle (sequences, ROI values and images) as JSON
+// {"api_name":"recognition:v3","ready":true,"state":"...","image":"/img_tmp/alg_roi.jpg",
+//  "sequences":[{"name":"main","rawValue":"..","actualValue":"..","digit":{"enabled":true,"rois":[{"name":"d1","valid":true,"value":"5","image":".."}]},"analog":{..}}]}
 esp_err_t handler_recognition_details(httpd_req_t *req)
 {
-    const char *APIName = "recognition_details:v2";
-    char query[100];
-    char valuechar[30];
-    std::string type;
+    const char *APIName = "recognition:v3";
 
-    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
-        if (httpd_query_key_value(query, "type", valuechar, sizeof(valuechar)) == ESP_OK) {
-            type = std::string(valuechar);
+    cJSON *root = cJSON_CreateObject();
+    if (root == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "E91: Error, JSON object cannot be created");
+        return ESP_FAIL;
+    }
+
+    cJSON_AddStringToObject(root, "api_name", APIName);
+    cJSON_AddStringToObject(root, "state", flowctrl.getActualProcessState().c_str());
+
+    const bool ready = !(taskAutoFlowState < 3 || taskAutoFlowState == FLOW_TASK_STATE_IMG_PROCESSING || cycleCounter == 0);
+    cJSON_AddBoolToObject(root, "ready", ready);
+
+    if (ready) {
+        const bool digitEnabled = ConfigClass::getInstance()->get()->sectionDigit.enabled;
+        const bool analogEnabled = ConfigClass::getInstance()->get()->sectionAnalog.enabled;
+
+        cJSON *sequences = cJSON_AddArrayToObject(root, "sequences");
+        for (const auto &sequence : flowctrl.getSequenceData()) {
+            cJSON *item = cJSON_CreateObject();
+            cJSON_AddStringToObject(item, "name", sequence->sequenceName.c_str());
+            cJSON_AddStringToObject(item, "rawValue", sequence->sRawValue.c_str());
+            cJSON_AddStringToObject(item, "actualValue", sequence->sActualValue.c_str());
+            addRecognitionRois(item, "digit", sequence->digitRoi, digitEnabled);
+            addRecognitionRois(item, "analog", sequence->analogRoi, analogEnabled);
+            cJSON_AddItemToArray(sequences, item);
         }
+        cJSON_AddStringToObject(root, "image", "/img_tmp/alg_roi.jpg");
     }
 
-    if (type == "api_name") {
-        httpd_resp_set_type(req, "text/plain");
-        httpd_resp_sendstr(req, APIName);
-        return ESP_OK;
+    char *json = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (json == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "E91: Error, JSON object cannot be serialized");
+        return ESP_FAIL;
     }
 
-    httpd_resp_set_type(req, "text/html");
-
-    // Header & Info Section
-    std::string txt = R"(<!DOCTYPE html><html><head>
-        <title>Recognition Details</title>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=720" />
-        <script>
-            (function () {
-                let theme;
-                try { theme = localStorage.getItem('theme'); } catch (e) { }
-                if (theme !== 'light' && theme !== 'dark') {
-                    try { theme = document.cookie.match(/(?:^|; )theme=(light|dark)/)?.[1]; } catch (e) { }
-                    if (!theme) theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-                }
-                document.documentElement.classList.remove('light', 'dark');
-                document.documentElement.classList.add(theme);
-            })();
-            window.addEventListener('storage', (e) => {
-                if (e.key !== 'theme') return;
-                const theme = e.newValue;
-                if (theme !== 'light' && theme !== 'dark') return;
-                const d = document.documentElement;
-                if (d.classList.contains(theme)) return;
-                d.classList.remove('light', 'dark');
-                d.classList.add(theme);
-                const t = document.getElementById('themeToggle'); // exists only in index.html
-                if (t) t.checked = theme === 'light';
-                if (typeof refreshTheme === 'function') refreshTheme();
-            });
-        </script>
-        <link rel="stylesheet" href="/style.css">
-        </head><body>)";
-
-    txt += R"(<div class="container"><div class="container-header">
-        <div class="container-title">Recognition</div>
-        <div class="page-sub">Result of the last completed recognition cycle.</div>
-        </div><div class="container-content">)";
-
-    // Not initialized state
-    if (taskAutoFlowState < 3 || taskAutoFlowState == FLOW_TASK_STATE_IMG_PROCESSING || cycleCounter == 0) {
-        txt += "<div class=\"card\"><div class=\"notice\">";
-        txt += "<div class=\"notice-title\">Waiting for the first completed cycle</div>";
-        txt += "<div>Details are available once the device is initialized and a cycle has finished.</div>";
-        txt += "<div class=\"notice-state\">Current state: <strong>" + flowctrl.getActualProcessState() + "</strong></div>";
-        txt += "<div><button class=\"button btn-action\" onclick=\"window.location.reload();\">Refresh</button></div>";
-        txt += "</div></div></div></div></body></html>";
-        httpd_resp_sendstr(req, txt.c_str());
-        return ESP_OK;
-    }
-
-    // Return cycle results in chunks
-    httpd_resp_sendstr_chunk(req, txt.c_str());
-
-    for (const auto &sequence : flowctrl.getSequenceData()) {
-        txt = "<div class=\"card\">";
-        txt += "<div class=\"card-header\">Sequence &middot; " + sequence->sequenceName + "</div>";
-        txt += "<div class=\"card-body recog-body\">";
-
-        // Results
-        txt += "<div class=\"recog-values\">";
-        txt += "<div class=\"stat\"><div class=\"stat-label\">Raw value</div><div class=\"stat-value\">" + sequence->sRawValue + "</div></div>";
-        txt += "<div class=\"stat\"><div class=\"stat-label\">Actual value</div><div class=\"stat-value\">" + sequence->sActualValue +
-               "</div></div>";
-        txt += "</div>";
-
-        // Digit & Analog ROIs using helper
-        bool digitEnabled = ConfigClass::getInstance()->get()->sectionDigit.enabled;
-        bool analogEnabled = ConfigClass::getInstance()->get()->sectionAnalog.enabled;
-        txt += recognitionDetailsRoiSection("Digit ROIs", sequence->digitRoi, digitEnabled);
-        txt += recognitionDetailsRoiSection("Analog ROIs", sequence->analogRoi, analogEnabled);
-
-        txt += "</div></div>";
-        httpd_resp_sendstr_chunk(req, txt.c_str());
-    }
-
-    // Full Image Card & Closing tags
-    txt = "<div class=\"card\"><div class=\"card-header\">Processed image</div>";
-    txt += "<div class=\"card-body image-body\"><img class=\"recog-img\" src=\"/img_tmp/alg_roi.jpg\"></div></div>";
-    txt += "</div></div></body></html>";
-    httpd_resp_sendstr_chunk(req, txt.c_str());
-    httpd_resp_sendstr_chunk(req, NULL);
-
-    return ESP_OK;
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t retVal = httpd_resp_sendstr(req, json);
+    free(json);
+    return retVal;
 }
 
 
@@ -1320,7 +1264,7 @@ void registerMainFlowTaskUri(httpd_handle_t server)
     camuri.user_ctx = httpServerData; // Pass server data as context
     httpd_register_uri_handler(server, &camuri);
 
-    camuri.uri = "/recognition_details";
+    camuri.uri = "/api/recognition";
     camuri.handler = HTTP_AUTH_BASIC(handler_recognition_details);
     camuri.user_ctx = NULL;
     httpd_register_uri_handler(server, &camuri);

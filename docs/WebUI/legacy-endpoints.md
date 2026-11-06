@@ -1,4 +1,7 @@
-# Legacy endpoints used by the Api layer
+# Notes of the view parts (written during the SPA refactoring)
+
+Note: the HTML parsing of the file listing and of the recognition page described below was replaced by the JSON endpoints
+`GET /fileserver/<dir>/?format=json` and `GET /api/recognition` (see `docs/API/REST`). Everything else is still as described.
 
 ## system
 

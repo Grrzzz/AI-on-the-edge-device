@@ -20,7 +20,8 @@ Browse, list and download files and directories from the SD card via HTTP GET re
 #### 1. Directory Listing & File Management
 * **Payload / URL**: `/fileserver/<dir-path>/` (Must end with a trailing slash `/`)
 * **Query Parameters**:
-  * `?list_dir=true`: Returns a JSON-formatted list of sub-folders and files in the directory
+  * `?list_dir=true`: Returns a JSON-formatted list of sub-folders and files in the directory (names only)
+  * `?format=json`: Returns a JSON listing with details: `{"path":"/config/","truncated":false,"entries":[{"name":"x","isDir":false,"size":123,"protected":false}]}`. Combine with `full=true` to get more than the first 100 entries (`truncated` tells whether the list was cut). `protected` marks root folders that cannot be deleted
   * `?readonly=true` (or `false`): Sets the directory view mode
   * `?full=true` (or `false`): Controls whether to show all files (`showAllFiles`)
 * **Response**: HTML formatted directory view or JSON file list

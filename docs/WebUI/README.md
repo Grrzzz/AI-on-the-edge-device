@@ -20,6 +20,8 @@ The wizard opens automatically when the device is called without a route while t
 - No inline handlers, no globals except `Api.*` and `App.*`; ids and classes carry the view prefix
   (`sys-`, `dash-`, `rec-`, `setup-`, `wiz-`, `cfg-`).
 
-## Next step: JSON REST backend
-The firmware still answers some requests with text or HTML (see `legacy-endpoints.md`). Replacing them with JSON `/api/*`
-endpoints only changes the `Api` objects in `app.js`.
+## Backend (JSON REST)
+The Api objects talk to these JSON endpoints: `GET /info`, `GET /config`, `POST /config`, `GET /process_data`, `GET /wlan?task=scan`,
+`GET /api/recognition`, `GET /fileserver/<dir>/?format=json`, `GET /ota?task=selfupdate_status`.
+Actions and plain values still use the original text endpoints (`/cycle_start`, `/set_fallbackvalue`, `/log`, `/reboot`, `/mqtt?task=...`, `/ota`);
+they are listed in `legacy-endpoints.md`. Moving one of them to JSON only changes its `Api` method in `app.js`.

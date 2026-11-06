@@ -1178,17 +1178,20 @@ const App = (() => {
   }
 
   async function loadDeviceInfo() {
-    const [host, fw, ui] = await Promise.all([Api.system.info('hostname'), Api.system.info('firmware_version'), Api.system.info('html_version')]);
+    const info = await Api.system.infoAll(); // GET /info (JSON)
+    if (!info) return;
 
-    if (host) {
-      hostname = String(host).trim();
+    if (info.hostname) {
+      hostname = String(info.hostname).trim();
       const name = document.getElementById('device-name');
       if (name) name.textContent = hostname;
       setTitle(current?.view.title);
     }
     const label = document.getElementById('fw-version');
-    if (label && fw) label.textContent = fw;
+    if (label && info.firmware_version) label.textContent = info.firmware_version;
 
+    const fw = info.firmware_version;
+    const ui = info.html_version;
     if (fw && ui && !String(ui).startsWith('?') && fw !== ui) {
       firework.launch(
         "Web interface version does not match the firmware version. It's strongly advised to use matching version. Check logs for more details.",
@@ -1482,54 +1485,29 @@ const App = (() => {
 
   /* ------------------------------------------------------------------------ */
   /* Api.files                                                                */
-  /*   Legacy endpoint: GET /fileserver<dir>/?full=true|false returns an HTML */
-  /*   page (server_file.cpp) with a <table id="files_table"> that is parsed  */
-  /*   here. JSON listings (?list_dir=true) have no sizes, so they are not    */
-  /*   used.                                                                  */
+  /*   GET /fileserver<dir>/?format=json[&full=true] (server_file.cpp):       */
+  /*   {path, truncated, entries:[{name, isDir, size, protected}]}            */
   /* ------------------------------------------------------------------------ */
-
-  const LIST_SIZE_RE = /^(\d+)\s*(KB|B)$/i;
-
-  function parseDirectoryHtml(html, dirPath) {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const entries = [];
-
-    doc.querySelectorAll('#files_table tbody tr').forEach((row) => {
-      const link = row.querySelector('td a');
-      if (!link) return;
-      const name = link.textContent.trim();
-      const type = (row.cells[1]?.textContent || '').trim();
-      const isDir = type === 'directory';
-      let size = null;
-      if (!isDir) {
-        const m = LIST_SIZE_RE.exec((row.cells[2]?.textContent || '').trim());
-        if (m) size = Number(m[1]) * (m[2].toUpperCase() === 'KB' ? 1024 : 1);
-      }
-      entries.push({
-        name,
-        isDir,
-        size, // bytes (the device reports KB resolution for files >= 1 KB), null for directories
-        path: dirPath + name, // no trailing slash, also for directories
-        protected: row.cells.length >= 4 && !row.querySelector('.action-td'), // root folders without delete button
-      });
-    });
-
-    // The device cuts the listing at 100 items unless full=true
-    entries.truncated = !!doc.querySelector('form input[name="full"]');
-    return entries;
-  }
 
   Api.files = {
     // dirPath: '/config/models/' (leading and trailing slash). Throws Error on failure.
     // Returns [{ name, isDir, size, path, protected }], array property `truncated` is true for a cut listing
     async list(dirPath, { all = false } = {}) {
-      const res = await apiCall(`/fileserver${encodePath(dirPath)}?full=${all ? 'true' : 'false'}`, { timeout: 30000 });
-      if (!res.ok) {
+      const res = await apiCall(`/fileserver${encodePath(dirPath)}?format=json&full=${all ? 'true' : 'false'}`, { timeout: 30000 }, { parseType: 'json' });
+      if (!res.ok || !res.data) {
         const err = new Error(describeError(res));
         err.status = res.status;
         throw err;
       }
-      return parseDirectoryHtml(res.data, dirPath);
+      const entries = res.data.entries.map((e) => ({
+        name: e.name,
+        isDir: e.isDir,
+        size: e.isDir ? null : e.size, // bytes, null for directories
+        path: dirPath + e.name, // no trailing slash, also for directories
+        protected: e.protected, // root folders that cannot be deleted
+      }));
+      entries.truncated = !!res.data.truncated; // the device cuts the listing at 100 items unless full=true
+      return entries;
     },
 
     // Recursive file list (no directories) below dirPath: [{ name, size, path }]
@@ -3639,12 +3617,7 @@ const App = (() => {
     },
 
     /**
-     * Result of the last completed recognition cycle.
-     * Legacy endpoint: GET /recognition_details (firmware generated HTML document, see
-     * handler_recognition_details in MainFlowControl.cpp). It carries per sequence the raw/actual value and
-     * the per-ROI results (CNN value + image) which /process_data does not provide, so the HTML is parsed here.
-     * Phase 2: replace by JSON /api/recognition returning the same shape.
-     *
+     * Result of the last completed recognition cycle. GET /api/recognition (MainFlowControl.cpp).
      * @returns {Promise<null | {ready:false, state:string} | {ready:true, sequences:Array<{
      *   name:string, rawValue:string, actualValue:string,
      *   digit:{enabled:boolean, rois:Array<{value:string, na:boolean, image:string|null}>},
@@ -3652,46 +3625,20 @@ const App = (() => {
      * }>, image:string|null}>} null = request failed
      */
     async recognition(signal) {
-      const res = await apiCall('/recognition_details', { signal });
-      if (!res.ok || typeof res.data !== 'string') return null;
+      const res = await apiCall('/api/recognition', { signal }, { parseType: 'json' });
+      if (!res.ok || !res.data) return null;
+      const d = res.data;
+      if (!d.ready) return { ready: false, state: d.state ?? '' };
 
-      const doc = new DOMParser().parseFromString(res.data, 'text/html');
-      const text = (root, sel) => (root.querySelector(sel)?.textContent ?? '').trim();
-
-      const notice = doc.querySelector('.notice');
-      if (notice) return { ready: false, state: text(notice, '.notice-state strong') };
-
-      const parseBlock = (block) => {
-        const out = { enabled: !!block && !block.querySelector('.roi-disabled'), rois: [] };
-        if (!block) return out;
-        for (const tile of block.querySelectorAll('.roi-tile')) {
-          out.rois.push({
-            value: text(tile, '.roi-value'),
-            na: !!tile.querySelector('.roi-value.na'),
-            image: tile.querySelector('.roi-img')?.getAttribute('src') ?? null,
-          });
-        }
-        return out;
+      const rois = (g) => ({
+        enabled: !!g?.enabled,
+        rois: (g?.rois ?? []).map((r) => ({ value: r.valid ? r.value : 'N/A', na: !r.valid, image: r.valid ? r.image : null })),
+      });
+      return {
+        ready: true,
+        sequences: d.sequences.map((s) => ({ name: s.name, rawValue: s.rawValue, actualValue: s.actualValue, digit: rois(s.digit), analog: rois(s.analog) })),
+        image: d.image ?? null,
       };
-
-      const sequences = [];
-      for (const card of doc.querySelectorAll('.card')) {
-        const head = text(card, '.card-header');
-        if (!head.startsWith('Sequence')) continue;
-
-        const blocks = {};
-        for (const b of card.querySelectorAll('.roi-block')) blocks[text(b, '.roi-title')] = b;
-        const values = card.querySelectorAll('.recog-values .stat-value');
-        sequences.push({
-          name: head.replace(/^Sequence\s*[··]?\s*/, ''),
-          rawValue: (values[0]?.textContent ?? '').trim(),
-          actualValue: (values[1]?.textContent ?? '').trim(),
-          digit: parseBlock(blocks['Digit ROIs']),
-          analog: parseBlock(blocks['Analog ROIs']),
-        });
-      }
-
-      return { ready: true, sequences, image: doc.querySelector('.recog-img')?.getAttribute('src') ?? null };
     },
   };
 

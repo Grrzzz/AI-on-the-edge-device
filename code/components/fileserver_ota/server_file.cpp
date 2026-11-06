@@ -698,6 +698,133 @@ static esp_err_t getDirectory(httpd_req_t *req, const char *dirpath, const char 
 }
 
 
+// Writes a JSON string literal (with quotes, escaped) to dst. Returns the number of bytes written (0 if it does not fit)
+static size_t appendJsonString(char *dst, size_t cap, const char *src)
+{
+    size_t n = 0;
+    if (cap < 3) {
+        return 0;
+    }
+    dst[n++] = '"';
+    for (; *src; src++) {
+        const unsigned char c = (unsigned char)*src;
+        if (c == '"' || c == '\\') {
+            if (n + 3 >= cap) return 0;
+            dst[n++] = '\\';
+            dst[n++] = (char)c;
+        }
+        else if (c < 0x20) {
+            if (n + 7 >= cap) return 0;
+            n += snprintf(dst + n, cap - n, "\\u%04x", c);
+        }
+        else {
+            if (n + 2 >= cap) return 0;
+            dst[n++] = (char)c;
+        }
+    }
+    if (n + 2 > cap) return 0;
+    dst[n++] = '"';
+    dst[n] = '\0';
+    return n;
+}
+
+
+// Directory listing as JSON (GET /fileserver/<dir>/?format=json[&full=true])
+// {"path":"/config/","truncated":false,"entries":[{"name":"x","isDir":false,"size":123,"protected":false}]}
+static esp_err_t getDirectoryJson(httpd_req_t *req, const char *dirpath, const char *uripath, bool showAllFiles)
+{
+    char dirpathCorrected[FILE_PATH_MAX];
+    strlcpy(dirpathCorrected, dirpath, sizeof(dirpathCorrected));
+
+    // Strip trailing slash if necessary
+    if ((strlen(dirpathCorrected) - 1) > strlen(((HttpServerData *)req->user_ctx)->basePathFileserver)) {
+        dirpathCorrected[strlen(dirpathCorrected) - 1] = '\0';
+    }
+
+    DIR *dir = opendir(dirpathCorrected);
+    if (!dir) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Directory not found");
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+    httpd_resp_set_type(req, "application/json");
+
+    static const std::unordered_set<std::string> protectedRootFolder = {"/sdcard/", "/sdcard/config", "/sdcard/log"};
+    const bool inProtectedRoot = protectedRootFolder.count(dirpathCorrected) > 0;
+
+    char *buffer = ((HttpServerData *)req->user_ctx)->scratch; // Scratch buffer for temporary storage
+    const size_t bufSize = WEBSERVER_SCRATCH_BUFSIZE;
+    size_t used = 0;
+
+    // Chunk is sent once less than 2 KB would be left; the total size of the listing is not limited by memory
+    auto flush = [&]() {
+        if (used > 0) {
+            httpd_resp_send_chunk(req, buffer, used);
+            used = 0;
+        }
+    };
+
+    used += snprintf(buffer + used, bufSize - used, "{\"path\":");
+    used += appendJsonString(buffer + used, bufSize - used, uripath);
+    used += snprintf(buffer + used, bufSize - used, ",\"entries\":[");
+
+    char entryPath[FILE_PATH_MAX];
+    const size_t dirPathLen = strlen(dirpath);
+    strlcpy(entryPath, dirpath, sizeof(entryPath));
+
+    const int maxFiles = 100;
+    int fileCount = 0;
+    bool truncated = false;
+    bool first = true;
+    struct dirent *entry;
+    struct stat entryStat;
+
+    while ((entry = readdir(dir)) != NULL) {
+        if (!showAllFiles && fileCount >= maxFiles) {
+            truncated = true;
+            break;
+        }
+
+        // @Deprecated: Keep up to now even ini file support already dropped, but files could still be on device
+        if (sensitiveContent.count(toLower(entry->d_name)) > 0) {
+            continue;
+        }
+
+        strlcpy(entryPath + dirPathLen, entry->d_name, sizeof(entryPath) - dirPathLen);
+        if (stat(entryPath, &entryStat) == -1) {
+            continue;
+        }
+
+        const bool isDir = entry->d_type == DT_DIR;
+
+        if (bufSize - used < 2048) {
+            flush();
+        }
+
+        if (!first) {
+            buffer[used++] = ',';
+        }
+        first = false;
+
+        used += snprintf(buffer + used, bufSize - used, "{\"name\":");
+        used += appendJsonString(buffer + used, bufSize - used, entry->d_name);
+        used += snprintf(buffer + used, bufSize - used, ",\"isDir\":%s,\"size\":%ld,\"protected\":%s}", isDir ? "true" : "false",
+                         isDir ? 0L : (long)entryStat.st_size, (isDir && inProtectedRoot) ? "true" : "false");
+
+        fileCount++;
+    }
+    closedir(dir);
+
+    used += snprintf(buffer + used, bufSize - used, "],\"truncated\":%s}", truncated ? "true" : "false");
+    flush();
+
+    // Final empty chunk signals response complete
+    httpd_resp_sendstr_chunk(req, NULL);
+    return ESP_OK;
+}
+
+
 // Handler to download a file from server (sd card)
 static esp_err_t download_get_handler(httpd_req_t *req)
 {
@@ -722,12 +849,16 @@ static esp_err_t download_get_handler(httpd_req_t *req)
     if (relativePath[strlen(relativePath) - 1] == '/') {
         bool readonly = false;
         bool showAllFiles = true;
+        bool asJson = false;
         char query[64];
 
         if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
             char param[16];
             if (httpd_query_key_value(query, "list_dir", param, sizeof(param)) == ESP_OK) {
                 return getDirList(req, fullPath);
+            }
+            if (httpd_query_key_value(query, "format", param, sizeof(param)) == ESP_OK) {
+                asJson = (strcmp(param, "json") == 0);
             }
             if (httpd_query_key_value(query, "readonly", param, sizeof(param)) == ESP_OK) {
                 readonly = (strcmp(param, "true") == 0);
@@ -737,6 +868,9 @@ static esp_err_t download_get_handler(httpd_req_t *req)
             }
         }
 
+        if (asJson) {
+            return getDirectoryJson(req, fullPath, relativePath, showAllFiles);
+        }
         return getDirectory(req, fullPath, relativePath, readonly, showAllFiles);
     }
 
