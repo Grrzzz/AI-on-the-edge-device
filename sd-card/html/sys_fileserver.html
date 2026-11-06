@@ -23,64 +23,188 @@
   <link rel="stylesheet" href="/style-iframe.css?v=$COMMIT_HASH" />
 
   <style>
-    input[type='file'] {
-      width: 100%;
-      font-family: inherit;
-      font-size: inherit;
-      color: var(--text-secondary);
+    .bar {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      padding: 12px 16px;
     }
 
-    .explorer-bar {
+    .bar .button {
+      width: auto;
+      padding: 7px 16px;
+    }
+
+    .bar .grow {
+      flex: 1;
+    }
+
+    .bar input[type='text'] {
+      width: 220px;
+      max-width: 100%;
+    }
+
+    .crumbs {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 4px;
+      min-width: 0;
+      font-weight: 600;
+    }
+
+    .crumbs a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      padding: 3px 6px;
+      border-radius: 0.4rem;
+    }
+
+    .crumbs a:hover {
+      background: var(--surface);
+      color: var(--primary);
+    }
+
+    .crumbs .sep {
+      color: var(--text-secondary);
+      opacity: 0.6;
+    }
+
+    .crumbs .current {
+      padding: 3px 6px;
+      color: var(--text-main);
+    }
+
+    /* ------------------------------------------------------------- drop zone */
+    .dz-card {
+      overflow: visible;
+    }
+
+    .dropzone {
       display: flex;
       flex-direction: column;
-      gap: 14px;
-      padding: 4px 20px 20px;
-    }
-
-    .input-group {
-      display: grid;
-      grid-template-columns: 90px minmax(0, 1fr) auto;
-      gap: 12px;
       align-items: center;
+      gap: 4px;
+      margin: 16px;
+      padding: 28px 16px;
+      border: 2px dashed var(--border);
+      border-radius: 1rem;
+      background: var(--surface);
+      text-align: center;
+      cursor: pointer;
+      transition: border-color var(--transition-speed), background var(--transition-speed), transform var(--transition-speed);
     }
 
-    .input-group label {
-      font-size: 0.8rem;
-      font-weight: 600;
+    .dropzone:hover,
+    .dropzone:focus-visible {
+      border-color: var(--primary);
+      outline: none;
+    }
+
+    .dropzone.over {
+      border-color: var(--primary);
+      background: var(--primary-soft);
+      transform: scale(1.005);
+    }
+
+    .dz-icon {
+      width: 40px;
+      height: 40px;
+      margin-bottom: 6px;
+      background: var(--primary);
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 16V4M7 9l5-5 5 5M4 20h16'/%3E%3C/svg%3E") center / contain no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 16V4M7 9l5-5 5 5M4 20h16'/%3E%3C/svg%3E") center / contain no-repeat;
+    }
+
+    .dz-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .dz-sub {
       color: var(--text-secondary);
     }
 
-    .input-group .button,
-    .nav-controls .button {
-      width: auto;
-      padding: 8px 18px;
+    .dz-link {
+      color: var(--primary);
+      font-weight: 600;
     }
 
-    #filepath {
-      width: 100%;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+    .dz-hint {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    .queue {
+      display: flex;
+      flex-direction: column;
+      margin: 0 16px 16px;
+      border: 1px solid var(--border);
+      border-radius: 0.8rem;
       overflow: hidden;
     }
 
-    .nav-controls {
-      display: flex;
-      justify-content: space-between;
+    .q-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
       align-items: center;
-      flex-wrap: wrap;
-      gap: 12px;
-      padding-top: 14px;
+      gap: 4px 14px;
+      padding: 10px 14px;
+    }
+
+    .q-row + .q-row {
       border-top: 1px solid var(--border);
     }
 
-    .path-display {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      min-width: 0;
-      overflow-wrap: anywhere;
+    .q-name {
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
+    .q-size,
+    .q-status {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    .q-status.done {
+      color: var(--success);
+    }
+
+    .q-status.error {
+      color: var(--error);
+    }
+
+    .q-bar {
+      grid-column: 1 / -1;
+      height: 4px;
+      border-radius: 999px;
+      background: var(--surface);
+      overflow: hidden;
+    }
+
+    .q-bar i {
+      display: block;
+      height: 100%;
+      width: 0;
+      background: var(--primary);
+      transition: width 0.15s linear;
+    }
+
+    .q-row.done .q-bar i {
+      background: var(--success);
+    }
+
+    .q-row.error .q-bar i {
+      background: var(--error);
+    }
+
+    /* ------------------------------------------------------------- file list (rows are injected by the firmware) */
     #files_table {
       width: 100%;
       border-collapse: separate;
@@ -109,18 +233,52 @@
       padding: 10px 16px;
     }
 
+    #files_table th:nth-child(3),
+    #files_table td:nth-child(3) {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      color: var(--text-secondary);
+    }
+
     #files_table tr + tr td {
       border-top: 1px solid var(--border);
     }
 
-    #files_table tr:hover td {
+    #files_table tbody tr:hover td {
       background: var(--surface);
     }
 
-    #files_table td a {
-      color: var(--primary);
-      text-decoration: none;
+    #files_table td:first-child a {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-main);
       font-weight: 500;
+      text-decoration: none;
+    }
+
+    #files_table td:first-child a:hover {
+      color: var(--primary);
+    }
+
+    #files_table td:first-child a::before {
+      content: '';
+      flex: none;
+      width: 18px;
+      height: 18px;
+      background: var(--text-secondary);
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3h9l5 5v13H6z'/%3E%3Cpath d='M14 3v6h6'/%3E%3C/svg%3E") center / contain no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3h9l5 5v13H6z'/%3E%3Cpath d='M14 3v6h6'/%3E%3C/svg%3E") center / contain no-repeat;
+    }
+
+    #files_table td:first-child a[href*='full=false']::before {
+      background: var(--primary);
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h6l2 2h10v12H3z'/%3E%3C/svg%3E") center / contain no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h6l2 2h10v12H3z'/%3E%3C/svg%3E") center / contain no-repeat;
+    }
+
+    #files_table td:first-child a[href*='full=false'] {
+      font-weight: 600;
     }
 
     #files_table td.action-td {
@@ -136,9 +294,19 @@
       justify-content: center;
       width: auto;
       padding: 5px 12px;
-      margin: 0 0 0 8px;
+      margin: 0 0 0 6px;
       font-size: 0.82rem;
       vertical-align: middle;
+    }
+
+    .action-button[title^='Delete'] {
+      color: var(--error);
+    }
+
+    .empty-note {
+      padding: 22px;
+      text-align: center;
+      color: var(--text-secondary);
     }
   </style>
 
@@ -164,32 +332,26 @@
     </div>
 
     <div class="card" style="margin-bottom: var(--card-gap)">
-      <div class="card-header"><span>Upload</span></div>
-      <div class="explorer-bar">
-        <div class="input-group">
-          <label for="newfile">Source</label>
-          <input id="newfile" type="file" onchange="setPath()" />
-          <button id="upload" type="button" class="button btn-action" onclick="uploadFile()">Upload</button>
-        </div>
-
-        <div class="input-group">
-          <label for="filepath">Destination</label>
-          <input id="filepath" type="text" readonly placeholder="-" />
-          <span></span>
-        </div>
-
-        <div class="nav-controls">
-          <div class="path-display">
-            <button class="button" id="dirup" type="button" onclick="dirup()" disabled>Directory up</button>
-            <span id="currentpath"></span>
-          </div>
-
-          <button class="button" id="saveZipButton" type="button" title="Save all files in actual path as ZIP file">
-            Save all files (ZIP)
-          </button>
-        </div>
+      <div class="bar">
+        <button class="button ghost" id="dirup" type="button" onclick="dirup()" disabled>Up</button>
+        <nav class="crumbs" id="crumbs" aria-label="Path"></nav>
+        <span class="grow"></span>
+        <input id="fileFilter" type="text" placeholder="Filter files" autocomplete="off" />
+        <button class="button" id="saveZipButton" type="button" title="Save all files in actual path as ZIP file">Save all (ZIP)</button>
       </div>
     </div>
+
+    <div class="card dz-card" style="margin-bottom: var(--card-gap)">
+      <div class="dropzone" id="dropZone" tabindex="0" role="button" aria-label="Upload files: drop files here or press Enter to browse">
+        <div class="dz-icon"></div>
+        <div class="dz-title">Drop files here</div>
+        <div class="dz-sub">or <span class="dz-link">browse</span> &middot; uploads to <b id="dzTarget">/</b></div>
+        <div class="dz-hint">Up to 16 MB per file. Existing files with the same name are replaced.</div>
+        <input id="newfile" type="file" multiple hidden />
+      </div>
+      <div class="queue" id="queue" hidden></div>
+    </div>
+
     <div class="container-content">
       <!-- The the remaining part of body is injected by firmware (server_file.cpp) -->
 
@@ -301,83 +463,283 @@
           firework.launch(`File saved: ${name}`, 'success', 3000);
         }
 
-        async function uploadFile() {
-          const fileInput = document.getElementById('newfile');
-          const uploadBtn = document.getElementById('upload');
-          const filePath = document.getElementById('filepath').value;
-
-          // Validation Logic
-          const MAX_FILE_SIZE = 16000 * 1024;
-          const MAX_FILE_SIZE_STR = '16MB';
-
-          if (fileInput.files.length === 0) return firework.launch('No file selected', 'danger', 5000);
-          if (!filePath) return firework.launch('File path on server is not set', 'danger', 5000);
-          if (filePath.length > 100) return firework.launch('File name is too long: max. 100 characters', 'danger', 5000);
-          if (filePath.includes(' ')) return firework.launch('File path on server cannot have spaces', 'danger', 5000);
-          if (filePath.endsWith('/')) return firework.launch('File name not specified after path', 'danger', 5000);
-          if (fileInput.files[0].size > MAX_FILE_SIZE) return firework.launch(`File size must be less than ${MAX_FILE_SIZE_STR}`, 'danger', 5000);
-
-          fileInput.disabled = true;
-          uploadBtn.disabled = true;
-
-          const res = await apiCallNotify('/upload' + filePath + '?overwrite=true', { method: 'POST', body: fileInput.files[0], timeout: 60000 },
-            {
-              action: 'Uploading',
-              loadingMsg: "Uploading file. Please wait..."
-            });
-
-          fileInput.disabled = false;
-          uploadBtn.disabled = false;
-
-          if (res.ok) {
-            firework.sticky('Uploading completed', 'success', 2000);
-            window.location.reload();
-          }
-        }
-
+        // ------------------------------------------------------------------ path helpers
         function getPath() {
           return window.location.pathname.replace(/\/+$/, '') + '/';
         }
 
-        function setPath() {
-          document.getElementById('filepath').value =
-            getPath().replace('/fileserver', '') + document.getElementById('newfile').files[0].name;
+        function currentDir() {
+          return getPath().replace('/fileserver', '') || '/';
         }
 
         function dirup() {
           let url = window.location.href;
-
-          // Remove any query or hash part first
           url = url.split('#')[0].split('?')[0];
+          if (url.endsWith('/')) url = url.slice(0, -1);
+          const lastSlashIndex = url.lastIndexOf('/');
+          if (lastSlashIndex > -1) window.location.href = url.substring(0, lastSlashIndex + 1) + '?full=false';
+        }
 
-          // Remove trailing slash if present
-          if (url.endsWith('/')) {
-            url = url.slice(0, -1);
+        function renderBreadcrumb() {
+          const host = document.getElementById('crumbs');
+          host.textContent = '';
+          const parts = currentDir().split('/').filter(Boolean);
+
+          const addLink = (text, href) => {
+            const a = document.createElement('a');
+            a.href = href;
+            a.textContent = text;
+            host.append(a);
+          };
+          const addSep = () => {
+            const sep = document.createElement('span');
+            sep.className = 'sep';
+            sep.textContent = '/';
+            host.append(sep);
+          };
+
+          let acc = '/fileserver';
+          if (parts.length === 0) {
+            const cur = document.createElement('span');
+            cur.className = 'current';
+            cur.textContent = 'SD card';
+            host.append(cur);
+          } else {
+            addLink('SD card', '/fileserver/?full=false');
+            parts.forEach((part, i) => {
+              addSep();
+              acc += '/' + part;
+              if (i === parts.length - 1) {
+                const cur = document.createElement('span');
+                cur.className = 'current';
+                cur.textContent = part;
+                host.append(cur);
+              } else {
+                addLink(part, acc + '/?full=false');
+              }
+            });
           }
 
-          // Remove the last path segment
-          const lastSlashIndex = url.lastIndexOf('/');
-          if (lastSlashIndex > -1) {
-            const parentUrl = url.substring(0, lastSlashIndex + 1) + '?full=false';
-            window.location.href = parentUrl;
+          document.getElementById('dirup').disabled = parts.length === 0;
+          document.getElementById('dzTarget').textContent = currentDir();
+        }
+
+        // ------------------------------------------------------------------ upload: drag and drop, queue with progress
+        const MAX_FILE_SIZE = 16000 * 1024;
+        const MAX_PATH_LENGTH = 100;
+        const queue = [];
+        let uploading = false;
+
+        function fmtSize(bytes) {
+          if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+          if (bytes >= 1024) return (bytes / 1024).toFixed(1) + ' KB';
+          return bytes + ' B';
+        }
+
+        function addToQueue(file) {
+          const item = { file, name: file.name, status: 'waiting' };
+
+          const row = document.createElement('div');
+          row.className = 'q-row';
+          const name = document.createElement('span');
+          name.className = 'q-name';
+          const size = document.createElement('span');
+          size.className = 'q-size';
+          size.textContent = fmtSize(file.size);
+          const status = document.createElement('span');
+          status.className = 'q-status';
+          const bar = document.createElement('div');
+          bar.className = 'q-bar';
+          const fill = document.createElement('i');
+          bar.append(fill);
+          row.append(name, size, status, bar);
+
+          item.setStatus = (text, cls = '') => {
+            status.textContent = text;
+            status.className = 'q-status ' + cls;
+            row.classList.toggle('done', cls === 'done');
+            row.classList.toggle('error', cls === 'error');
+          };
+          item.setName = (text) => {
+            name.textContent = text;
+            name.title = text;
+          };
+          item.setProgress = (pct) => {
+            fill.style.width = pct + '%';
+          };
+
+          item.setName(file.name);
+          item.setStatus('Waiting');
+          queue.push(item);
+
+          const host = document.getElementById('queue');
+          host.hidden = false;
+          host.append(row);
+          return item;
+        }
+
+        function uploadOne(item) {
+          return new Promise((resolve) => {
+            // spaces are not allowed in paths on the device
+            if (item.name.includes(' ')) {
+              item.name = item.name.replace(/\s+/g, '_');
+              item.setName(item.name + ' (renamed)');
+            }
+            const remotePath = currentDir() + item.name;
+
+            if (item.file.size > MAX_FILE_SIZE) {
+              item.setStatus('Larger than 16 MB', 'error');
+              item.status = 'error';
+              return resolve();
+            }
+            if (remotePath.length > MAX_PATH_LENGTH) {
+              item.setStatus('Path too long (max. 100 characters)', 'error');
+              item.status = 'error';
+              return resolve();
+            }
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/upload' + remotePath + '?overwrite=true');
+            xhr.withCredentials = true;
+            xhr.timeout = 120000;
+            item.setStatus('Uploading 0 %');
+
+            xhr.upload.onprogress = (e) => {
+              if (!e.lengthComputable) return;
+              const pct = Math.round((e.loaded / e.total) * 100);
+              item.setProgress(pct);
+              item.setStatus('Uploading ' + pct + ' %');
+            };
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                item.setProgress(100);
+                item.setStatus('Done', 'done');
+                item.status = 'done';
+              } else {
+                const detail = (xhr.responseText || '').trim().split('\n')[0].slice(0, 80);
+                item.setStatus(detail || 'Failed (HTTP ' + xhr.status + ')', 'error');
+                item.status = 'error';
+              }
+              resolve();
+            };
+            xhr.onerror = () => {
+              item.setStatus('Network error', 'error');
+              item.status = 'error';
+              resolve();
+            };
+            xhr.ontimeout = () => {
+              item.setStatus('Timed out', 'error');
+              item.status = 'error';
+              resolve();
+            };
+            xhr.send(item.file);
+          });
+        }
+
+        async function processQueue() {
+          if (uploading) return;
+          uploading = true;
+          for (const item of queue.filter((i) => i.status === 'waiting')) {
+            await uploadOne(item);
+          }
+          uploading = false;
+
+          const done = queue.filter((i) => i.status === 'done').length;
+          if (done > 0) {
+            firework.launch(done === 1 ? 'Upload completed' : done + ' files uploaded', 'success', 2500);
+            setTimeout(() => window.location.reload(), 1200);
           }
         }
 
-        function checkAtRootLevel(res) {
-          if (getPath() == '/fileserver/') {
-            // Already at root level
-            document.getElementById('dirup').disabled = true;
-            return true;
-          }
+        function addFiles(files) {
+          for (const file of files) addToQueue(file);
+          processQueue();
+        }
 
-          document.getElementById('dirup').disabled = false;
-          return false;
+        function setupDropZone() {
+          const zone = document.getElementById('dropZone');
+          const input = document.getElementById('newfile');
+
+          zone.addEventListener('click', () => input.click());
+          input.addEventListener('click', (e) => e.stopPropagation());
+          zone.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              input.click();
+            }
+          });
+          input.addEventListener('change', () => {
+            addFiles([...input.files]);
+            input.value = '';
+          });
+
+          // the whole page accepts drops, the zone lights up
+          let depth = 0;
+          document.addEventListener('dragenter', (e) => {
+            if (![...(e.dataTransfer?.types || [])].includes('Files')) return;
+            e.preventDefault();
+            depth++;
+            zone.classList.add('over');
+          });
+          document.addEventListener('dragover', (e) => {
+            if (![...(e.dataTransfer?.types || [])].includes('Files')) return;
+            e.preventDefault();
+          });
+          document.addEventListener('dragleave', () => {
+            depth = Math.max(0, depth - 1);
+            if (depth === 0) zone.classList.remove('over');
+          });
+          document.addEventListener('drop', (e) => {
+            if (![...(e.dataTransfer?.types || [])].includes('Files')) return;
+            e.preventDefault();
+            depth = 0;
+            zone.classList.remove('over');
+
+            const files = [];
+            const items = [...(e.dataTransfer.items || [])];
+            let folders = 0;
+            if (items.length && items[0].webkitGetAsEntry) {
+              items.forEach((it) => {
+                const entry = it.webkitGetAsEntry();
+                if (entry && entry.isDirectory) folders++;
+                else if (it.getAsFile()) files.push(it.getAsFile());
+              });
+            } else {
+              files.push(...e.dataTransfer.files);
+            }
+            if (folders) firework.launch('Folders cannot be uploaded. Drop files only', 'warning', 5000);
+            if (files.length) addFiles(files);
+          });
+        }
+
+        // ------------------------------------------------------------------ file list: filter, type chips
+        function setupFileList() {
+          const filter = document.getElementById('fileFilter');
+          filter.addEventListener('input', () => {
+            const q = filter.value.trim().toLowerCase();
+            document.querySelectorAll('#files_table tbody tr').forEach((row) => {
+              const name = (row.querySelector('td a')?.textContent || row.cells[0]?.textContent || '').toLowerCase();
+              row.style.display = !q || name.includes(q) ? '' : 'none';
+            });
+          });
+
+          document.querySelectorAll('#files_table tbody tr').forEach((row) => {
+            const typeCell = row.cells[1];
+            if (typeCell && !typeCell.querySelector('.chip')) {
+              const text = typeCell.textContent.trim();
+              const chip = document.createElement('span');
+              chip.className = 'chip';
+              chip.textContent = text;
+              typeCell.textContent = '';
+              typeCell.append(chip);
+            }
+          });
         }
 
         window.addEventListener('DOMContentLoaded', function () {
-          checkAtRootLevel();
-          document.getElementById('currentpath').innerHTML =
-            'Path: <b>' + getPath().replace('/fileserver', '') + '</b>';
+          renderBreadcrumb();
+          setupDropZone();
+          setupFileList();
           document.cookie = 'page=' + getPath() + '?full=false;path=/;SameSite=Lax';
         });
 
