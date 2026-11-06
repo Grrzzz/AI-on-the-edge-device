@@ -18,6 +18,9 @@
 
 static const char *TAG = "CFGLEGACY";
 
+// Model files named in config.ini (firmware v16 kept them in /config, newer firmware expects /config/models)
+static std::vector<std::string> legacyModelFiles;
+
 
 namespace {
 
@@ -358,6 +361,7 @@ bool legacyIniToJson(std::string &json)
 
     j.boolean({"digit"}, "enabled", !digits.sequenceOrder.empty());
     j.str({"digit"}, "model", modelByPrefix(digitsSec, "dig"));
+    if (!modelByPrefix(digitsSec, "dig").empty()) legacyModelFiles.push_back(modelByPrefix(digitsSec, "dig"));
     if (asNumber(firstValue(digitsSec, "CNNGoodThreshold"), n)) j.str({"digit"}, "cnngoodthreshold", formatFixed(n, 2));
     if (digits.rois.count(sequenceName)) {
         cJSON *arr = cJSON_AddArrayToObject(child(root, "digit"), "sequence");
@@ -367,6 +371,7 @@ bool legacyIniToJson(std::string &json)
     j.boolean({"analog"}, "enabled", analogSec != nullptr && !analog.sequenceOrder.empty());
     if (analogSec && !analog.sequenceOrder.empty()) {
         j.str({"analog"}, "model", modelByPrefix(analogSec, "ana"));
+        if (!modelByPrefix(analogSec, "ana").empty()) legacyModelFiles.push_back(modelByPrefix(analogSec, "ana"));
         if (analog.rois.count(sequenceName)) {
             cJSON *arr = cJSON_AddArrayToObject(child(root, "analog"), "sequence");
             cJSON_AddItemToArray(arr, roiSequenceJson(sequenceName, analog.rois.at(sequenceName), true));
@@ -585,6 +590,25 @@ void legacyIniFinishMigration()
             }
         }
     }
+
+    // Model files: /config/<model> -> /config/models/<model>
+    for (const std::string &model : legacyModelFiles) {
+        const std::string source = "/sdcard/config/" + model;
+        const std::string target = "/sdcard/config/models/" + model;
+        if (fileExists(target)) {
+            continue;
+        }
+        if (!fileExists(source)) {
+            LogFile.writeToFile(ESP_LOG_WARN, TAG, "Model file not found, upload it to /config/models: " + model);
+        }
+        else if (copyFile(source, target)) {
+            LogFile.writeToFile(ESP_LOG_INFO, TAG, "Model file copied: " + source + " -> " + target);
+        }
+        else {
+            LogFile.writeToFile(ESP_LOG_WARN, TAG, "Failed to copy model file: " + source);
+        }
+    }
+    legacyModelFiles.clear();
 
     migratePrevalue();
 
