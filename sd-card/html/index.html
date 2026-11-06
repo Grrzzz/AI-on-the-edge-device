@@ -18,7 +18,7 @@
   </script>
 
   <link rel="icon" type="image/x-icon" href="favicon.ico?v=$COMMIT_HASH" />
-  <link rel="icon" type="image/svg+xml" href="icon.svg?v=$COMMIT_HASH" />
+  <link rel="icon" type="image/svg+xml" id="favicon-svg" href="icon.svg?v=$COMMIT_HASH" />
   <link rel="apple-touch-icon" sizes="180x180" href="/icon-apple-touch.png?v=$COMMIT_HASH" />
   <link rel="manifest" type="application/manifest+json" href="/site.webmanifest?v=$COMMIT_HASH" />
   <link rel="stylesheet" href="style.css?v=$COMMIT_HASH" />
@@ -41,20 +41,7 @@
   <div class="app" id="app">
     <aside class="sidebar" id="sidebar">
       <div class="brand">
-        <svg class="brand-logo" viewBox="0 0 64 64" aria-hidden="true">
-          <defs>
-            <linearGradient id="brand-grad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#4f46e5" />
-              <stop offset="1" stop-color="#7c83ff" />
-            </linearGradient>
-          </defs>
-          <rect width="64" height="64" rx="15" fill="url(#brand-grad)" />
-          <g fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M11 21V11h10M43 11h10v10M53 43v10H43M21 53H11V43" />
-            <circle cx="32" cy="32" r="11.5" />
-          </g>
-          <circle cx="32" cy="32" r="4.5" fill="#fff" />
-        </svg>
+        <div class="brand-logo" id="brand-logo"></div>
         <div class="brand-text">
           <h1 class="brand-title">AI-on-the-Edge</h1>
           <div class="brand-sub" id="device-name">Loading...</div>
@@ -86,14 +73,7 @@
         </div>
         <div class="cycle-state">
           <span class="cycle-dot"></span>
-          <svg class="scan-icon cycle-scan" viewBox="0 0 64 64" aria-hidden="true">
-            <g class="scan-corners" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M11 21V11h10M43 11h10v10M53 43v10H43M21 53H11V43" />
-            </g>
-            <circle class="scan-lens" cx="32" cy="32" r="11.5" fill="none" stroke="currentColor" stroke-width="5" />
-            <circle class="scan-pupil" cx="32" cy="32" r="4.5" fill="currentColor" />
-            <rect class="scan-line" x="12" y="30" width="40" height="4" rx="2" fill="currentColor" />
-          </svg>
+          <span class="cycle-scan" id="cycle-scan"></span>
           <span id="cycle-state">Connecting ...</span>
         </div>
         <div class="cycle-timer" id="cycle-timer">&nbsp;</div>

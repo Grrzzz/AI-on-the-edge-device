@@ -12,6 +12,9 @@
 
 static const char *TAG = "IMG_TPLMATCH";
 
+// Upper limit of the temporarily widened search field [pixel]
+#define ALIGN_WIDENED_SEARCH_MAX 60
+
 
 TplMatchStatus IRAM_ATTR CImageTplMatch::invokeTplMatch(CImage &img, CImage &imgTarget, AlignmentMarker &marker1, AlignmentMarker &marker2,
                                                         TplMatchAlgorithm tplMatchAlgorithm)
@@ -26,6 +29,25 @@ TplMatchStatus IRAM_ATTR CImageTplMatch::invokeTplMatch(CImage &img, CImage &img
         return TPL_MATCH_ERROR_IMAGE;
     }
 
+    // The search fields of the markers are widened temporarily (see below) and restored when leaving this function
+    struct SearchFieldGuard {
+        AlignmentMarker &m1, &m2;
+        const int x1, y1, x2, y2;
+        SearchFieldGuard(AlignmentMarker &a, AlignmentMarker &b) : m1(a), m2(b), x1(a.searchX), y1(a.searchY), x2(b.searchX), y2(b.searchY) {}
+        ~SearchFieldGuard()
+        {
+            m1.searchX = x1;
+            m1.searchY = y1;
+            m2.searchX = x2;
+            m2.searchY = y2;
+        }
+    } searchFieldGuard(marker1, marker2);
+
+    // A best match on the border of the search field usually means that the real marker is just outside of it
+    auto atBorder = [](const AlignmentMarker &m) {
+        return abs(m.targetX - m.foundX) >= m.searchX || abs(m.targetY - m.foundY) >= m.searchY;
+    };
+
     switch (tplMatchAlgorithm) {
         case TplMatchAlgorithm::SAD: {
             TplMatchStatus retVal = tplMatchBySad(img, marker1);
@@ -36,6 +58,33 @@ TplMatchStatus IRAM_ATTR CImageTplMatch::invokeTplMatch(CImage &img, CImage &img
             retVal = tplMatchBySad(img, marker2);
             if (retVal != TPL_MATCH_OK) {
                 return retVal;
+            }
+
+            // Tolerant validation: Instead of failing right away, search once more with a wider field (only for the marker(s) at the border)
+            const bool border1 = atBorder(marker1);
+            const bool border2 = atBorder(marker2);
+            if (border1 || border2) {
+                LogFile.writeToFile(ESP_LOG_WARN, TAG,
+                                    "Alignment: Marker at the border of the search field, retry with wider search field (" +
+                                        std::string(border1 ? "marker 1 " : "") + std::string(border2 ? "marker 2" : "") + ")");
+                auto widen = [](AlignmentMarker &m) {
+                    m.searchX = std::min(std::max(m.searchX * 2, m.searchX + 20), ALIGN_WIDENED_SEARCH_MAX);
+                    m.searchY = std::min(std::max(m.searchY * 2, m.searchY + 20), ALIGN_WIDENED_SEARCH_MAX);
+                };
+                if (border1) {
+                    widen(marker1);
+                    retVal = tplMatchBySad(img, marker1);
+                    if (retVal != TPL_MATCH_OK) {
+                        return retVal;
+                    }
+                }
+                if (border2) {
+                    widen(marker2);
+                    retVal = tplMatchBySad(img, marker2);
+                    if (retVal != TPL_MATCH_OK) {
+                        return retVal;
+                    }
+                }
             }
             break;
         }

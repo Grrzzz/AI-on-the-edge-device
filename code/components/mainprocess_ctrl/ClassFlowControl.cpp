@@ -616,29 +616,75 @@ bool ClassFlowControl::setFallbackValue(std::string _sequenceName, std::string _
 }
 
 
+// State images of the dashboard follow the meter type of the MQTT settings: flowstate_<theme>_<state>.jpg,
+// the generic image flowstate_<state>.jpg is the fallback
+static std::string flowStateImage(const char *state)
+{
+    const char *theme = "";
+    switch (ConfigClass::getInstance()->get()->sectionMqtt.homeAssistant.meterType) {
+        case 1:
+        case 2:
+        case 3:
+        case 4:
+        case 15:
+        case 16:
+            theme = "water_";
+            break;
+        case 5:
+        case 6:
+            theme = "gas_";
+            break;
+        case 7:
+        case 8:
+        case 9:
+        case 10:
+            theme = "energy_";
+            break;
+        case 11:
+        case 12:
+            theme = "temperature_";
+            break;
+        case 13:
+        case 14:
+            theme = "pressure_";
+            break;
+        default:
+            break;
+    }
+
+    if (theme[0] != '\0') {
+        const std::string themed = std::string("/sdcard/html/flowstate_") + theme + state + ".jpg";
+        if (fileExists(themed)) {
+            return themed;
+        }
+    }
+    return std::string("/sdcard/html/flowstate_") + state + ".jpg";
+}
+
+
 esp_err_t ClassFlowControl::sendProcessImages(httpd_req_t *req, const char *filename)
 {
     if (strcmp("alg_roi.jpg", filename) == 0) { // Process state images or aligned image with overlays (ROI)
         if (getTaskAutoFlowState() == FLOW_TASK_STATE_INIT_DELAYED) {
-            return sendFile(req, "/sdcard/html/flowstate_initialization_delayed.jpg", true);
+            return sendFile(req, flowStateImage("initialization_delayed"), true);
         }
         else if (getTaskAutoFlowState() == FLOW_TASK_STATE_INIT) {
-            return sendFile(req, "/sdcard/html/flowstate_initialization.jpg", true);
+            return sendFile(req, flowStateImage("initialization"), true);
         }
         else if (getTaskAutoFlowState() == FLOW_TASK_STATE_SETUPMODE) {
-            return sendFile(req, "/sdcard/html/flowstate_setup_mode.jpg", true);
+            return sendFile(req, flowStateImage("setup_mode"), true);
         }
         // Show only before first cycle started or error occurred, otherwise result will be shown till next start
         else if ((getActualProcessState() == std::string(FLOW_IDLE_NO_AUTOSTART) && (flowtakeimage != NULL) &&
                   !flowtakeimage->getFlowState()->getExecuted) ||
                  (getActualProcessState() == std::string(FLOW_TAKE_IMAGE) && !isAutoStart() && flowStateEventOccurred())) {
-            return sendFile(req, "/sdcard/html/flowstate_idle_no_autostart.jpg", true);
+            return sendFile(req, flowStateImage("idle_no_autostart"), true);
         }
         else if (getActualProcessState() == std::string(FLOW_TAKE_IMAGE) && isAutoStart() && flowStateEventOccurred()) {
-            return sendFile(req, "/sdcard/html/flowstate_idle_autostart.jpg", true);
+            return sendFile(req, flowStateImage("idle_autostart"), true);
         }
         else if (getActualProcessState() == std::string(FLOW_TAKE_IMAGE)) {
-            return sendFile(req, "/sdcard/html/flowstate_take_image.jpg", true);
+            return sendFile(req, flowStateImage("take_image"), true);
         }
         else { // Show actual image taken for all other states
             if (flowImageData && flowImageData->imgVisu->isValid()) {

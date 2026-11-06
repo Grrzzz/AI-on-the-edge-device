@@ -110,9 +110,13 @@ body {
 .brand-logo {
   width: 42px;
   height: 42px;
-  border-radius: 12px;
-  object-fit: contain;
   flex-shrink: 0;
+}
+
+.brand-logo svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .brand-text {
@@ -402,14 +406,13 @@ body {
 /* Animated scan icon (camera takes the picture): sidebar, dashboard loader, toasts */
 .scan-icon {
   flex: none;
-  color: var(--primary);
+  color: var(--meter-accent, var(--primary));
   overflow: visible;
   vertical-align: -4px;
 }
 
 .scan-icon .scan-corners,
-.scan-icon .scan-lens,
-.scan-icon .scan-pupil {
+.scan-icon .scan-glyph {
   transform-origin: 32px 32px;
 }
 
@@ -417,12 +420,8 @@ body {
   animation: scan-breathe 1.3s ease-in-out infinite;
 }
 
-.scan-icon .scan-lens {
-  animation: scan-breathe 1.3s ease-in-out infinite reverse;
-}
-
-.scan-icon .scan-pupil {
-  animation: scan-pupil 1.3s ease-in-out infinite;
+.scan-icon .scan-glyph {
+  animation: scan-pulse 1.3s ease-in-out infinite;
 }
 
 .scan-icon .scan-line {
@@ -432,9 +431,9 @@ body {
 /* sidebar: replaces the status dot while the image is taken */
 .cycle-scan {
   display: none;
+  flex: none;
   width: 20px;
   height: 20px;
-  vertical-align: baseline;
 }
 
 .cycle[data-phase='capture'] .cycle-dot {
@@ -442,7 +441,7 @@ body {
 }
 
 .cycle[data-phase='capture'] .cycle-scan {
-  display: block;
+  display: inline-flex;
 }
 
 @keyframes scan-breathe {
@@ -450,9 +449,9 @@ body {
   50% { transform: scale(0.88); }
 }
 
-@keyframes scan-pupil {
+@keyframes scan-pulse {
   0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.6); opacity: 0.5; }
+  50% { transform: scale(1.12); opacity: 0.6; }
 }
 
 @keyframes scan-sweep {
@@ -463,8 +462,7 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .scan-icon .scan-corners,
-  .scan-icon .scan-lens,
-  .scan-icon .scan-pupil,
+  .scan-icon .scan-glyph,
   .scan-icon .scan-line {
     animation: none;
   }
