@@ -9413,17 +9413,49 @@ const App = (() => {
   /* ---------------------------------------------------------------------- */
   /* WLAN scan dialog                                                        */
   /* ---------------------------------------------------------------------- */
-  function signalClass(network) {
-    const rssi = network.rssi;
-    let cls = rssi >= -55 ? 'cfg-q-4' : rssi >= -67 ? 'cfg-q-3' : rssi >= -78 ? 'cfg-q-2' : rssi >= -85 ? 'cfg-q-1' : 'cfg-q-0';
-    if (network.authmode !== 'OPEN') cls += ' cfg-q-l'; // lock symbol
-    return cls;
+  // 0..4 active bars of the signal strength, thresholds as in the dashboard
+  const signalBars = (rssi) => (rssi >= -55 ? 4 : rssi >= -67 ? 3 : rssi >= -78 ? 2 : rssi >= -85 ? 1 : 0);
+
+  function signalIcon(bars, secured) {
+    const svgNs = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNs, 'svg');
+    svg.setAttribute('viewBox', '0 0 40 16');
+    svg.setAttribute('class', 'cfg-scan-icon');
+    svg.setAttribute('aria-hidden', 'true');
+    const add = (tag, attrs, cls) => {
+      const el = document.createElementNS(svgNs, tag);
+      for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+      if (cls) el.setAttribute('class', cls);
+      svg.append(el);
+    };
+    if (secured) {
+      add('rect', { x: 0, y: 7, width: 9, height: 8, rx: 1.5 }, 'cfg-scan-lock');
+      add('path', { d: 'M2 7V5a2.5 2.5 0 0 1 5 0v2', fill: 'none', 'stroke-width': 1.5 }, 'cfg-scan-lock');
+    }
+    for (let i = 0; i < 4; i++) {
+      add('rect', { x: 15 + i * 6.5, y: 15 - (i + 1) * 3.5, width: 4.5, height: (i + 1) * 3.5, rx: 1 }, i < bars ? 'cfg-scan-bar on' : 'cfg-scan-bar');
+    }
+    return svg;
+  }
+
+  // Visible networks only, one entry per SSID (the strongest), strongest first
+  function cleanNetworks(networks) {
+    const best = new Map();
+    for (const n of networks) {
+      const ssid = String(n.ssid ?? '').trim();
+      if (!ssid) continue; // hidden network without name
+      const known = best.get(ssid);
+      if (!known || n.rssi > known.rssi) best.set(ssid, { ...n, ssid });
+    }
+    return [...best.values()].sort((x, y) => y.rssi - x.rssi);
   }
 
   async function runScan(s) {
     const list = s.scanDlg.querySelector('.cfg-scan-list');
     const token = ++s.scanToken;
-    list.replaceChildren(App.el('div', '', 'Scanning...'));
+    const scanBtn = s.scanDlg.querySelector('[data-action=run-scan]');
+    scanBtn.disabled = true;
+    list.replaceChildren(App.el('div', 'cfg-scan-empty', 'Scanning ...'));
     let networks = [];
     try {
       networks = await Api.config.wlanScan();
@@ -9431,25 +9463,31 @@ const App = (() => {
       networks = [];
     }
     if (s.dead || token !== s.scanToken) return;
+    scanBtn.disabled = false;
     list.replaceChildren();
-    if (!networks.length) {
-      list.append(App.el('div', '', 'No networks found'));
+
+    const visible = cleanNetworks(networks);
+    if (!visible.length) {
+      list.append(App.el('div', 'cfg-scan-empty', 'No networks found'));
       return;
     }
-    for (const n of networks) {
-      const wrapper = App.el('div', 'cfg-scan-item');
+    const current = (s.byId[WLAN_SSID_ID]?.el.value || '').trim();
+    for (const n of visible) {
       // SSIDs come from the air: textContent only
-      const link = App.el('button', 'cfg-scan-ssid', n.ssid);
-      link.type = 'button';
-      link.dataset.action = 'pick-ssid';
-      link.dataset.ssid = n.ssid;
-      const signal = App.el('div', 'cfg-q ' + signalClass(n));
-      const label = `${n.rssi}dBm | CH${n.channel} | ${n.authmode}`;
-      signal.setAttribute('role', 'img');
-      signal.setAttribute('aria-label', label);
-      signal.title = label;
-      wrapper.append(link, signal);
-      list.append(wrapper);
+      const row = App.el('button', 'cfg-scan-item');
+      row.type = 'button';
+      row.dataset.action = 'pick-ssid';
+      row.dataset.ssid = n.ssid;
+
+      const text = App.el('span', 'cfg-scan-text');
+      const name = App.el('span', 'cfg-scan-ssid', n.ssid);
+      if (n.ssid === current) name.append(App.el('span', 'cfg-scan-current', 'current'));
+      const secured = n.authmode !== 'OPEN';
+      text.append(name, App.el('span', 'cfg-scan-meta', `Channel ${n.channel} \u00b7 ${n.rssi} dBm \u00b7 ${secured ? n.authmode : 'Open'}`));
+
+      const icon = signalIcon(signalBars(n.rssi), secured);
+      row.append(text, icon);
+      list.append(row);
     }
   }
 

@@ -4618,10 +4618,13 @@ a .rst-content .admonition-title {
 
 /* ------------------------------------------------------------ WLAN scan dialog */
 .cfg dialog.cfg-scan .cfg-scan-list {
-  min-width: min(350px, 70vw);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: min(380px, 78vw);
   max-height: 50vh;
   overflow-y: auto;
-  margin: 8px 0 12px;
+  margin: 12px 0 16px;
   text-align: left;
 }
 
@@ -4629,67 +4632,86 @@ a .rst-content .admonition-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 4px 0;
+  gap: 16px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: var(--bg-card);
+  color: var(--text-main);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition-speed), background var(--transition-speed);
+}
+
+.cfg dialog.cfg-scan .cfg-scan-item:hover,
+.cfg dialog.cfg-scan .cfg-scan-item:focus-visible {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  outline: none;
+}
+
+.cfg dialog.cfg-scan .cfg-scan-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .cfg dialog.cfg-scan .cfg-scan-ssid {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--primary);
-  font: inherit;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 600;
-  text-align: left;
-  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.cfg dialog.cfg-scan .cfg-scan-ssid:hover {
-  text-decoration: underline;
+.cfg dialog.cfg-scan .cfg-scan-current {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 600;
 }
 
-/* signal strength icons (sprite of the old page): bars q-0..q-4, lock symbol q-l */
-.cfg dialog.cfg-scan .cfg-q {
-  float: right;
+.cfg dialog.cfg-scan .cfg-scan-meta {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.cfg dialog.cfg-scan .cfg-scan-empty {
+  padding: 18px 8px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+/* signal strength: four bars, secured networks show a lock */
+.cfg dialog.cfg-scan .cfg-scan-icon {
+  flex: none;
+  width: 40px;
   height: 16px;
-  margin: 0;
-  padding: 0 5px;
-  text-align: right;
-  min-width: 38px;
 }
 
-.cfg dialog.cfg-scan .cfg-q.cfg-q-0::after { background-position-x: 0; }
-.cfg dialog.cfg-scan .cfg-q.cfg-q-1::after { background-position-x: -16px; }
-.cfg dialog.cfg-scan .cfg-q.cfg-q-2::after { background-position-x: -32px; }
-.cfg dialog.cfg-scan .cfg-q.cfg-q-3::after { background-position-x: -48px; }
-.cfg dialog.cfg-scan .cfg-q.cfg-q-4::after { background-position-x: -64px; }
-
-.cfg dialog.cfg-scan .cfg-q.cfg-q-l::before {
-  background-position-x: -80px;
-  padding-right: 5px;
+.cfg dialog.cfg-scan .cfg-scan-bar {
+  fill: var(--border);
 }
 
-.cfg dialog.cfg-scan .cfg-q::after,
-.cfg dialog.cfg-scan .cfg-q::before {
-  content: '';
-  width: 16px;
-  height: 16px;
-  display: inline-block;
-  background-repeat: no-repeat;
-  background-position: 16px 0;
-  background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAAAQCAMAAADeZIrLAAAAJFBMVEX///8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADHJj5lAAAAC3RSTlMAIjN3iJmqu8zd7vF8pzcAAABsSURBVHja7Y1BCsAwCASNSVo3/v+/BUEiXnIoXkoX5jAQMxTHzK9cVSnvDxwD8bFx8PhZ9q8FmghXBhqA1faxk92PsxvRc2CCCFdhQCbRkLoAQ3q/wWUBqG35ZxtVzW4Ed6LngPyBU2CobdIDQ5oPWI5nCUwAAAAASUVORK5CYII=');
+.cfg dialog.cfg-scan .cfg-scan-bar.on {
+  fill: var(--primary);
 }
 
-.cfg.cfg-dark dialog.cfg-scan .cfg-q {
-  filter: invert(1);
+.cfg dialog.cfg-scan .cfg-scan-lock {
+  fill: var(--text-secondary);
+  stroke: var(--text-secondary);
 }
 
-@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
-  .cfg dialog.cfg-scan .cfg-q::before,
-  .cfg dialog.cfg-scan .cfg-q::after {
-    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALwAAAAgCAMAAACfM+KhAAAALVBMVEX///8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAOrOgAAAADnRSTlMAESIzRGZ3iJmqu8zd7gKjCLQAAACmSURBVHgB7dDBCoMwEEXRmKlVY3L//3NLhyzqIqSUggy8uxnhCR5Mo8xLt+14aZ7wwgsvvPA/ofv9+44334UXXngvb6XsFhO/VoC2RsSv9J7x8BnYLW+AjT56ud/uePMdb7IP8Bsc/e7h8Cfk912ghsNXWPpDC4hvN+D1560A1QPORyh84VKLjjdvfPFm++i9EWq0348XXnjhhT+4dIbCW+WjZim9AKk4UZMnnCEuAAAAAElFTkSuQmCC');
-    background-size: 95px 16px;
-  }
+.cfg dialog.cfg-scan .cfg-scan-lock[fill='none'] {
+  fill: none;
 }
 
 /* ------------------------------------------------------------ narrow screens */
