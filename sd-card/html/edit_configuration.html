@@ -97,8 +97,56 @@
       display: none;
     }
 
-    .cfg-panels > .card.active {
+    .cfg-panels > .card.in-section {
       display: block;
+    }
+
+    /* Basic view: rarely needed settings are hidden until "Advanced settings" is switched on */
+    .cfg-layout:not(.show-adv) .card.adv,
+    .cfg-layout:not(.show-adv) tr.adv {
+      display: none;
+    }
+
+    /* Settings that live elsewhere now (Setup > Image) or are obsolete */
+    tr.dup,
+    tr.obsolete {
+      display: none;
+    }
+
+    .cfg-note {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px 16px;
+      flex-wrap: wrap;
+      padding: 14px 18px;
+      background: var(--info-box-bg);
+      border-left: 4px solid var(--info-box-border);
+      border-radius: var(--input-radius);
+      font-size: 0.92rem;
+    }
+
+    .cfg-note .button {
+      width: auto;
+      padding: 7px 16px;
+    }
+
+    .adv-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin: 12px 0 0 10px;
+      padding: 5px 14px 5px 6px;
+      border-radius: 999px;
+      background: var(--surface);
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .adv-toggle input {
+      margin: 0 0 0 8px;
     }
 
     #apply-buttons {
@@ -216,13 +264,15 @@
     }
 
     .indent1 {
-      padding-left: 28px !important;
+      padding-left: 22px !important;
       font-size: inherit;
+      box-shadow: inset 2px 0 0 var(--border);
     }
 
     .indent2 {
-      padding-left: 52px !important;
+      padding-left: 34px !important;
       font-size: inherit;
+      box-shadow: inset 2px 0 0 var(--border);
     }
 
     .field-icon {
@@ -2884,12 +2934,85 @@
         .finally(() => SaveBar.busy(false));
     }
 
-    // Section navigation: one section (card) at a time
+    // ------------------------------------------------------------------------
+    // Sections: a few topics instead of twelve cards. Rare settings sit behind "Advanced settings".
+    // ------------------------------------------------------------------------
+    // card indexes: 0 Operation, 1 Take Image, 2 Alignment, 3 Digit, 4 Analog, 5 Post-processing, 6 MQTT, 7 GPIO,
+    //               8 Log, 9 Network, 10 System, 11 WebUI
     const CONFIG_SECTIONS = [
-      { group: 'Device', items: [['Operation', 0], ['Network', 9], ['System', 10], ['WebUI', 11], ['Log', 8], ['GPIO', 7]] },
-      { group: 'Recognition', items: [['Image capturing', 1], ['Image alignment', 2], ['Digit ROIs', 3], ['Analog ROIs', 4], ['Post-processing', 5]] },
-      { group: 'Integrations', items: [['MQTT', 6]] },
+      { group: 'Basics', items: [{ label: 'General', cards: [0, 11, 8, 10] }, { label: 'Network', cards: [9] }] },
+      { group: 'Recognition', items: [{ label: 'Recognition', cards: [2, 3, 4, 5], note: true }] },
+      { group: 'Integrations', items: [{ label: 'MQTT', cards: [6] }] },
+      { group: 'Advanced', adv: true, items: [{ label: 'Camera', cards: [1] }, { label: 'GPIO', cards: [7] }] },
     ];
+
+    // whole cards that only show in the advanced view
+    const ADV_CARDS = [1, 7, 8, 10];
+
+    // rows (by parameter id) that only show in the advanced view
+    const ADV_ROWS = [
+      'operationmode_usedemoimages',
+      'network_wlan_wlanroaming_enabled', 'network_time_processstartinterlock',
+      'imagealignment_searchfield_x', 'imagealignment_searchfield_y', 'imagealignment_debug_savedebuginfo',
+      'digit_debug_saveroiimages', 'analog_debug_saveroiimages', 'postprocessing_debug_savedebuginfo',
+      'mqtt_clientid', 'mqtt_tls_servercertverification', 'mqtt_retainprocessdata',
+      'mqtt_homeassistant_discoveryprefix', 'mqtt_homeassistant_statustopic', 'mqtt_homeassistant_retaindiscovery',
+      'takeimage_flashlightgpiomapping', 'takeimage_camera_camerafrequency', 'takeimage_camera_imagequality', 'takeimage_debug_saverawimages',
+    ];
+
+    // rows that are configured under Setup > Image now (kept in the form, but not shown here)
+    const DUPLICATE_ROWS = [
+      'takeimage_flashlight_flashtime', 'takeimage_flashlight_flashintensity',
+      'takeimage_camera_brightness', 'takeimage_camera_contrast', 'takeimage_camera_saturation', 'takeimage_camera_sharpness',
+      'takeimage_camera_exposurecontrolmode', 'takeimage_camera_autoexposurelevel', 'takeimage_camera_manualexposurevalue',
+      'takeimage_camera_gaincontrolmode', 'takeimage_camera_manualgainvalue', 'takeimage_camera_specialeffect',
+      'takeimage_camera_mirrorimage', 'takeimage_camera_flipimage',
+      'takeimage_camera_zoomfactor', 'takeimage_camera_zoomoffsetx', 'takeimage_camera_zoomoffsety',
+      'imagealignment_imagerotation',
+    ];
+
+    // obsolete: the dashboard refreshes itself every 5 seconds, charts / table are gone
+    const OBSOLETE_ROWS = ['webui_autorefresh_dashboard_enabled', 'webui_autorefresh_dashboard_refreshtime'];
+
+    function markRows(ids, cls) {
+      for (const id of ids) {
+        const el = document.getElementById(id + '_value');
+        const row = el && el.closest('tr');
+        if (row) row.classList.add(cls);
+      }
+    }
+
+    // Group headings (<th>) without any visible row below them are hidden
+    function updateEmptyGroups() {
+      document.querySelectorAll('#divcontent table.table').forEach((table) => {
+        let heading = null;
+        let visible = 0;
+        const flush = () => {
+          if (heading) heading.style.display = visible ? '' : 'none';
+        };
+        // a heading is a <th> row or a single full-width cell with bold text (e.g. "Debug")
+        const isHeading = (row) => !!row.querySelector('th') || (row.cells.length === 1 && row.cells[0].colSpan >= 2 && !!row.cells[0].querySelector('b'));
+        for (const row of table.rows) {
+          if (isHeading(row)) {
+            flush();
+            heading = row;
+            visible = 0;
+            row.style.display = '';
+          } else if (getComputedStyle(row).display !== 'none') {
+            visible++;
+          }
+        }
+        flush();
+      });
+    }
+
+    function openSetup(tab) {
+      try {
+        window.parent.loadPage('edit_setup.html?v=$COMMIT_HASH#' + tab);
+      } catch (e) {
+        window.location.href = 'edit_setup.html#' + tab;
+      }
+    }
 
     function buildSectionNav() {
       const content = document.getElementById('divcontent');
@@ -2899,8 +3022,28 @@
       const apply = document.getElementById('apply-buttons');
       if (cards.length !== 12 || !apply) return; // unexpected structure: keep the plain list
 
+      markRows(ADV_ROWS, 'adv');
+      markRows(DUPLICATE_ROWS, 'dup');
+      markRows(OBSOLETE_ROWS, 'obsolete');
+      ADV_CARDS.forEach((i) => cards[i].classList.add('adv'));
+
       const panels = document.createElement('div');
       panels.className = 'cfg-panels';
+
+      // pointer to the settings that moved to the Setup page
+      const note = document.createElement('div');
+      note.className = 'cfg-note';
+      note.hidden = true;
+      const noteText = document.createElement('span');
+      noteText.textContent = 'Camera image settings (zoom, brightness, exposure, flash), alignment markers and ROIs are set up on the Setup page.';
+      const noteBtn = document.createElement('button');
+      noteBtn.type = 'button';
+      noteBtn.className = 'button';
+      noteBtn.textContent = 'Open Setup';
+      noteBtn.onclick = () => openSetup('image');
+      note.append(noteText, noteBtn);
+      panels.append(note);
+
       cards.forEach((c) => panels.append(c));
       panels.append(apply);
 
@@ -2908,34 +3051,72 @@
       nav.className = 'cfg-nav';
       nav.setAttribute('aria-label', 'Configuration sections');
 
-      const show = (idx) => {
-        cards.forEach((c, i) => c.classList.toggle('active', i === idx));
-        nav.querySelectorAll('button').forEach((b) => b.classList.toggle('active', Number(b.dataset.idx) === idx));
-        try { sessionStorage.setItem('cfgSection', String(idx)); } catch (e) { }
+      const items = [];
+      let current = null;
+
+      const showSection = (item) => {
+        current = item;
+        cards.forEach((c, i) => c.classList.toggle('in-section', item.cards.includes(i)));
+        // keep the order of the cards as defined for the section
+        item.cards.forEach((i) => panels.append(cards[i]));
+        panels.append(apply);
+        note.hidden = !item.note;
+        if (item.note) panels.prepend(note);
+        items.forEach((it) => it.btn.classList.toggle('active', it === item));
+        try { sessionStorage.setItem('cfgSection2', item.label); } catch (e) { }
+        updateEmptyGroups();
       };
 
       for (const g of CONFIG_SECTIONS) {
         const label = document.createElement('div');
         label.className = 'cfg-nav-group';
         label.textContent = g.group;
+        if (g.adv) label.dataset.adv = '1';
         nav.append(label);
-        for (const [text, idx] of g.items) {
+        for (const it of g.items) {
           const b = document.createElement('button');
           b.type = 'button';
-          b.textContent = text;
-          b.dataset.idx = idx;
-          b.onclick = () => show(idx);
+          b.textContent = it.label;
+          if (g.adv) b.dataset.adv = '1';
+          const item = { ...it, btn: b, adv: !!g.adv, groupLabel: label };
+          b.onclick = () => showSection(item);
+          items.push(item);
           nav.append(b);
         }
       }
+
+      // advanced toggle (remembered)
+      const toggle = document.createElement('label');
+      toggle.className = 'adv-toggle';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      try { cb.checked = localStorage.getItem('cfgAdvanced') === '1'; } catch (e) { }
+      toggle.append('Advanced settings', cb);
+      const header = document.querySelector('.container-header');
+      const details = document.getElementById('desc_details');
+      if (header) (details || header).after(toggle);
+
+      const applyAdvanced = () => {
+        content.classList.toggle('show-adv', cb.checked);
+        nav.querySelectorAll('[data-adv]').forEach((el) => { el.hidden = !cb.checked; });
+        try { localStorage.setItem('cfgAdvanced', cb.checked ? '1' : '0'); } catch (e) { }
+        if (current && current.adv && !cb.checked) showSection(items[0]);
+        updateEmptyGroups();
+      };
+      cb.addEventListener('change', applyAdvanced);
 
       content.classList.add('cfg-layout');
       content.prepend(nav);
       content.append(panels);
 
-      let start = 0;
-      try { start = parseInt(sessionStorage.getItem('cfgSection') ?? '0', 10) || 0; } catch (e) { }
-      show(start >= 0 && start < cards.length ? start : 0);
+      let start = items[0];
+      try {
+        const saved = sessionStorage.getItem('cfgSection2');
+        start = items.find((it) => it.label === saved) || items[0];
+      } catch (e) { }
+      applyAdvanced();
+      if (start.adv && !cb.checked) start = items[0];
+      showSection(start);
     }
 
     function loadConfigData(modelFileListObj, certFileListObj) {
@@ -2966,7 +3147,7 @@
       buildSectionNav();
       jsonConfigModifiedDelta = {}; // limits / visibility handlers fired change events while initializing: nothing is modified yet
       const contentEl = document.getElementById('divcontent');
-      ['change', 'input'].forEach((ev) => contentEl.addEventListener(ev, () => setTimeout(updateConfigSaveBar, 0)));
+      ['change', 'input'].forEach((ev) => contentEl.addEventListener(ev, () => setTimeout(() => { updateConfigSaveBar(); updateEmptyGroups(); }, 0)));
       updateConfigSaveBar();
       $('#divcontent').show(); // Show parameter content
     }
