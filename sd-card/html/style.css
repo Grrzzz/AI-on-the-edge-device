@@ -2847,6 +2847,139 @@ a .rst-content .admonition-title {
   margin-top: 10px;
 }
 
+/* Full screen progress of an update (Doorbell style) */
+.sys-ov {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(5, 8, 16, 0.74);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: #fff;
+  text-align: center;
+}
+
+.sys-ov[hidden] {
+  display: none;
+}
+
+.sys-ov-body {
+  width: min(460px, 100%);
+}
+
+.sys-ov-spin {
+  width: 46px;
+  height: 46px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  border: 4px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  animation: sys-ov-rotate 0.9s linear infinite;
+}
+
+.sys-ov-title {
+  margin: 0 0 6px;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.sys-ov-text {
+  min-height: 2.8em;
+  margin: 0 0 16px;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.45;
+}
+
+.sys-ov-steps {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+}
+
+.sys-ov-steps li {
+  flex: 1;
+  padding: 7px 6px;
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.sys-ov-steps li.active {
+  background: rgba(255, 255, 255, 0.95);
+  color: #111827;
+}
+
+.sys-ov-steps li.done {
+  background: rgba(16, 185, 129, 0.28);
+  color: #a7f3d0;
+}
+
+.sys-ov-bar {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.sys-ov-bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: #fff;
+  transition: width 0.4s;
+}
+
+.sys-ov-bar.sys-ov-indeterminate i {
+  width: 35%;
+  animation: sys-ov-slide 1.3s ease-in-out infinite;
+}
+
+.sys-ov-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  min-height: 1.2em;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+
+.sys-ov-close {
+  margin-top: 18px;
+  width: auto;
+  padding: 9px 28px;
+}
+
+.sys-ov-fail .sys-ov-title {
+  color: #fca5a5;
+}
+
+@keyframes sys-ov-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes sys-ov-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(290%);
+  }
+}
+
 /* ---- view: dashboard ---- */
 /* Dashboard + Recognition views (prefixes: .dash / .rec). Base components come from the shared style.css. */
 

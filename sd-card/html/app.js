@@ -2294,16 +2294,6 @@ const App = (() => {
               </div>
               <button class="button btn-action" type="button" data-r="start" data-action="self-update" hidden>Update now</button>
             </div>
-
-            <ol class="steps" data-r="steps" hidden>
-              <li data-step="1">1 &middot; Download</li>
-              <li data-step="2">2 &middot; Install</li>
-              <li data-step="3">3 &middot; Restart</li>
-            </ol>
-            <div class="prog" data-r="progress" hidden>
-              <progress data-r="bar" value="0" max="100"></progress>
-              <div class="prog-meta"><span data-r="state">Idle</span><span data-r="percent"></span></div>
-            </div>
             <div class="sys-spacer"></div>
           </div>
 
@@ -2321,14 +2311,93 @@ const App = (() => {
                 accept: '.bin,.zip',
               })}
               <button class="button btn-wide btn-action" type="button" data-r="install" data-action="install" disabled>Install</button>
-              <div class="prog sys-prog-flat">
-                <progress data-r="uploadBar" value="0" max="100"></progress>
-                <div class="prog-meta"><span data-r="status">Status: Idle</span><span data-r="loadedBytes"></span></div>
-              </div>
             </div>
           </div>
         </div>
       </div>`;
+  }
+
+  /**
+   * Full screen progress of an update (upload / download, installation, restart), like the updater of the Doorbell:
+   * dimmed page, title, text, three steps, progress bar and elapsed time. The page reloads when the device is back.
+   */
+  function createUpdateOverlay() {
+    let el = null;
+    let timer = null;
+    let t0 = 0;
+    let refs = {};
+
+    const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+    const build = () => {
+      el = App.h(`
+        <div class="sys-ov" role="alertdialog" aria-modal="true" aria-live="polite">
+          <div class="sys-ov-body">
+            <div class="sys-ov-spin" data-o="spin"></div>
+            <h2 class="sys-ov-title" data-o="title"></h2>
+            <p class="sys-ov-text" data-o="text"></p>
+            <ol class="sys-ov-steps" data-o="steps" hidden></ol>
+            <div class="sys-ov-bar" data-o="bar" hidden><i data-o="fill"></i></div>
+            <div class="sys-ov-meta"><span data-o="left"></span><span data-o="right"></span></div>
+            <button class="button sys-ov-close" type="button" data-o="close" hidden>Close</button>
+          </div>
+        </div>`);
+      el.querySelectorAll('[data-o]').forEach((n) => { refs[n.dataset.o] = n; });
+      document.body.append(el);
+    };
+
+    const api = {
+      open(title, text, stepLabels) {
+        if (!el) build();
+        el.classList.remove('sys-ov-fail');
+        refs.spin.hidden = false;
+        refs.close.hidden = true;
+        refs.title.textContent = title;
+        refs.text.textContent = text;
+        refs.left.textContent = '';
+        refs.right.textContent = '';
+        refs.bar.hidden = true;
+        refs.steps.textContent = '';
+        refs.steps.hidden = !stepLabels;
+        (stepLabels || []).forEach((label, i) => refs.steps.append(App.el('li', '', `${i + 1} · ${label}`)));
+        t0 = Date.now();
+        clearInterval(timer);
+        timer = setInterval(() => { refs.right.textContent = `Elapsed ${fmt((Date.now() - t0) / 1000)}`; }, 1000);
+        refs.right.textContent = 'Elapsed 0:00';
+        el.hidden = false;
+      },
+      title(t) { refs.title.textContent = t; },
+      text(t) { refs.text.textContent = t; },
+      // current step 1..n (earlier ones are done)
+      step(n) {
+        [...refs.steps.children].forEach((li, i) => { li.className = i + 1 < n ? 'done' : i + 1 === n ? 'active' : ''; });
+      },
+      // pct: 0..100, null = unknown (animated bar)
+      progress(pct, left = '') {
+        refs.bar.hidden = false;
+        refs.bar.classList.toggle('sys-ov-indeterminate', pct === null);
+        refs.fill.style.width = pct === null ? '' : `${Math.max(0, Math.min(100, pct))}%`;
+        refs.left.textContent = left;
+      },
+      fail(title, message, onClose) {
+        clearInterval(timer);
+        el.classList.add('sys-ov-fail');
+        refs.spin.hidden = true;
+        refs.bar.hidden = true;
+        refs.title.textContent = title;
+        refs.text.textContent = message;
+        refs.right.textContent = '';
+        refs.close.hidden = false;
+        refs.close.onclick = () => { api.close(); onClose?.(); };
+      },
+      close() {
+        clearInterval(timer);
+        el?.remove();
+        el = null;
+        refs = {};
+      },
+    };
+    return api;
   }
 
   App.register('system-update', {
@@ -2339,7 +2408,8 @@ const App = (() => {
       root.innerHTML = updateTemplate();
       const r = collectRefs(root);
       let alive = true;
-      this._stop = () => { alive = false; };
+      const overlay = createUpdateOverlay();
+      this._stop = () => { alive = false; overlay.close(); };
 
       let latestRelease = null;
       let boardType = '';
@@ -2363,26 +2433,26 @@ const App = (() => {
         r.start.hidden = !showStart;
       };
 
-      // 1 download, 2 install, 3 restart
-      const setStep = (n) => {
-        r.steps.hidden = n === 0;
-        r.steps.querySelectorAll('li').forEach((li) => {
-          const i = Number(li.dataset.step);
-          li.className = i < n ? 'done' : i === n ? 'active' : '';
-        });
+      const unlock = () => {
+        picker.setBusy(false);
+        r.checkBtn.disabled = false;
+        r.install.disabled = !picker.file();
       };
 
-      // Wait until the device is back, then reload the app
+      // Step 3: wait until the device is back, then reload the app
       const waitForDevice = async () => {
-        const result = await Api.ota.rebootAndWait({
-          onTick: (elapsed) => { r.uploadBar.value = Math.min(Math.round(elapsed / 1250), 100); },
-          cancelled: () => !alive,
-        });
+        overlay.step(3);
+        overlay.title('Restarting ...');
+        overlay.text('The device installs the update and restarts. This page reloads automatically. Do not unplug the device.');
+        overlay.progress(null);
+        const result = await Api.ota.rebootAndWait({ cancelled: () => !alive });
+        if (!alive) return;
         if (result === 'online') {
-          r.uploadBar.value = 100;
+          overlay.title('Update installed');
+          overlay.text('Reloading ...');
           reloadApp();
         } else if (result === 'timeout') {
-          firework.launch('Reboot takes unusually long. Reload this page or power cycle the device', 'danger', 30000);
+          overlay.fail('Restart takes unusually long', 'Reload this page or power cycle the device.', unlock);
         }
       };
 
@@ -2440,20 +2510,17 @@ const App = (() => {
         r.checkBtn.disabled = true;
         picker.setBusy(true);
         r.install.disabled = true;
-        r.progress.hidden = false;
-        setStep(1);
-        r.state.textContent = 'Starting ...';
-        firework.launch('Do not reload this page or switch to another page while the update is in progress', 'warning', 90000);
+        overlay.open(`Updating to ${latestRelease.tag}`, 'Starting ...', ['Download', 'Install', 'Restart']);
+        overlay.step(1);
+        overlay.progress(0);
 
         const res = await Api.ota.selfUpdate(latestRelease.url);
         if (!res.ok) {
-          setUpdateText(res.unsupported
+          const text = res.unsupported
             ? 'This firmware does not support one-click updates yet. Install the package manually below.'
-            : `Update could not be started: ${esc(res.message)}`, false, 'err');
-          r.progress.hidden = true;
-          setStep(0);
-          r.checkBtn.disabled = false;
-          picker.setBusy(false);
+            : `Update could not be started: ${res.message}`;
+          setUpdateText(esc(text), false, 'err');
+          overlay.fail('Update not started', text, unlock);
           return;
         }
 
@@ -2470,8 +2537,6 @@ const App = (() => {
           if (!status) {
             // the device may already be restarting
             if (++failures >= 4) {
-              r.state.textContent = 'Restarting ...';
-              setStep(3);
               waitForDevice();
               return;
             }
@@ -2480,22 +2545,21 @@ const App = (() => {
           failures = 0;
 
           const { state, percent, message } = status;
-          r.bar.value = percent || 0;
-          r.percent.textContent = percent ? `${percent} %` : '';
-          r.state.textContent = message || state;
+          overlay.progress(percent || 0, percent ? `${percent} %` : '');
+          overlay.text(message || state);
 
           if (state === 'done' || state === 'staging') {
-            r.state.textContent = 'Installing ... the device restarts';
-            setStep(state === 'done' ? 3 : 2);
+            overlay.step(2);
+            overlay.title('Installing ...');
+            overlay.text('The package is installed during the restart.');
+            overlay.progress(null);
             waitForDevice();
             return;
           }
           if (state === 'error') {
-            setUpdateText(`Update failed: ${esc(message || 'unknown error')}`, false, 'err');
-            r.progress.hidden = true;
-            setStep(0);
-            r.checkBtn.disabled = false;
-            picker.setBusy(false);
+            const text = `Update failed: ${message || 'unknown error'}`;
+            setUpdateText(esc(text), false, 'err');
+            overlay.fail('Update failed', message || 'unknown error', unlock);
             return;
           }
         }
@@ -2534,29 +2598,23 @@ const App = (() => {
         r.install.disabled = false;
       };
 
-      const resetControls = () => {
-        picker.setBusy(false);
-        r.install.disabled = false;
-        r.uploadBar.value = 0;
-      };
-
       const uploadFailed = (message) => {
         console.error('OTA upload failed:', message);
-        r.status.textContent = 'Status: Upload failed | ' + message;
-        firework.launch('Upload failed: ' + message, 'danger', 30000);
-        resetControls();
+        overlay.fail('Upload failed', message, unlock);
       };
 
       const onUploadProgress = (loaded, total) => {
         const percent = Math.round((loaded / total) * 100);
-        r.uploadBar.value = percent;
-        r.status.textContent = 'Status: ' + percent + '% uploaded. Please wait...';
-        r.loadedBytes.textContent = 'Uploaded ' + (loaded / 1024 / 1024).toFixed(2) + ' MB of ' + (total / 1024 / 1024).toFixed(2) + ' MB';
+        overlay.progress(percent, `${(loaded / 1048576).toFixed(2)} of ${(total / 1048576).toFixed(2)} MB`);
+        overlay.text(`${percent} % uploaded. Please wait ...`);
       };
 
+      // upload done: the device stages the package and installs it during the restart
       const installDone = () => {
-        r.status.textContent = 'Status: Installing...';
-        firework.launch('Update staged. The device will restart and install it', 'success', 5000);
+        overlay.step(2);
+        overlay.title('Installing ...');
+        overlay.text('The package is staged and installed during the restart.');
+        overlay.progress(null);
         waitForDevice();
       };
 
@@ -2569,40 +2627,31 @@ const App = (() => {
           okLabel: 'Install',
         }))) return;
 
-        firework.launch('Do not reload this page or switch to another page while the update is in progress', 'warning', 90000);
-
         r.install.disabled = true;
+        r.checkBtn.disabled = true;
         picker.setBusy(true);
-        r.status.textContent = 'Status: Uploading...';
+        overlay.open(`Installing ${name}`, 'Uploading ...', ['Upload', 'Install', 'Restart']);
+        overlay.step(1);
+        overlay.progress(0);
 
         const res = await Api.ota.upload(file, onUploadProgress);
         if (res.ok) {
-          r.status.textContent = 'Status: Upload completed';
-          r.uploadBar.value = 0;
-          r.loadedBytes.textContent = '';
           installDone();
           return;
         }
-        r.loadedBytes.textContent = '';
-        r.uploadBar.value = 0;
 
         // @Deprecated: Remove legacy OTA support once old API versions are no longer supported
         // --------------------------------------------------------------------------------
         if (res.type === 'network' && (await Api.ota.hasLegacyApi())) {
-          firework.launch('Network error. Retry with legacy OTA API', 'warning', 5000);
+          overlay.text('Network error. Retry with legacy OTA API ...');
           const legacy = await Api.ota.legacyInstall(file, {
-            onPhase: (text) => { r.status.textContent = 'Status: ' + text; },
+            onPhase: (text) => overlay.text(text),
             onProgress: onUploadProgress,
           });
-          r.loadedBytes.textContent = '';
-          r.uploadBar.value = 0;
           if (legacy.ok) {
-            firework.launch('Update staged. The device will restart and install it', 'success', 5000);
-            r.status.textContent = 'Status: Installing...';
-            waitForDevice();
+            installDone();
           } else if (legacy.type === 'prepare' || legacy.type === 'process') {
-            firework.launch(legacy.message, 'danger', 30000);
-            resetControls();
+            overlay.fail('Update not possible', legacy.message, unlock);
           } else {
             uploadFailed(legacy.message);
           }
@@ -4939,7 +4988,7 @@ const App = (() => {
     const tabButtons = EDITOR_TABS.map(
       (t) =>
         `<button type="button" class="setup-tab" role="tab" data-click="tab" data-tab="${t}">${TAB_LABEL[t]}` +
-        (t === 'digit' || t === 'analog' ? ` <span class="setup-tab-count" data-count="${t}"></span>` : '') +
+        (t === 'markers' || t === 'digit' || t === 'analog' ? ` <span class="setup-tab-count" data-count="${t}"></span>` : '') +
         '</button>',
     ).join('');
 
@@ -6330,6 +6379,8 @@ const App = (() => {
 
     function updateCounts() {
       try {
+        const markerCount = root.querySelector('[data-count="markers"]');
+        if (markerCount && delta.imagealignment?.marker) markerCount.textContent = delta.imagealignment.marker.length;
         if (!delta.digit || seqIdx() < 0) return;
         const idx = seqIdx();
         [['digit', delta.digit], ['analog', delta.analog]].forEach(([type, set]) => {
