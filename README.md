@@ -15,6 +15,20 @@ backend and a one-click update from GitHub, and trims the firmware to the `esp32
   <img src="docs/images/ui-dashboard.png" width="800" alt="Dashboard">
 </p>
 
+## What is new in 2.1
+
+- **Countdown and pause** - in automatic mode the sidebar shows the countdown to the next run instead of the idle time. A mini pause
+  button stops the countdown while you configure the device (config mode), a manual start still works
+- **Last successful run** - shown in the sidebar and on the dashboard
+- **Readings plot** - minimal chart of the data log on the dashboard (6 h, 12 h, 24 h, 1 week, 1 month). Problem periods are shaded
+  yellow (invalid data, rate problems) or red (errors), fallback values are drawn dashed, the legend shows the share of each
+- **Color themes** - the main color of the interface follows the meter type (blue for generic). `System > Setup > General` has a
+  "Meter Type & Theme" card with custom selection boxes: the meter type shows its icon, the theme (Blue, Orange, Amber, Pink,
+  Slate) can be overridden. The icons always follow the meter type
+- **Status favicon and tab title** - the favicon shows the meter icon with a status dot, the tab title gets a prefix on errors or pause
+- **MQTT badge** on the dashboard, a 60 second total countdown in the update screen, smaller digit tiles in the recognition card
+- Development builds can always be updated to the official release from `System > Update`
+
 ## What is new in 2.0
 
 - **New web interface** - a single page app (`index.html`, `app.js`, `style.css`) with light and dark theme, a responsive layout for
