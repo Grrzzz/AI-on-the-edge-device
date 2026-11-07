@@ -5475,3 +5475,57 @@ a .rst-content .admonition-title {
   position: relative;
   z-index: 5;
 }
+
+/* plot: problems while reading */
+.plot-band.is-warn {
+  fill: var(--warning);
+  opacity: 0.22;
+}
+
+.plot-band.is-error {
+  fill: var(--error);
+  opacity: 0.22;
+}
+
+.plot-line.is-fallback {
+  stroke-dasharray: 5 4;
+}
+
+.plot-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.plot-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.plot-legend i {
+  display: inline-block;
+  width: 12px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.plot-legend .lg-warn {
+  background: var(--warning);
+  opacity: 0.5;
+}
+
+.plot-legend .lg-error {
+  background: var(--error);
+  opacity: 0.5;
+}
+
+.plot-legend .lg-dash {
+  width: 18px;
+  height: 2px;
+  border-radius: 0;
+  background: repeating-linear-gradient(90deg, var(--meter-accent, var(--primary)) 0 5px, transparent 5px 8px);
+}

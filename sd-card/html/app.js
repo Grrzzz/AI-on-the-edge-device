@@ -4529,6 +4529,8 @@ const App = (() => {
   const PLOT_MAX_POINTS = 240;
   const plotFileCache = new Map(); // 'name|size' -> parsed rows [{t, name, v}]
 
+  const plotIssue = (code) => (code === '000' || code === '' ? 0 : ['W01', 'E91', 'E92', 'E93'].includes(code) ? 1 : 2);
+
   const parseDataTime = (text) => {
     const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})/.exec(text);
     // wall clock of the device as UTC value: only differences and the labels are used
@@ -4542,7 +4544,8 @@ const App = (() => {
       if (f.length < 4) continue;
       const t = parseDataTime(f[0]);
       const v = parseFloat(f[3]);
-      if (Number.isFinite(t) && Number.isFinite(v)) rows.push({ t, name: f[1], v });
+      // f[7]: status code of the reading ('000' valid, W01 invalid data, E91-E93 rate problems: the fallback value was used)
+      if (Number.isFinite(t) && Number.isFinite(v)) rows.push({ t, name: f[1], v, s: (f[7] || '000').trim().substring(0, 3) });
     }
     return rows;
   };
@@ -4630,13 +4633,51 @@ const App = (() => {
       const y = (v) => pt + (1 - (v - lo) / (hi - lo)) * (H - pt - pb);
       const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(p.t).toFixed(1)} ${y(p.v).toFixed(1)}`).join('');
       const area = `${line}L${x(t1).toFixed(1)} ${H - pb}L${x(t0).toFixed(1)} ${H - pb}Z`;
+
+      // Problems: shaded background (yellow: invalid data or rate problem, red: error) and a dashed line where the
+      // device used the fallback value instead of the reading
+      let solid = '';
+      let dashed = '';
+      let bands = '';
+      let issues = 0;
+      let prevBad = false;
+      for (let i = 1; i < points.length; i++) {
+        const bad = !!plotIssue(points[i].s);
+        const from = `${x(points[i - 1].t).toFixed(1)} ${y(points[i - 1].v).toFixed(1)}`;
+        const to = `${x(points[i].t).toFixed(1)} ${y(points[i].v).toFixed(1)}`;
+        // consecutive segments of the same kind form one path (a continuous dash pattern)
+        if (bad) dashed += `${prevBad ? '' : `M${from}`}L${to}`;
+        else solid += `${i > 1 && !prevBad ? '' : `M${from}`}L${to}`;
+        prevBad = bad;
+      }
+      for (let i = 0; i < points.length; ) {
+        const level = plotIssue(points[i].s);
+        if (!level) {
+          i++;
+          continue;
+        }
+        let j = i;
+        let worst = level;
+        while (j + 1 < points.length && plotIssue(points[j + 1].s)) {
+          j++;
+          worst = Math.max(worst, plotIssue(points[j].s));
+        }
+        // from the middle between the previous reading and the first problem to the middle after the last one
+        const xa = i > 0 ? (x(points[i - 1].t) + x(points[i].t)) / 2 : x(points[i].t);
+        const xb = j + 1 < points.length ? (x(points[j].t) + x(points[j + 1].t)) / 2 : x(points[j].t);
+        const w = Math.max(xb - xa, 2);
+        bands += `<rect class="plot-band ${worst === 2 ? 'is-error' : 'is-warn'}" x="${xa.toFixed(1)}" y="${pt}" width="${w.toFixed(1)}" height="${H - pt - pb}"><title>${worst === 2 ? 'Error' : 'Problem'} ${fmtTime(points[i].t, true)}</title></rect>`;
+        issues++;
+        i = j + 1;
+      }
       const withDay = t1 - t0 > 36 * 3600000;
 
       body.textContent = '';
       const wrap = el('div', 'plot-wrap');
       wrap.innerHTML =
         `<svg class="plot-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Readings over time">` +
-        `<path class="plot-area" d="${area}"/><path class="plot-line" d="${line}"/>` +
+        `${bands}<path class="plot-area" d="${area}"/><path class="plot-line" d="${solid || line}"/>` +
+        (dashed ? `<path class="plot-line is-fallback" d="${dashed}"/>` : '') +
         '<line class="plot-cursor" x1="0" x2="0" y1="0" y2="0" hidden/><circle class="plot-dot" r="3.5" hidden/></svg>';
       const info = el('div', 'plot-info');
       const left = el('span', '', fmtTime(t0, withDay));
@@ -4644,6 +4685,11 @@ const App = (() => {
       const right = el('span', '', fmtTime(t1, withDay));
       info.append(left, mid, right);
       body.append(wrap, info);
+      if (issues) {
+        const legend = el('div', 'plot-legend');
+        legend.innerHTML = '<span><i class="lg-warn"></i>Problem reading</span><span><i class="lg-error"></i>Error</span><span><i class="lg-dash"></i>Fallback value used</span>';
+        body.append(legend);
+      }
 
       const svg = wrap.querySelector('svg');
       const cursor = svg.querySelector('.plot-cursor');
@@ -4669,7 +4715,7 @@ const App = (() => {
         dot.setAttribute('cy', by);
         cursor.removeAttribute('hidden');
         dot.removeAttribute('hidden');
-        mid.textContent = `${fmtValue(best.v)} \u00b7 ${fmtTime(best.t, true)}`;
+        mid.textContent = `${fmtValue(best.v)} \u00b7 ${fmtTime(best.t, true)}${plotIssue(best.s) ? ` \u00b7 ${best.s}` : ''}`;
       });
       wrap.addEventListener('pointerleave', leave);
     }
@@ -4697,10 +4743,15 @@ const App = (() => {
           return;
         }
         if (pts.length > PLOT_MAX_POINTS) {
+          // one point per bucket, a problem inside the bucket is kept (worst status wins)
           const step = pts.length / PLOT_MAX_POINTS;
           const reduced = [];
-          for (let i = 0; i < PLOT_MAX_POINTS; i++) reduced.push(pts[Math.floor(i * step)]);
-          reduced.push(pts[pts.length - 1]);
+          for (let i = 0; i < PLOT_MAX_POINTS; i++) {
+            const bucket = pts.slice(Math.floor(i * step), Math.floor((i + 1) * step));
+            if (!bucket.length) continue;
+            const worst = bucket.reduce((w, r) => (plotIssue(r.s) > plotIssue(w.s) ? r : w), bucket[0]);
+            reduced.push({ ...bucket[bucket.length - 1], s: worst.s });
+          }
           pts = reduced;
         }
         card.hidden = false;
