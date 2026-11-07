@@ -3573,6 +3573,23 @@ a .rst-content .admonition-title {
   .dash .dash-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  /* single column: reading card first, camera image second, then the details */
+  .dash .dash-side {
+    display: contents;
+  }
+
+  .dash .dash-sequences {
+    order: 1;
+  }
+
+  .dash .dash-image {
+    order: 2;
+  }
+
+  .dash .dash-stats {
+    order: 3;
+  }
 }
 
 /* ---- recognition (same look as the former firmware generated page) ---- */
