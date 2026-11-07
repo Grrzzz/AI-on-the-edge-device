@@ -3723,7 +3723,7 @@ a .rst-content .admonition-title {
 
 .plot-line {
   fill: none;
-  stroke: var(--meter-accent, var(--primary));
+  stroke: var(--primary);
   stroke-width: 2;
   stroke-linejoin: round;
   stroke-linecap: round;
@@ -3731,7 +3731,7 @@ a .rst-content .admonition-title {
 }
 
 .plot-area {
-  fill: var(--meter-accent, var(--primary));
+  fill: var(--primary);
   opacity: 0.1;
 }
 
@@ -3744,7 +3744,7 @@ a .rst-content .admonition-title {
 }
 
 .plot-dot {
-  fill: var(--meter-accent, var(--primary));
+  fill: var(--primary);
   stroke: #fff;
   stroke-width: 1.5;
 }
@@ -5466,14 +5466,26 @@ a .rst-content .admonition-title {
 }
 
 /* the list opens over the following cards */
-.cfg .cfg-theme-card,
-.cfg .cfg-theme-card .card-body {
+[data-card="metertheme"],
+[data-card="metertheme"] .card-body {
   overflow: visible;
 }
 
-.cfg .cfg-theme-card {
+[data-card="metertheme"] {
   position: relative;
   z-index: 5;
+}
+
+.theme-override {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.theme-combo.is-disabled .theme-combo-btn {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* plot: problems while reading */
@@ -5528,4 +5540,10 @@ a .rst-content .admonition-title {
   height: 2px;
   border-radius: 0;
   background: repeating-linear-gradient(90deg, var(--meter-accent, var(--primary)) 0 5px, transparent 5px 8px);
+}
+
+.plot-legend b {
+  font-weight: 600;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
 }

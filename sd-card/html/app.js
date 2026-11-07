@@ -708,10 +708,10 @@ const METER_THEMES = {
   'generic': {
     'label': 'Meter',
     'colors': [
-      '#5b6cff',
-      '#8b5cf6'
+      '#0ea5e9',
+      '#2563eb'
     ],
-    'primary': '#5b5ef0',
+    'primary': '#2563eb',
     'paths': [
       'M10.2 8V12.5',
       'M13.8 8V12.5',
@@ -834,15 +834,16 @@ const METER_THEMES = {
 const METER_TYPE_THEME = {"0": "generic", "1": "water", "2": "water", "3": "water", "4": "water", "15": "water", "16": "water", "5": "gas", "6": "gas", "7": "energy", "8": "energy", "9": "energy", "10": "energy", "11": "temperature", "12": "temperature", "13": "pressure", "14": "pressure"};
 // END METER THEMES
 
-const DEFAULT_THEME = 'water';
-let meterThemeId = DEFAULT_THEME; // theme in use
-let deviceThemeId = DEFAULT_THEME; // theme of the meter type
-let themePref = 'auto'; // choice of the user: 'auto' (follows the meter type) or a theme id
+const DEFAULT_THEME = 'water'; // color theme (blue) for the meter type 'generic' or no meter type
+let meterThemeId = 'generic'; // icon theme: ALWAYS the meter type of the device
+let deviceThemeId = 'generic'; // theme of the meter type
+let themeOverride = ''; // theme chosen manually in the setup ('' = no override: the colors follow the meter type)
 try {
-  const saved = localStorage.getItem('uiTheme');
-  if (saved) themePref = saved;
+  const saved = localStorage.getItem('uiThemeOverride');
+  if (saved) themeOverride = saved;
 } catch (e) { }
-const meterTheme = () => METER_THEMES[meterThemeId] || METER_THEMES[DEFAULT_THEME];
+const meterTheme = () => METER_THEMES[meterThemeId] || METER_THEMES.generic; // icons, logo, favicon, scan icon
+const colorThemeId = () => (themeOverride && METER_THEMES[themeOverride] ? themeOverride : deviceThemeId === 'generic' ? DEFAULT_THEME : deviceThemeId);
 
 // main color of the interface: the primary color of the theme, lighter in the dark mode
 const mixHex = (hex, other, amount) => {
@@ -949,39 +950,45 @@ const MeterTheme = {
     return meterThemeId;
   },
 
-  get pref() {
-    return themePref;
+  get override() {
+    return themeOverride;
   },
 
   get deviceId() {
     return deviceThemeId;
   },
 
-  // choice of the user in the setup: 'auto' or a theme id (stored in this browser)
-  setPref(pref) {
-    themePref = pref === 'auto' || METER_THEMES[pref] ? pref : 'auto';
-    try { localStorage.setItem('uiTheme', themePref); } catch (e) { }
+  // theme whose colors are in use
+  get colorId() {
+    return colorThemeId();
+  },
+
+  // manual choice in the setup: theme id or '' (no override). Stored in this browser. Only the colors change, never the icons.
+  setOverride(id) {
+    themeOverride = METER_THEMES[id] ? id : '';
+    try { localStorage.setItem('uiThemeOverride', themeOverride); } catch (e) { }
     this.render();
   },
 
   // theme id ('water') or meter type number of the MQTT settings (5 -> 'gas'): the theme of the device (used by 'auto')
   apply(typeOrId) {
     let id = typeof typeOrId === 'number' || /^\d+$/.test(String(typeOrId)) ? METER_TYPE_THEME[Number(typeOrId)] : typeOrId;
-    if (!METER_THEMES[id]) id = DEFAULT_THEME;
+    if (!METER_THEMES[id]) id = 'generic';
     deviceThemeId = id;
     try { localStorage.setItem('meterTheme', id); } catch (e) { }
     this.render();
   },
 
   render() {
-    const id = themePref !== 'auto' && METER_THEMES[themePref] ? themePref : deviceThemeId;
+    const id = deviceThemeId;
     meterThemeId = id;
 
-    const t = meterTheme();
+    const t = meterTheme(); // icons
+    const ct = METER_THEMES[colorThemeId()]; // colors of the interface
     const root = document.documentElement;
     root.style.setProperty('--meter-accent', t.colors[0]);
-    root.style.setProperty('--theme-primary', t.primary);
-    root.style.setProperty('--theme-primary-dark', mixHex(t.primary, '#ffffff', 0.32));
+    root.style.setProperty('--theme-primary', ct.primary);
+    root.style.setProperty('--theme-primary-dark', mixHex(ct.primary, '#ffffff', 0.32));
     root.dataset.meter = id;
     const logo = document.getElementById('brand-logo');
     if (logo) logo.innerHTML = logoSvg(id);
@@ -990,7 +997,7 @@ const MeterTheme = {
     const scan = document.getElementById('cycle-scan');
     if (scan) scan.innerHTML = scanIconHtml(20);
     loaderSpinner = buildLoaderSpinner();
-    window.dispatchEvent(new CustomEvent('meter-theme', { detail: { id, pref: themePref, device: deviceThemeId } }));
+    window.dispatchEvent(new CustomEvent('meter-theme', { detail: { id, color: colorThemeId(), device: deviceThemeId } }));
   },
 
   applyFromConfig() {
@@ -1518,8 +1525,8 @@ const App = (() => {
 
     // The config is cached in sessionStorage for the views. A device in operation mode 'Setup' opens the wizard
     // when the page is called without a route (this replaces the former firmware redirect to setup.html).
-    let storedTheme = DEFAULT_THEME;
-    try { storedTheme = localStorage.getItem('meterTheme') || DEFAULT_THEME; } catch (e) { }
+    let storedTheme = 'generic';
+    try { storedTheme = localStorage.getItem('meterTheme') || 'generic'; } catch (e) { }
     MeterTheme.apply(storedTheme); // last known theme, no flash while the config loads
     const configLoaded = loadConfig().then(() => MeterTheme.applyFromConfig()).catch((e) => console.error('Failed to load config', e));
     if (!location.hash) {
@@ -4614,7 +4621,7 @@ const App = (() => {
       return withDay ? `${pad(d.getUTCDate())}.${pad(d.getUTCMonth() + 1)}. ${time}` : time;
     };
 
-    function draw(points) {
+    function draw(points, stats) {
       const W = 600;
       const H = 140;
       const pl = 8;
@@ -4687,7 +4694,13 @@ const App = (() => {
       body.append(wrap, info);
       if (issues) {
         const legend = el('div', 'plot-legend');
-        legend.innerHTML = '<span><i class="lg-warn"></i>Problem reading</span><span><i class="lg-error"></i>Error</span><span><i class="lg-dash"></i>Fallback value used</span>';
+        // share of the readings in the selected range
+        const pct = (n) => (n === 0 ? '0 %' : n / stats.total < 0.001 ? '<0.1 %' : `${((n / stats.total) * 100).toFixed(1)} %`);
+        legend.innerHTML =
+          `<span><i class="lg-warn"></i>Problem reading <b>${pct(stats.warn)}</b></span>` +
+          `<span><i class="lg-error"></i>Error <b>${pct(stats.error)}</b></span>` +
+          '<span><i class="lg-dash"></i>Fallback value used</span>';
+        legend.title = `${stats.total} readings in the selected range`;
         body.append(legend);
       }
 
@@ -4742,6 +4755,12 @@ const App = (() => {
           card.hidden = true;
           return;
         }
+        const stats = { total: pts.length, warn: 0, error: 0 };
+        for (const r of pts) {
+          const level = plotIssue(r.s);
+          if (level === 1) stats.warn++;
+          else if (level === 2) stats.error++;
+        }
         if (pts.length > PLOT_MAX_POINTS) {
           // one point per bucket, a problem inside the bucket is kept (worst status wins)
           const step = pts.length / PLOT_MAX_POINTS;
@@ -4755,7 +4774,7 @@ const App = (() => {
           pts = reduced;
         }
         card.hidden = false;
-        draw(pts);
+        draw(pts, stats);
       } finally {
         busy = false;
         if (again) {
@@ -8181,7 +8200,7 @@ const App = (() => {
   // BEGIN GENERATED SCHEMA (gen_config_schema.py from edit_configuration.html, do not edit by hand, edit the generator)
   const SCHEMA = {
     groups: [
-      {"label": "Basics", "sections": [{"id": "general", "label": "General", "cards": ["operation", "time", "webui", "log", "system"]}, {"id": "network", "label": "Network", "cards": ["network"]}]},
+      {"label": "Basics", "sections": [{"id": "general", "label": "General", "cards": ["metertheme", "operation", "time", "webui", "log", "system"]}, {"id": "network", "label": "Network", "cards": ["network"]}]},
       {"label": "Recognition", "sections": [{"id": "recognition", "label": "Recognition", "cards": ["alignment", "digit", "analog", "postprocessing"], "note": true}]},
       {"label": "Integrations", "sections": [{"id": "mqtt", "label": "MQTT", "cards": ["mqtt"]}]},
       {"label": "Advanced", "adv": true, "sections": [{"id": "camera", "label": "Camera", "cards": ["capture"]}, {"id": "gpio", "label": "GPIO", "cards": ["gpio"]}]},
@@ -8340,7 +8359,6 @@ const App = (() => {
           {"label": "Home Assistant Discovery", "lvl": 1, "show": ["classvisibility_mqtt_enabled"], "id": "mqtt_homeassistant_discoveryenabled", "name": "mqtt.homeassistant.discoveryenabled", "t": "switch", "def": "false"},
           {"label": "Discovery Prefix", "lvl": 2, "show": ["classvisibility_mqtt_enabled", "classvisibility_mqtt_homeassistant_discoveryenabled"], "id": "mqtt_homeassistant_discoveryprefix", "name": "mqtt.homeassistant.discoveryprefix", "t": "text", "ph": "homeassistant", "req": true, "adv": true},
           {"label": "Status Topic", "lvl": 2, "show": ["classvisibility_mqtt_enabled", "classvisibility_mqtt_homeassistant_discoveryenabled"], "id": "mqtt_homeassistant_statustopic", "name": "mqtt.homeassistant.statustopic", "t": "text", "ph": "homeassistant/status", "req": true, "adv": true},
-          {"label": "Meter Type", "lvl": 2, "show": ["classvisibility_mqtt_enabled", "classvisibility_mqtt_homeassistant_discoveryenabled"], "id": "mqtt_homeassistant_metertype", "name": "mqtt.homeassistant.metertype", "t": "select", "opts": [["0", "Generic (No Units)"], ["1", "Water (Value: m³, Rate: m³/h)"], ["2", "Water (Value: L, Rate: L/h*)"], ["15", "Water (Value: L, Rate: L/min)"], ["3", "Water (Value: gal, Rate: gal/h*)"], ["16", "Water (Value: gal, Rate: gal/min)"], ["4", "Water (Value: ft³, Rate: ft³/min)"], ["5", "Gas (Value: m³, Rate: m³/h)"], ["6", "Gas (Value: ft³, Rate: ft³/min)"], ["7", "Energy (Value: Wh, Rate: W)"], ["8", "Energy (Value: kWh, Rate: kW)"], ["9", "Energy (Value: MWh, Rate: MW)"], ["10", "Energy (Value: GJ, Rate: GJ/h*)"], ["11", "Temperature (Value: °C, Rate: °C/min)"], ["12", "Temperature (Value: °F, Rate: °F/min)"], ["13", "Pressure (Value: bar, Rate: bar/min)"], ["14", "Pressure (Value: psi, Rate: psi/min)"]], "def": "1", "wide": true, "int": true},
           {"label": "Retain Discovery Topics", "lvl": 2, "show": ["classvisibility_mqtt_enabled", "classvisibility_mqtt_homeassistant_discoveryenabled"], "id": "mqtt_homeassistant_retaindiscovery", "name": "mqtt.homeassistant.retaindiscovery", "t": "switch", "def": "false", "adv": true},
         ],
       },
@@ -8413,6 +8431,12 @@ const App = (() => {
         "id": "system", "title": "System", "adv": true,
         "rows": [
           {"label": "CPU Frequency", "lvl": 1, "id": "system_cpufrequency", "name": "system.cpufrequency", "t": "select", "opts": [["160", "160 MHz"], ["240", "240 MHz"]], "def": "160", "int": true, "reboot": true},
+        ],
+      },
+      {
+        "id": "metertheme", "title": "Meter Type & Theme",
+        "rows": [
+          {"label": "Meter Type", "lvl": 0, "id": "mqtt_homeassistant_metertype", "name": "mqtt.homeassistant.metertype", "t": "select", "opts": [["0", "Generic (No Units)"], ["1", "Water (Value: m³, Rate: m³/h)"], ["2", "Water (Value: L, Rate: L/h*)"], ["15", "Water (Value: L, Rate: L/min)"], ["3", "Water (Value: gal, Rate: gal/h*)"], ["16", "Water (Value: gal, Rate: gal/min)"], ["4", "Water (Value: ft³, Rate: ft³/min)"], ["5", "Gas (Value: m³, Rate: m³/h)"], ["6", "Gas (Value: ft³, Rate: ft³/min)"], ["7", "Energy (Value: Wh, Rate: W)"], ["8", "Energy (Value: kWh, Rate: kW)"], ["9", "Energy (Value: MWh, Rate: MW)"], ["10", "Energy (Value: GJ, Rate: GJ/h*)"], ["11", "Temperature (Value: °C, Rate: °C/min)"], ["12", "Temperature (Value: °F, Rate: °F/min)"], ["13", "Pressure (Value: bar, Rate: bar/min)"], ["14", "Pressure (Value: psi, Rate: psi/min)"]], "def": "1", "wide": true, "int": true},
         ],
       },
       {
@@ -9695,15 +9719,10 @@ const App = (() => {
     card.items.push({ def: row, el });
   }
 
-  // Theme choice (icon and main color of the interface): custom combo box with icon, color and name. Stored in this browser.
-  function buildThemeCard(s) {
-    const card = App.el('div', 'card cfg-card cfg-theme-card');
-    const head = App.el('div', 'card-header');
-    head.append(App.el('span', 'cfg-card-title', 'Appearance'));
-    const body = App.el('div', 'card-body cfg-body');
-    card.append(head, body);
-
-    const row = App.el('div', 'cfg-row cfg-l0');
+  // Theme row (Setup > General > Meter Type & Theme): the main color of the interface follows the meter type (blue for generic).
+  // The combo box is inactive until 'Override' is checked. Icons always follow the meter type. Stored in this browser.
+  function addThemeRow(body) {
+    const row = App.el('div', 'cfg-row cfg-l0 cfg-theme-row');
     const label = App.el('div', 'cfg-label');
     label.append(App.el('span', '', 'Theme'));
     const ctl = App.el('div', 'cfg-ctl');
@@ -9718,12 +9737,16 @@ const App = (() => {
     list.setAttribute('role', 'listbox');
     list.hidden = true;
     combo.append(btn, list);
-    ctl.append(combo);
 
-    const hint = App.el('p', 'cfg-hint', 'Icon and main color of the interface. Auto follows the meter type of the MQTT settings. This choice is stored in this browser.');
-    ctl.append(hint);
+    const overrideLabel = App.el('label', 'theme-override');
+    const overrideBox = document.createElement('input');
+    overrideBox.type = 'checkbox';
+    overrideLabel.append(overrideBox, ' Override');
+    ctl.append(combo, overrideLabel);
+    ctl.append(App.el('p', 'cfg-hint', 'Main color of the interface. It follows the meter type (blue for Generic) until you override it. Icons always follow the meter type. This choice is stored in this browser.'));
     body.append(row);
 
+    const themeIds = Object.keys(METER_THEMES).filter((id) => id !== 'generic'); // generic has the colors of water
     const optionContent = (id, text) => {
       const t = METER_THEMES[id];
       const wrap = App.el('span', 'theme-opt');
@@ -9735,7 +9758,6 @@ const App = (() => {
       wrap.append(icon, name, dot);
       return wrap;
     };
-    const entries = () => [['auto', `Auto (${METER_THEMES[MeterTheme.deviceId].label})`, MeterTheme.deviceId], ...Object.keys(METER_THEMES).map((id) => [id, METER_THEMES[id].label, id])];
 
     let active = -1;
     const close = () => {
@@ -9748,33 +9770,42 @@ const App = (() => {
       list.children[i]?.scrollIntoView({ block: 'nearest' });
     };
     const build = () => {
-      const pref = MeterTheme.pref;
-      btn.replaceChildren(optionContent(pref === 'auto' ? MeterTheme.deviceId : pref, pref === 'auto' ? `Auto (${METER_THEMES[MeterTheme.deviceId].label})` : METER_THEMES[pref].label), App.el('span', 'theme-combo-chev', '\u25BE'));
+      const on = !!MeterTheme.override;
+      overrideBox.checked = on;
+      btn.disabled = !on;
+      combo.classList.toggle('is-disabled', !on);
+      const current = MeterTheme.colorId;
+      btn.replaceChildren(optionContent(current, METER_THEMES[current].label + (on ? '' : ' (automatic)')), App.el('span', 'theme-combo-chev', '\u25BE'));
       list.replaceChildren();
-      entries().forEach(([value, text, iconId], i) => {
+      themeIds.forEach((id) => {
         const li = App.el('li', 'theme-combo-item');
         li.setAttribute('role', 'option');
-        li.dataset.value = value;
-        li.setAttribute('aria-selected', String(value === pref));
-        li.append(optionContent(iconId, text));
-        if (value === pref) li.classList.add('selected');
+        li.dataset.value = id;
+        li.setAttribute('aria-selected', String(on && id === current));
+        li.append(optionContent(id, METER_THEMES[id].label));
+        if (on && id === current) li.classList.add('selected');
         li.addEventListener('click', () => {
-          MeterTheme.setPref(value);
+          MeterTheme.setOverride(id);
           close();
           btn.focus();
         });
-        li.addEventListener('pointermove', () => mark(i));
+        li.addEventListener('pointermove', () => mark(themeIds.indexOf(id)));
         list.append(li);
       });
     };
     const open = () => {
       list.hidden = false;
       btn.setAttribute('aria-expanded', 'true');
-      mark(entries().findIndex(([v]) => v === MeterTheme.pref));
+      mark(Math.max(0, themeIds.indexOf(MeterTheme.colorId)));
     };
+    overrideBox.addEventListener('change', () => {
+      close();
+      // override on: starts with the color in use, off: back to the meter type
+      MeterTheme.setOverride(overrideBox.checked ? MeterTheme.colorId : '');
+    });
     btn.addEventListener('click', () => (list.hidden ? open() : close()));
     btn.addEventListener('keydown', (e) => {
-      const n = entries().length;
+      const n = themeIds.length;
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
         if (list.hidden) open();
@@ -9796,9 +9827,8 @@ const App = (() => {
       if (!combo.contains(e.target)) close();
     };
     document.addEventListener('pointerdown', onDoc);
-    window.addEventListener('meter-theme', build); // the meter type or the choice changed
+    window.addEventListener('meter-theme', build); // the meter type or the override changed
     build();
-    return card;
   }
 
   function buildCard(s, def) {
@@ -9920,6 +9950,7 @@ const App = (() => {
     s.sections = {};
     const cardEls = {};
     for (const def of SCHEMA.cards) cardEls[def.id] = buildCard(s, def);
+    addThemeRow(cardEls.metertheme.querySelector('.cfg-body'));
 
     for (const g of SCHEMA.groups) {
       const label = App.el('div', 'cfg-nav-group', g.label);
@@ -9938,7 +9969,6 @@ const App = (() => {
         const panel = App.el('div', 'cfg-panel');
         panel.hidden = true;
         if (sec.id === 'general') {
-          panel.append(buildThemeCard(s));
           s.hero = App.el('div', 'cfg-hero');
           s.hero.append(App.el('div', 'cfg-hero-label', 'This device'), App.el('div', 'chips'));
           panel.append(s.hero);

@@ -35,8 +35,8 @@ if not os.path.exists(FONT_B):  # other systems
 THEMES = {
     'generic': {
         'label': 'Meter',
-        'colors': ['#5b6cff', '#8b5cf6'],
-        'primary': '#5b5ef0',
+        'colors': ['#0ea5e9', '#2563eb'],
+        'primary': '#2563eb',
         'paths': ['M10.2 8V12.5', 'M13.8 8V12.5', 'M7.5 16.6H9.5', 'M14.5 16.6H16.5'],
         'circles': [[12, 16.6, 1.1]],
         'rects': [[3.5, 3.8, 17, 16.4, 3.2], [6.6, 7.6, 10.8, 5.4, 1.2]],
