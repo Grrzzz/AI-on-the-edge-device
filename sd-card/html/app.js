@@ -839,15 +839,57 @@ const glyphMarkup = (t) =>
 
 let logoCounter = 0;
 // Doorbell style tile: gradient, radius 30 percent, white line glyph
-function logoSvg(themeId, size) {
+// stateKind (favicon only): '' = no badge, otherwise a status dot in the corner ('ok', 'warn', 'error', 'paused', 'offline')
+const FAVICON_DOT = { ok: '#22c55e', warn: '#f59e0b', error: '#ef4444', paused: '#94a3b8', offline: '#64748b' };
+function logoSvg(themeId, size, stateKind = '') {
   const t = METER_THEMES[themeId] || METER_THEMES.generic;
   const id = `mt-g-${++logoCounter}`;
+  const offline = stateKind === 'offline';
+  const dot = FAVICON_DOT[stateKind]
+    ? `<circle cx="50" cy="50" r="13" fill="#fff"/><circle cx="50" cy="50" r="10" fill="${FAVICON_DOT[stateKind]}"/>` +
+      (stateKind === 'paused' ? '<path d="M47.5 45.5V54.5M52.5 45.5V54.5" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>' : '')
+    : '';
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"${size ? ` width="${size}" height="${size}"` : ''} aria-hidden="true">` +
     `<defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${t.colors[0]}"/><stop offset="1" stop-color="${t.colors[1]}"/></linearGradient></defs>` +
-    `<rect width="64" height="64" rx="19" fill="url(#${id})"/>` +
-    `<g transform="translate(13 13) scale(1.5833)" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${glyphMarkup(t)}</g></svg>`
+    `<g${offline ? ' opacity="0.45"' : ''}><rect width="64" height="64" rx="19" fill="${offline ? '#94a3b8' : `url(#${id})`}"/>` +
+    `<g transform="translate(13 13) scale(1.5833)" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${glyphMarkup(t)}</g></g>${dot}</svg>`
   );
+}
+
+// Tab title badge ("(!) Dashboard | gasmeter") and favicon status dot, driven by the cycle monitor
+let titleBadge = '';
+let faviconState = '';
+function setTitleBadge(badge) {
+  if (badge === titleBadge) return;
+  document.title = badge + document.title.slice(titleBadge.length);
+  titleBadge = badge;
+}
+function setFaviconState(kind) {
+  if (kind === faviconState) return;
+  faviconState = kind;
+  const favicon = document.getElementById('favicon-svg');
+  if (favicon) favicon.href = `data:image/svg+xml,${encodeURIComponent(logoSvg(meterThemeId, 64, kind))}`;
+}
+
+// "4 min ago" for the age of the last successful cycle [s]
+function formatAgo(sec) {
+  sec = Math.max(0, Math.floor(sec));
+  if (sec < 60) return 'just now';
+  const m = Math.floor(sec / 60);
+  if (m < 60) return `${m} min ago`;
+  const h = Math.floor(m / 60);
+  return h < 48 ? `${h} h ${String(m % 60).padStart(2, '0')} min ago` : `${Math.floor(h / 24)} days ago`;
+}
+
+// {text, title} for the last successful cycle of an /api/status answer (ageOffset: seconds since the answer was received)
+function formatLastSuccess(status, ageOffset = 0) {
+  if (!status || !(status.lastSuccessSeconds >= 0)) return { text: 'none since start', title: 'No cycle completed without error since the device started' };
+  const stamp = String(status.lastSuccess || '');
+  const age = status.lastSuccessSeconds + ageOffset;
+  let when = '';
+  if (stamp.length >= 19) when = age < 86400 ? stamp.substring(11, 19) : `${stamp.substring(0, 10)} ${stamp.substring(11, 16)}`;
+  return { text: when ? `${when} · ${formatAgo(age)}` : formatAgo(age), title: stamp.length >= 19 ? `${stamp.substring(0, 10)} ${stamp.substring(11, 19)}` : '' };
 }
 
 const SCAN_CORNERS = 'M11 21V11h10M43 11h10v10M53 43v10H43M21 53H11V43';
@@ -899,7 +941,7 @@ const MeterTheme = {
     const logo = document.getElementById('brand-logo');
     if (logo) logo.innerHTML = logoSvg(id);
     const favicon = document.getElementById('favicon-svg');
-    if (favicon) favicon.href = `data:image/svg+xml,${encodeURIComponent(logoSvg(id, 64))}`;
+    if (favicon) favicon.href = `data:image/svg+xml,${encodeURIComponent(logoSvg(id, 64, faviconState))}`;
     const scan = document.getElementById('cycle-scan');
     if (scan) scan.innerHTML = scanIconHtml(20);
     loaderSpinner = buildLoaderSpinner();
@@ -1308,7 +1350,7 @@ const App = (() => {
 
   function setTitle(title) {
     const t = title || 'AI-on-the-Edge';
-    document.title = hostname ? `${t} | ${hostname}` : `${t} | AI-on-the-Edge Device`;
+    document.title = titleBadge + (hostname ? `${t} | ${hostname}` : `${t} | AI-on-the-Edge Device`);
     const bar = document.getElementById('topbar-title');
     if (bar) bar.textContent = hostname || t;
   }
@@ -2477,11 +2519,14 @@ const App = (() => {
   function isNewer(candidate, installed) {
     const a = parseVersion(candidate);
     const b = parseVersion(installed);
-    if (!a || !b) return false;
+    if (!a) return false;
+    // Development builds ("Develop: branch @ hash", no release tag) and modified builds (version + "+") can always be replaced
+    // by an official release
+    if (!b) return true;
     for (let i = 0; i < 4; i++) {
       if (a[i] !== b[i]) return a[i] > b[i];
     }
-    return false;
+    return /\+\s*$/.test(String(installed || ''));
   }
 
   function updateTemplate() {
@@ -4175,9 +4220,25 @@ const App = (() => {
     },
 
     /**
+     * Pause or resume the countdown to the next automatic cycle (config mode). POST /api/cycle {paused}
+     * @returns {Promise<boolean>}
+     */
+    async setPaused(paused) {
+      const res = await Api.post('/api/cycle', { paused: !!paused }, {
+        action: 'Pause request',
+        resultMsg: {
+          '004': { msg: 'Countdown paused. No automatic cycles until you resume', type: 'success', time: 3000 },
+          '005': { msg: 'Countdown resumed', type: 'success', time: 2000 },
+        },
+      });
+      return !!res.ok;
+    },
+
+    /**
      * State of the main process. GET /api/status
      * @returns {Promise<null | {state:string, stateCode:number, stateSeconds:number, cycle:number, autoStart:boolean,
-     *   running:boolean, cycleStart:'ready'|'queued'|'unavailable', processInterval:number, processTime:number, uptime:number, error:number}>}
+     *   running:boolean, cycleStart:'ready'|'queued'|'unavailable', processInterval:number, processTime:number, uptime:number, error:number,
+     *   nextRunSeconds:number (-1: not waiting), paused:boolean, lastSuccessSeconds:number (-1: none), lastSuccess:string}>}
      */
     async status(signal) {
       const res = await apiCall('/api/status', { signal, timeout: 8000 }, { parseType: 'json' });
@@ -4257,11 +4318,11 @@ const App = (() => {
   const show = (v) => (v === null || v === undefined || v === '' ? '--' : String(v));
 
   // Result tiles of one ROI kind (digit / analog): value of the recognition and the cut-out image
-  const recRoiSection = (title, block) => {
+  const recRoiSection = (title, block, kind = '') => {
     const wrap = el('div', 'rec-roi-block');
     wrap.append(el('div', 'rec-roi-title', title));
     if (block.enabled && block.rois.length) {
-      const grid = el('div', 'rec-roi-grid');
+      const grid = el('div', `rec-roi-grid${kind ? ` is-${kind}` : ''}`);
       for (const roi of block.rois) {
         const tile = el('div', 'rec-roi-tile');
         if (!roi.na && roi.image) {
@@ -4353,6 +4414,10 @@ const App = (() => {
             <div class="stat-value small" data-ref="state">--</div>
             <div class="dash-process-error" data-ref="error"></div>
           </div>
+          <div class="stat wide">
+            <div class="stat-label">Last successful run</div>
+            <div class="stat-value small"><output data-ref="lastRun">--</output></div>
+          </div>
           <div class="stat">
             <div class="stat-label">Uptime</div>
             <div class="stat-value"><output data-ref="uptime">--</output></div>
@@ -4384,11 +4449,21 @@ const App = (() => {
       </div>
     </main>
 
-    <section class="card dash-rec rec">
-      <div class="card-header"><span>Recognition</span></div>
-      <div class="dash-activity-sub">Result of the last completed cycle: what the AI read in each region.</div>
-      <div class="rec-body" data-ref="recBody"><span class="dash-log-empty">Loading ...</span></div>
-    </section>
+    <div class="dash-row">
+      <section class="card dash-rec rec">
+        <div class="card-header"><span>Recognition</span></div>
+        <div class="dash-activity-sub">Result of the last completed cycle: what the AI read in each region.</div>
+        <div class="rec-body" data-ref="recBody"><span class="dash-log-empty">Loading ...</span></div>
+      </section>
+
+      <section class="card dash-plot" data-ref="plotCard" hidden>
+        <div class="card-header">
+          <span>Readings</span>
+          <div class="plot-range" data-ref="plotRange" role="group" aria-label="Time range"></div>
+        </div>
+        <div class="plot-body" data-ref="plotBody"></div>
+      </section>
+    </div>
 
     <section class="card dash-activity">
       <div class="card-header"><span>Activity</span></div>
@@ -4398,6 +4473,203 @@ const App = (() => {
 
   let dashSeq = 0;
   let dashActive = null; // state of the mounted dashboard view
+
+  // ------------------------------------------------------------------------
+  // Readings plot: values of the data log (SD card, /log/data/data_YYYY-MM-DD.csv), minimal line chart.
+  // The card stays hidden as long as there is no data logging or fewer than two readings in the range.
+  // CSV columns: timestamp, sequence name, raw value, value, fallback value, ...
+  // ------------------------------------------------------------------------
+  const PLOT_RANGES = [['6h', 6], ['12h', 12], ['24h', 24], ['1w', 168], ['1m', 744]];
+  const PLOT_MAX_POINTS = 240;
+  const plotFileCache = new Map(); // 'name|size' -> parsed rows [{t, name, v}]
+
+  const parseDataTime = (text) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})/.exec(text);
+    // wall clock of the device as UTC value: only differences and the labels are used
+    return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : NaN;
+  };
+
+  const parseDataCsv = (text) => {
+    const rows = [];
+    for (const line of text.split('\n')) {
+      const f = line.split(',');
+      if (f.length < 4) continue;
+      const t = parseDataTime(f[0]);
+      const v = parseFloat(f[3]);
+      if (Number.isFinite(t) && Number.isFinite(v)) rows.push({ t, name: f[1], v });
+    }
+    return rows;
+  };
+
+  async function loadPlotRows(hours, signal) {
+    let files;
+    try {
+      files = await Api.files.list('/log/data/', { all: true });
+    } catch (e) {
+      return null; // no data logging
+    }
+    files = files.filter((f) => !f.isDir && /^data_\d{4}-\d{2}-\d{2}\.csv$/.test(f.name)).sort((a, b) => (a.name < b.name ? -1 : 1));
+    if (!files.length) return null;
+
+    const last = files[files.length - 1].name.substring(5, 15);
+    const endDay = Date.UTC(+last.substring(0, 4), +last.substring(5, 7) - 1, +last.substring(8, 10));
+    const firstDay = endDay - Math.ceil(hours / 24) * 86400000;
+    const rows = [];
+    for (const f of files) {
+      const day = Date.UTC(+f.name.substring(5, 9), +f.name.substring(10, 12) - 1, +f.name.substring(13, 15));
+      if (day < firstDay) continue;
+      const key = `${f.name}|${f.size}`;
+      if (!plotFileCache.has(key)) {
+        const res = await apiCall(`/fileserver/log/data/${f.name}`, { signal, timeout: 30000 }, { parseType: 'text' });
+        if (signal?.aborted) return undefined;
+        if (!res.ok || typeof res.data !== 'string') continue;
+        for (const k of plotFileCache.keys()) if (k.startsWith(f.name + '|')) plotFileCache.delete(k); // older state of the same file
+        plotFileCache.set(key, parseDataCsv(res.data));
+      }
+      rows.push(...plotFileCache.get(key));
+    }
+    return rows;
+  }
+
+  function createReadingsPlot(card, rangeBox, body, signal) {
+    let hours = 24;
+    let busy = false;
+    let again = false;
+    try {
+      const saved = Number(localStorage.getItem('plotHours'));
+      if (PLOT_RANGES.some((r) => r[1] === saved)) hours = saved;
+    } catch (e) { }
+
+    const buttons = PLOT_RANGES.map(([label, h]) => {
+      const b = el('button', 'plot-range-btn', label);
+      b.type = 'button';
+      b.addEventListener('click', () => {
+        hours = h;
+        try { localStorage.setItem('plotHours', String(h)); } catch (e) { }
+        buttons.forEach((x, i) => x.classList.toggle('active', PLOT_RANGES[i][1] === hours));
+        load();
+      });
+      rangeBox.append(b);
+      return b;
+    });
+    buttons.forEach((x, i) => x.classList.toggle('active', PLOT_RANGES[i][1] === hours));
+
+    const fmtValue = (v) => {
+      const a = Math.abs(v);
+      return String(parseFloat(v.toFixed(a >= 1000 ? 1 : a >= 10 ? 2 : 3)));
+    };
+    const pad = (n) => String(n).padStart(2, '0');
+    const fmtTime = (t, withDay) => {
+      const d = new Date(t);
+      const time = `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+      return withDay ? `${pad(d.getUTCDate())}.${pad(d.getUTCMonth() + 1)}. ${time}` : time;
+    };
+
+    function draw(points) {
+      const W = 600;
+      const H = 140;
+      const pl = 8;
+      const pr = 8;
+      const pt = 10;
+      const pb = 18;
+      const t0 = points[0].t;
+      const t1 = points[points.length - 1].t;
+      let lo = Math.min(...points.map((p) => p.v));
+      let hi = Math.max(...points.map((p) => p.v));
+      if (hi - lo < 1e-9) {
+        hi += 0.5;
+        lo -= 0.5;
+      }
+      const x = (t) => pl + ((t - t0) / Math.max(1, t1 - t0)) * (W - pl - pr);
+      const y = (v) => pt + (1 - (v - lo) / (hi - lo)) * (H - pt - pb);
+      const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(p.t).toFixed(1)} ${y(p.v).toFixed(1)}`).join('');
+      const area = `${line}L${x(t1).toFixed(1)} ${H - pb}L${x(t0).toFixed(1)} ${H - pb}Z`;
+      const withDay = t1 - t0 > 36 * 3600000;
+
+      body.textContent = '';
+      const wrap = el('div', 'plot-wrap');
+      wrap.innerHTML =
+        `<svg class="plot-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Readings over time">` +
+        `<path class="plot-area" d="${area}"/><path class="plot-line" d="${line}"/>` +
+        '<line class="plot-cursor" x1="0" x2="0" y1="0" y2="0" hidden/><circle class="plot-dot" r="3.5" hidden/></svg>';
+      const info = el('div', 'plot-info');
+      const left = el('span', '', fmtTime(t0, withDay));
+      const mid = el('span', 'plot-readout', `${fmtValue(lo)} \u2013 ${fmtValue(hi)}`);
+      const right = el('span', '', fmtTime(t1, withDay));
+      info.append(left, mid, right);
+      body.append(wrap, info);
+
+      const svg = wrap.querySelector('svg');
+      const cursor = svg.querySelector('.plot-cursor');
+      const dot = svg.querySelector('.plot-dot');
+      const idle = mid.textContent;
+      const leave = () => {
+        cursor.setAttribute('hidden', '');
+        dot.setAttribute('hidden', '');
+        mid.textContent = idle;
+      };
+      wrap.addEventListener('pointermove', (e) => {
+        const r = svg.getBoundingClientRect();
+        const t = t0 + ((e.clientX - r.left) / r.width) * (t1 - t0);
+        let best = points[0];
+        for (const p of points) if (Math.abs(p.t - t) < Math.abs(best.t - t)) best = p;
+        const bx = x(best.t);
+        const by = y(best.v);
+        cursor.setAttribute('x1', bx);
+        cursor.setAttribute('x2', bx);
+        cursor.setAttribute('y1', pt);
+        cursor.setAttribute('y2', H - pb);
+        dot.setAttribute('cx', bx);
+        dot.setAttribute('cy', by);
+        cursor.removeAttribute('hidden');
+        dot.removeAttribute('hidden');
+        mid.textContent = `${fmtValue(best.v)} \u00b7 ${fmtTime(best.t, true)}`;
+      });
+      wrap.addEventListener('pointerleave', leave);
+    }
+
+    async function load() {
+      if (busy) {
+        again = true;
+        return;
+      }
+      busy = true;
+      try {
+        const rows = await loadPlotRows(hours, signal);
+        if (signal?.aborted || rows === undefined) return;
+        if (!rows || rows.length < 2) {
+          card.hidden = true;
+          return;
+        }
+        // one sequence only: the first one of the log
+        const name = rows[rows.length - 1].name;
+        const seq = rows.filter((r) => r.name === name).sort((a, b) => a.t - b.t);
+        const end = seq[seq.length - 1].t;
+        let pts = seq.filter((r) => r.t >= end - hours * 3600000);
+        if (pts.length < 2) {
+          card.hidden = true;
+          return;
+        }
+        if (pts.length > PLOT_MAX_POINTS) {
+          const step = pts.length / PLOT_MAX_POINTS;
+          const reduced = [];
+          for (let i = 0; i < PLOT_MAX_POINTS; i++) reduced.push(pts[Math.floor(i * step)]);
+          reduced.push(pts[pts.length - 1]);
+          pts = reduced;
+        }
+        card.hidden = false;
+        draw(pts);
+      } finally {
+        busy = false;
+        if (again) {
+          again = false;
+          load();
+        }
+      }
+    }
+
+    return { load };
+  }
 
   App.register('dashboard', {
     title: 'Dashboard',
@@ -4607,6 +4879,9 @@ const App = (() => {
         if (st.dead) return;
         const capturing = !!(e.detail?.running && /take image/i.test(String(e.detail.state)));
         const wasCapturing = st.capturing;
+        const last = formatLastSuccess(e.detail);
+        ref.lastRun.textContent = last.text;
+        ref.lastRun.title = last.title;
         setStage(capturing);
         if (wasCapturing && !capturing) refresh(true);
       };
@@ -4712,7 +4987,7 @@ const App = (() => {
         }
         for (const seq of data.sequences) {
           if (data.sequences.length > 1) body.append(el('div', 'rec-roi-title', `Sequence \u00b7 ${seq.name}`));
-          body.append(recRoiSection('Digit ROIs', seq.digit), recRoiSection('Analog ROIs', seq.analog));
+          body.append(recRoiSection('Digit ROIs', seq.digit, 'digit'), recRoiSection('Analog ROIs', seq.analog, 'analog'));
         }
       };
 
@@ -4740,6 +5015,7 @@ const App = (() => {
           if (!st.capturing && (!auto || key !== st.lastImageKey)) {
             await Promise.all([loadRoiImage(), loadRecognition()]);
             st.lastImageKey = key;
+            st.plot?.load();
           }
         } catch (error) {
           console.error('Refresh failed:', error);
@@ -4772,6 +5048,8 @@ const App = (() => {
         if (!st.capturing) loadRoiImage();
         loadRecognition();
         loadActivity();
+        st.plot = createReadingsPlot(ref.plotCard, ref.plotRange, ref.plotBody, st.abort.signal);
+        st.plot.load();
         scheduleAuto();
       })();
     },
@@ -9955,10 +10233,21 @@ const CycleMonitor = (() => {
     return m < 60 ? `${m} min ${String(s % 60).padStart(2, '0')} s` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`;
   };
 
+  // countdown 4:12 or 1:04:12
+  const formatCountdown = (s) => {
+    s = Math.max(0, Math.ceil(s));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = String(s % 60).padStart(2, '0');
+    return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+  };
+
   function render() {
     const panel = $('cycle-panel');
     if (!panel) return;
     const btn = $('cycle-start');
+    const pauseBtn = $('cycle-pause');
+    const lastRow = $('cycle-last');
 
     // While the device computes an image it does not answer for a while: keep the last state ("busy") and
     // only report 'not reachable' when the silence lasts much longer than a cycle step
@@ -9974,13 +10263,22 @@ const CycleMonitor = (() => {
       btn.disabled = true;
       btn.classList.remove('queue');
       btn.textContent = 'Start cycle';
+      pauseBtn.hidden = true;
+      lastRow.hidden = true;
+      setFaviconState('offline');
+      setTitleBadge('(offline) ');
       return;
     }
 
-    const kind = status.error < 0 ? 'error' : status.error > 0 ? 'warn' : status.running ? 'running' : 'idle';
+    // paused: the countdown to the next automatic cycle stands still (config mode)
+    const paused = !!status.paused && status.autoStart;
+    const waiting = status.autoStart && !status.running && status.nextRunSeconds >= 0;
+    const kind = status.error < 0 ? 'error' : status.error > 0 ? 'warn' : status.running ? 'running' : paused ? 'paused' : 'idle';
     panel.dataset.kind = kind;
+    setFaviconState(status.error < 0 ? 'error' : status.error > 0 ? 'warn' : paused ? 'paused' : 'ok');
+    setTitleBadge(status.error < 0 ? '(!) ' : paused ? '(paused) ' : '');
     panel.dataset.phase = status.running && /take/i.test(status.state || '') ? 'capture' : '';
-    $('cycle-state').textContent = stale ? 'Computing ...' : status.state || '-';
+    $('cycle-state').textContent = stale ? 'Computing ...' : paused && waiting ? 'Paused (config mode)' : status.state || '-';
     $('cycle-count').textContent = `#${status.cycle}`;
     if (stale && status.running) panel.dataset.kind = 'running';
 
@@ -9992,10 +10290,25 @@ const CycleMonitor = (() => {
       const left = status.processTime - elapsed;
       timer = `running for ${formatSeconds(elapsed)}`;
       if (status.processTime > 0) timer += left > 0 ? ` · about ${formatSeconds(Math.ceil(left))} left` : ' · finishing ...';
+    } else if (waiting) {
+      // Automatic mode: countdown to the next run instead of the idle time
+      timer = paused
+        ? `no automatic cycles · ${formatCountdown(status.nextRunSeconds)} left`
+        : `next run in ${formatCountdown(status.nextRunSeconds - drift)}`;
     } else {
       timer = `${status.running ? 'running for' : 'in this state for'} ${formatSeconds(status.stateSeconds + drift)}`;
     }
+    if (status.running && paused) timer += ' · paused afterwards';
     $('cycle-timer').textContent = stale ? `${timer} · device is busy` : timer;
+
+    pauseBtn.hidden = !status.autoStart;
+    pauseBtn.disabled = busy || stale;
+    pauseBtn.title = paused ? 'Resume automatic cycles' : 'Pause countdown (config mode)';
+    pauseBtn.setAttribute('aria-label', pauseBtn.title);
+    const last = formatLastSuccess(status, drift);
+    lastRow.hidden = false;
+    $('cycle-last-value').textContent = last.text;
+    lastRow.title = last.title;
 
     const ready = status.cycleStart === 'ready' && !stale;
     const queued = status.cycleStart === 'queued' && !stale;
@@ -10026,6 +10339,15 @@ const CycleMonitor = (() => {
     render();
   }
 
+  async function togglePause() {
+    if (busy || !status) return;
+    busy = true;
+    render();
+    await Api.process.setPaused(!status.paused);
+    busy = false;
+    await poll();
+  }
+
   async function start() {
     if (busy) return;
     busy = true;
@@ -10038,6 +10360,7 @@ const CycleMonitor = (() => {
   return {
     start() {
       $('cycle-start')?.addEventListener('click', start);
+      $('cycle-pause')?.addEventListener('click', togglePause);
       document.addEventListener('visibilitychange', () => !document.hidden && poll());
       poll();
       pollTimer = setInterval(poll, POLL_MS);

@@ -20,3 +20,7 @@ State of the main process (used by the cycle display of the WebUI).
 | `running` | A cycle is being processed |
 | `cycleStart` | `ready` (a start triggers a cycle right away), `queued` (a start is executed after the running cycle), `unavailable` |
 | `error` | 0 none, -1 / -2 error (in a row), 1 / 2 deviation (in a row) |
+| `nextRunSeconds` | Seconds until the next automatic cycle, `-1` if the process is not waiting for one (running, manual mode) |
+| `paused` | The countdown to the next automatic cycle is paused (see [cycle](cycle.md)). Reset by a reboot |
+| `lastSuccessSeconds` | Seconds since the last cycle without error or deviation, `-1` if there was none since boot |
+| `lastSuccess` | Local time of that cycle (`2026-11-07T10:04:12+0100`), empty if there was none |

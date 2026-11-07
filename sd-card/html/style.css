@@ -385,11 +385,88 @@ body {
   background: var(--text-secondary);
 }
 
+.cycle-timer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .cycle-timer {
+  flex: 1;
+  min-width: 0;
   font-size: 0.78rem;
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
   padding-left: 16px;
+}
+
+/* mini button: pauses the countdown to the next automatic cycle (config mode) */
+.cycle-pause {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.cycle-pause[hidden] {
+  display: none;
+}
+
+.cycle-pause:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.cycle-pause svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cycle-pause .i-play {
+  display: none;
+  fill: currentColor;
+}
+
+.cycle[data-kind='paused'] .cycle-pause {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.cycle[data-kind='paused'] .cycle-pause .i-pause {
+  display: none;
+}
+
+.cycle[data-kind='paused'] .cycle-pause .i-play {
+  display: block;
+}
+
+.cycle[data-kind='paused'] .cycle-dot {
+  background: var(--warning);
+}
+
+.cycle-last {
+  padding-left: 16px;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.cycle-last[hidden] {
+  display: none;
 }
 
 .cycle-btn {
@@ -3572,8 +3649,119 @@ a .rst-content .admonition-title {
   color: var(--text-secondary);
 }
 
-.dash-rec {
+.dash-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--card-gap);
   margin-top: var(--card-gap);
+  align-items: start;
+}
+
+/* recognition left, readings plot right (only when readings exist) */
+@media screen and (min-width: 1157px) {
+  .dash-row:has(.dash-plot:not([hidden])) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.dash-row .dash-rec {
+  margin-top: 0;
+}
+
+.dash-plot[hidden] {
+  display: none;
+}
+
+.dash-plot .card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.plot-range {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 0.6rem;
+  background: var(--surface);
+}
+
+.plot-range-btn {
+  padding: 3px 9px;
+  border: 0;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.plot-range-btn.active {
+  background: var(--bg-card, #fff);
+  color: var(--primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.plot-body {
+  padding: 0 16px 14px;
+}
+
+.plot-wrap {
+  position: relative;
+  touch-action: none;
+}
+
+.plot-svg {
+  display: block;
+  width: 100%;
+  height: 140px;
+  overflow: visible;
+}
+
+.plot-line {
+  fill: none;
+  stroke: var(--meter-accent, var(--primary));
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.plot-area {
+  fill: var(--meter-accent, var(--primary));
+  opacity: 0.1;
+}
+
+.plot-cursor {
+  stroke: var(--text-secondary);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.6;
+}
+
+.plot-dot {
+  fill: var(--meter-accent, var(--primary));
+  stroke: #fff;
+  stroke-width: 1.5;
+}
+
+.plot-info {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.plot-readout {
+  font-weight: 600;
+  color: var(--text);
 }
 
 .dash-rec .rec-body {
@@ -3605,6 +3793,20 @@ a .rst-content .admonition-title {
 
 .dash-rec .rec-roi-title {
   margin-bottom: 6px;
+}
+
+/* the digit crops are tall: keep them narrow so they do not dominate the analog dials */
+.dash-rec .rec-roi-grid.is-digit {
+  grid-template-columns: repeat(auto-fill, 28px);
+  gap: 6px;
+}
+
+.dash-rec .rec-roi-grid.is-digit .rec-roi-tile {
+  padding: 3px 2px;
+}
+
+.dash-rec .rec-roi-grid.is-digit .rec-roi-value {
+  font-size: 0.7rem;
 }
 
 .rec .rec-image-body {

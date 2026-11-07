@@ -76,7 +76,14 @@
           <span class="cycle-scan" id="cycle-scan"></span>
           <span id="cycle-state">Connecting ...</span>
         </div>
-        <div class="cycle-timer" id="cycle-timer">&nbsp;</div>
+        <div class="cycle-timer-row">
+          <div class="cycle-timer" id="cycle-timer">&nbsp;</div>
+          <button class="cycle-pause" id="cycle-pause" type="button" hidden aria-label="Pause countdown">
+            <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6v12M15 6v12" /></svg>
+            <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z" /></svg>
+          </button>
+        </div>
+        <div class="cycle-last" id="cycle-last" hidden>Last success: <span id="cycle-last-value">-</span></div>
         <button class="button btn-action cycle-btn" id="cycle-start" type="button" disabled>Start cycle</button>
       </div>
 

@@ -44,6 +44,10 @@ static long automaticProcessInterval = 0;
 static int cycleCounter = 0;
 static int processingTime = 0;
 static time_t cycleStartUptime = 0; // Uptime [s] when the running cycle started
+static bool autoCountdownPaused = false;     // Countdown to the next automatic cycle is paused (config mode), reset by reboot
+static int64_t autoCountdownRemainingMs = -1; // Remaining wait time until the next automatic cycle [ms], -1 if not waiting
+static time_t lastSuccessUptime = -1;         // Uptime [s] of the last successful cycle, -1 if there was none since boot
+static std::string lastSuccessTime = "";      // Local time of the last successful cycle (ISO 8601)
 
 
 bool doInit(void)
@@ -263,6 +267,15 @@ esp_err_t handler_api_status(httpd_req_t *req)
     cJSON_AddNumberToObject(root, "cycleSeconds", running && now >= cycleStartUptime ? (double)(now - cycleStartUptime) : 0);
     cJSON_AddNumberToObject(root, "uptime", (double)now);
     cJSON_AddNumberToObject(root, "error", flowctrl.getFlowStateErrorOrDeviation());
+    // Countdown to the next automatic cycle [s], -1 if the process is not waiting for one
+    cJSON_AddNumberToObject(root, "nextRunSeconds",
+                            taskAutoFlowState == FLOW_TASK_STATE_IDLE_AUTOSTART && autoCountdownRemainingMs >= 0
+                                ? (double)((autoCountdownRemainingMs + 999) / 1000)
+                                : -1);
+    cJSON_AddBoolToObject(root, "paused", autoCountdownPaused);
+    // Last successful cycle: age [s] (-1: none since boot) and local time
+    cJSON_AddNumberToObject(root, "lastSuccessSeconds", lastSuccessUptime >= 0 && now >= lastSuccessUptime ? (double)(now - lastSuccessUptime) : -1);
+    cJSON_AddStringToObject(root, "lastSuccess", lastSuccessTime.c_str());
     return apiSendJson(req, "200 OK", root);
 }
 
@@ -272,6 +285,24 @@ esp_err_t handler_api_status(httpd_req_t *req)
 esp_err_t handler_api_cycle(httpd_req_t *req)
 {
     const std::string timeStamp = " (" + getCurrentTimeString("%H:%M:%S") + ")";
+
+    // POST /api/cycle {"paused":true|false}: pause or resume the countdown to the next automatic cycle (config mode)
+    if (req->content_len > 0) {
+        cJSON *body = apiReadJsonBody(req);
+        if (body == NULL) {
+            return ESP_FAIL; // response already sent
+        }
+        const cJSON *paused = cJSON_GetObjectItemCaseSensitive(body, "paused");
+        if (!cJSON_IsBool(paused)) {
+            cJSON_Delete(body);
+            return apiSendResult(req, "400 Bad Request", false, "E91", "Parameter 'paused' (boolean) missing");
+        }
+        autoCountdownPaused = cJSON_IsTrue(paused);
+        cJSON_Delete(body);
+        LogFile.writeToFile(ESP_LOG_INFO, TAG, autoCountdownPaused ? "Automatic cycle countdown paused (REST API)" : "Automatic cycle countdown resumed (REST API)");
+        return apiSendResult(req, "200 OK", true, autoCountdownPaused ? "004" : "005",
+                             std::string(autoCountdownPaused ? "Countdown paused" : "Countdown resumed") + timeStamp);
+    }
 
     if (taskAutoFlowState == FLOW_TASK_STATE_IDLE_NO_AUTOSTART || taskAutoFlowState == FLOW_TASK_STATE_IDLE_AUTOSTART ||
         flowctrl.getActualProcessState() == FLOW_INIT_WAITING_VALID_TIME ||
@@ -1073,6 +1104,8 @@ void task_autodoFlow(void *pvParameter)
             }
             else {
                 flowctrl.clearFlowStateEventInRowCounter();
+                lastSuccessUptime = getUptime(); // Cycle without error or deviation
+                lastSuccessTime = getCurrentTimeString("%Y-%m-%dT%H:%M:%S%z");
 #ifdef ENABLE_MQTT
                 publishMqttData(std::string(mqttServer_getMainTopic() + "/process/status/process_error"), "0", 1, false);
 #endif // ENABLE_MQTT
@@ -1164,10 +1197,20 @@ void task_autodoFlow(void *pvParameter)
             // ********************************************
             suspendWifiConnection();
 
+            // Wait until the interval is elapsed. The wait runs in 1 s steps to provide the countdown and to be able to pause it.
+            // A manual start or a config reload aborts the wait (xTaskAbortDelay)
             int64_t processIntervalDeltaTime = (esp_timer_get_time() - cycleStartActualTime) / 1000;
-            if (automaticProcessInterval > processIntervalDeltaTime) {
-                vTaskDelay((automaticProcessInterval - processIntervalDeltaTime) / portTICK_PERIOD_MS);
+            autoCountdownRemainingMs = automaticProcessInterval > processIntervalDeltaTime ? automaticProcessInterval - processIntervalDeltaTime : 0;
+            int64_t lastTickUs = esp_timer_get_time();
+            while (autoCountdownRemainingMs > 0 && !reloadConfig && !manualFlowStart) {
+                vTaskDelay((autoCountdownRemainingMs < 1000 && !autoCountdownPaused ? autoCountdownRemainingMs : 1000) / portTICK_PERIOD_MS);
+                const int64_t nowUs = esp_timer_get_time();
+                if (!autoCountdownPaused) {
+                    autoCountdownRemainingMs -= (nowUs - lastTickUs) / 1000;
+                }
+                lastTickUs = nowUs;
             }
+            autoCountdownRemainingMs = -1;
 
             // Check if reload config is triggered by REST API
             // ********************************************
