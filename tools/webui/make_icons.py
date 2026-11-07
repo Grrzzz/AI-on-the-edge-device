@@ -36,6 +36,7 @@ THEMES = {
     'generic': {
         'label': 'Meter',
         'colors': ['#5b6cff', '#8b5cf6'],
+        'primary': '#5b5ef0',
         'paths': ['M10.2 8V12.5', 'M13.8 8V12.5', 'M7.5 16.6H9.5', 'M14.5 16.6H16.5'],
         'circles': [[12, 16.6, 1.1]],
         'rects': [[3.5, 3.8, 17, 16.4, 3.2], [6.6, 7.6, 10.8, 5.4, 1.2]],
@@ -43,6 +44,7 @@ THEMES = {
     'water': {
         'label': 'Water',
         'colors': ['#0ea5e9', '#2563eb'],
+        'primary': '#2563eb',
         'paths': [
             'M12 3C9.6 6 6 9.4 6 13.6C6 17.1 8.7 20 12 20C15.3 20 18 17.1 18 13.6C18 9.4 14.4 6 12 3Z',
             'M9.3 14.2C9.4 15.7 10.4 16.9 11.8 17.2',
@@ -52,6 +54,7 @@ THEMES = {
     'gas': {
         'label': 'Gas',
         'colors': ['#f97316', '#ef4444'],
+        'primary': '#ea580c',
         'paths': [
             'M12 3C12.6 6.2 16.6 8 16.6 13.2C16.6 16.7 14.7 20 12 20C9.3 20 7.4 17.6 7.4 14.6C7.4 12.6 8.4 11.4 9.4 10.3C9.6 11.9 10.4 12.7 11.2 12.9C11.7 9.6 11 6 12 3Z',
         ],
@@ -60,12 +63,14 @@ THEMES = {
     'energy': {
         'label': 'Energy',
         'colors': ['#d97706', '#f59e0b'],
+        'primary': '#d97706',
         'paths': ['M13.2 2.8L5.6 13.2H11.3L10.6 21.2L18.4 10.6H12.7Z'],
         'circles': [], 'rects': [],
     },
     'temperature': {
         'label': 'Temperature',
         'colors': ['#ec4899', '#f43f5e'],
+        'primary': '#db2777',
         'paths': [
             'M10 13.3V5.5C10 4.4 10.9 3.5 12 3.5C13.1 3.5 14 4.4 14 5.5V13.3C15.2 14.1 16 15.4 16 17C16 19.2 14.2 21 12 21C9.8 21 8 19.2 8 17C8 15.4 8.8 14.1 10 13.3Z',
             'M12 9V15.6',
@@ -75,6 +80,7 @@ THEMES = {
     'pressure': {
         'label': 'Pressure',
         'colors': ['#64748b', '#334155'],
+        'primary': '#475569',
         'paths': ['M12 13L16.3 8.7', 'M12 5.8V7.4', 'M5.9 9.7L7.2 10.6', 'M18.1 9.7L16.8 10.6', 'M8.5 21H15.5'],
         'circles': [[12, 12.8, 8.2], [12, 13, 1.2]],
         'rects': [],
@@ -240,7 +246,7 @@ def state_image(theme, state, path):
 # JS block for app.js
 # ---------------------------------------------------------------------------------------------
 def js_block():
-    data = {k: {'label': v['label'], 'colors': v['colors'], 'paths': v['paths'], 'circles': v['circles'], 'rects': v['rects']} for k, v in THEMES.items()}
+    data = {k: {'label': v['label'], 'colors': v['colors'], 'primary': v['primary'], 'paths': v['paths'], 'circles': v['circles'], 'rects': v['rects']} for k, v in THEMES.items()}
     body = json.dumps(data, indent=2).replace('"', "'")
     # meter type of the MQTT settings (mqtt.homeassistant.metertype) -> theme
     types = {0: 'generic', 1: 'water', 2: 'water', 3: 'water', 4: 'water', 15: 'water', 16: 'water', 5: 'gas', 6: 'gas',

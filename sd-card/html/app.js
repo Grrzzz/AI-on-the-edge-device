@@ -711,6 +711,7 @@ const METER_THEMES = {
       '#5b6cff',
       '#8b5cf6'
     ],
+    'primary': '#5b5ef0',
     'paths': [
       'M10.2 8V12.5',
       'M13.8 8V12.5',
@@ -747,6 +748,7 @@ const METER_THEMES = {
       '#0ea5e9',
       '#2563eb'
     ],
+    'primary': '#2563eb',
     'paths': [
       'M12 3C9.6 6 6 9.4 6 13.6C6 17.1 8.7 20 12 20C15.3 20 18 17.1 18 13.6C18 9.4 14.4 6 12 3Z',
       'M9.3 14.2C9.4 15.7 10.4 16.9 11.8 17.2'
@@ -760,6 +762,7 @@ const METER_THEMES = {
       '#f97316',
       '#ef4444'
     ],
+    'primary': '#ea580c',
     'paths': [
       'M12 3C12.6 6.2 16.6 8 16.6 13.2C16.6 16.7 14.7 20 12 20C9.3 20 7.4 17.6 7.4 14.6C7.4 12.6 8.4 11.4 9.4 10.3C9.6 11.9 10.4 12.7 11.2 12.9C11.7 9.6 11 6 12 3Z'
     ],
@@ -772,6 +775,7 @@ const METER_THEMES = {
       '#d97706',
       '#f59e0b'
     ],
+    'primary': '#d97706',
     'paths': [
       'M13.2 2.8L5.6 13.2H11.3L10.6 21.2L18.4 10.6H12.7Z'
     ],
@@ -784,6 +788,7 @@ const METER_THEMES = {
       '#ec4899',
       '#f43f5e'
     ],
+    'primary': '#db2777',
     'paths': [
       'M10 13.3V5.5C10 4.4 10.9 3.5 12 3.5C13.1 3.5 14 4.4 14 5.5V13.3C15.2 14.1 16 15.4 16 17C16 19.2 14.2 21 12 21C9.8 21 8 19.2 8 17C8 15.4 8.8 14.1 10 13.3Z',
       'M12 9V15.6'
@@ -803,6 +808,7 @@ const METER_THEMES = {
       '#64748b',
       '#334155'
     ],
+    'primary': '#475569',
     'paths': [
       'M12 13L16.3 8.7',
       'M12 5.8V7.4',
@@ -828,8 +834,23 @@ const METER_THEMES = {
 const METER_TYPE_THEME = {"0": "generic", "1": "water", "2": "water", "3": "water", "4": "water", "15": "water", "16": "water", "5": "gas", "6": "gas", "7": "energy", "8": "energy", "9": "energy", "10": "energy", "11": "temperature", "12": "temperature", "13": "pressure", "14": "pressure"};
 // END METER THEMES
 
-let meterThemeId = 'generic';
-const meterTheme = () => METER_THEMES[meterThemeId] || METER_THEMES.generic;
+const DEFAULT_THEME = 'water';
+let meterThemeId = DEFAULT_THEME; // theme in use
+let deviceThemeId = DEFAULT_THEME; // theme of the meter type
+let themePref = 'auto'; // choice of the user: 'auto' (follows the meter type) or a theme id
+try {
+  const saved = localStorage.getItem('uiTheme');
+  if (saved) themePref = saved;
+} catch (e) { }
+const meterTheme = () => METER_THEMES[meterThemeId] || METER_THEMES[DEFAULT_THEME];
+
+// main color of the interface: the primary color of the theme, lighter in the dark mode
+const mixHex = (hex, other, amount) => {
+  const c = (h) => [1, 3, 5].map((i) => parseInt(h.substr(i, 2), 16));
+  const a = c(hex);
+  const b = c(other);
+  return '#' + a.map((v, i) => Math.round(v + (b[i] - v) * amount).toString(16).padStart(2, '0')).join('');
+};
 
 // SVG elements of the glyph (to be placed inside a group with stroke attributes)
 const glyphMarkup = (t) =>
@@ -928,16 +949,40 @@ const MeterTheme = {
     return meterThemeId;
   },
 
-  // theme id ('water') or meter type number of the MQTT settings (5 -> 'gas')
+  get pref() {
+    return themePref;
+  },
+
+  get deviceId() {
+    return deviceThemeId;
+  },
+
+  // choice of the user in the setup: 'auto' or a theme id (stored in this browser)
+  setPref(pref) {
+    themePref = pref === 'auto' || METER_THEMES[pref] ? pref : 'auto';
+    try { localStorage.setItem('uiTheme', themePref); } catch (e) { }
+    this.render();
+  },
+
+  // theme id ('water') or meter type number of the MQTT settings (5 -> 'gas'): the theme of the device (used by 'auto')
   apply(typeOrId) {
     let id = typeof typeOrId === 'number' || /^\d+$/.test(String(typeOrId)) ? METER_TYPE_THEME[Number(typeOrId)] : typeOrId;
-    if (!METER_THEMES[id]) id = 'generic';
-    meterThemeId = id;
+    if (!METER_THEMES[id]) id = DEFAULT_THEME;
+    deviceThemeId = id;
     try { localStorage.setItem('meterTheme', id); } catch (e) { }
+    this.render();
+  },
+
+  render() {
+    const id = themePref !== 'auto' && METER_THEMES[themePref] ? themePref : deviceThemeId;
+    meterThemeId = id;
 
     const t = meterTheme();
-    document.documentElement.style.setProperty('--meter-accent', t.colors[0]);
-    document.documentElement.dataset.meter = id;
+    const root = document.documentElement;
+    root.style.setProperty('--meter-accent', t.colors[0]);
+    root.style.setProperty('--theme-primary', t.primary);
+    root.style.setProperty('--theme-primary-dark', mixHex(t.primary, '#ffffff', 0.32));
+    root.dataset.meter = id;
     const logo = document.getElementById('brand-logo');
     if (logo) logo.innerHTML = logoSvg(id);
     const favicon = document.getElementById('favicon-svg');
@@ -945,6 +990,7 @@ const MeterTheme = {
     const scan = document.getElementById('cycle-scan');
     if (scan) scan.innerHTML = scanIconHtml(20);
     loaderSpinner = buildLoaderSpinner();
+    window.dispatchEvent(new CustomEvent('meter-theme', { detail: { id, pref: themePref, device: deviceThemeId } }));
   },
 
   applyFromConfig() {
@@ -1472,8 +1518,8 @@ const App = (() => {
 
     // The config is cached in sessionStorage for the views. A device in operation mode 'Setup' opens the wizard
     // when the page is called without a route (this replaces the former firmware redirect to setup.html).
-    let storedTheme = 'generic';
-    try { storedTheme = localStorage.getItem('meterTheme') || 'generic'; } catch (e) { }
+    let storedTheme = DEFAULT_THEME;
+    try { storedTheme = localStorage.getItem('meterTheme') || DEFAULT_THEME; } catch (e) { }
     MeterTheme.apply(storedTheme); // last known theme, no flash while the config loads
     const configLoaded = loadConfig().then(() => MeterTheme.applyFromConfig()).catch((e) => console.error('Failed to load config', e));
     if (!location.hash) {
@@ -9598,6 +9644,112 @@ const App = (() => {
     card.items.push({ def: row, el });
   }
 
+  // Theme choice (icon and main color of the interface): custom combo box with icon, color and name. Stored in this browser.
+  function buildThemeCard(s) {
+    const card = App.el('div', 'card cfg-card cfg-theme-card');
+    const head = App.el('div', 'card-header');
+    head.append(App.el('span', 'cfg-card-title', 'Appearance'));
+    const body = App.el('div', 'card-body cfg-body');
+    card.append(head, body);
+
+    const row = App.el('div', 'cfg-row cfg-l0');
+    const label = App.el('div', 'cfg-label');
+    label.append(App.el('span', '', 'Theme'));
+    const ctl = App.el('div', 'cfg-ctl');
+    row.append(label, ctl);
+
+    const combo = App.el('div', 'theme-combo');
+    const btn = App.el('button', 'theme-combo-btn');
+    btn.type = 'button';
+    btn.setAttribute('aria-haspopup', 'listbox');
+    btn.setAttribute('aria-expanded', 'false');
+    const list = App.el('ul', 'theme-combo-list');
+    list.setAttribute('role', 'listbox');
+    list.hidden = true;
+    combo.append(btn, list);
+    ctl.append(combo);
+
+    const hint = App.el('p', 'cfg-hint', 'Icon and main color of the interface. Auto follows the meter type of the MQTT settings. This choice is stored in this browser.');
+    ctl.append(hint);
+    body.append(row);
+
+    const optionContent = (id, text) => {
+      const t = METER_THEMES[id];
+      const wrap = App.el('span', 'theme-opt');
+      const icon = App.el('span', 'theme-opt-icon');
+      icon.innerHTML = logoSvg(id, 24);
+      const name = App.el('span', 'theme-opt-name', text);
+      const dot = App.el('span', 'theme-opt-dot');
+      dot.style.background = t.primary;
+      wrap.append(icon, name, dot);
+      return wrap;
+    };
+    const entries = () => [['auto', `Auto (${METER_THEMES[MeterTheme.deviceId].label})`, MeterTheme.deviceId], ...Object.keys(METER_THEMES).map((id) => [id, METER_THEMES[id].label, id])];
+
+    let active = -1;
+    const close = () => {
+      list.hidden = true;
+      btn.setAttribute('aria-expanded', 'false');
+    };
+    const mark = (i) => {
+      active = i;
+      [...list.children].forEach((li, k) => li.classList.toggle('active', k === i));
+      list.children[i]?.scrollIntoView({ block: 'nearest' });
+    };
+    const build = () => {
+      const pref = MeterTheme.pref;
+      btn.replaceChildren(optionContent(pref === 'auto' ? MeterTheme.deviceId : pref, pref === 'auto' ? `Auto (${METER_THEMES[MeterTheme.deviceId].label})` : METER_THEMES[pref].label), App.el('span', 'theme-combo-chev', '\u25BE'));
+      list.replaceChildren();
+      entries().forEach(([value, text, iconId], i) => {
+        const li = App.el('li', 'theme-combo-item');
+        li.setAttribute('role', 'option');
+        li.dataset.value = value;
+        li.setAttribute('aria-selected', String(value === pref));
+        li.append(optionContent(iconId, text));
+        if (value === pref) li.classList.add('selected');
+        li.addEventListener('click', () => {
+          MeterTheme.setPref(value);
+          close();
+          btn.focus();
+        });
+        li.addEventListener('pointermove', () => mark(i));
+        list.append(li);
+      });
+    };
+    const open = () => {
+      list.hidden = false;
+      btn.setAttribute('aria-expanded', 'true');
+      mark(entries().findIndex(([v]) => v === MeterTheme.pref));
+    };
+    btn.addEventListener('click', () => (list.hidden ? open() : close()));
+    btn.addEventListener('keydown', (e) => {
+      const n = entries().length;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (list.hidden) open();
+        else mark((active + (e.key === 'ArrowDown' ? 1 : n - 1)) % n);
+      } else if ((e.key === 'Enter' || e.key === ' ') && !list.hidden) {
+        e.preventDefault();
+        list.children[active]?.click();
+      } else if (e.key === 'Escape' && !list.hidden) {
+        e.stopPropagation();
+        close();
+      }
+    });
+    const onDoc = (e) => {
+      if (!combo.isConnected) {
+        document.removeEventListener('pointerdown', onDoc);
+        window.removeEventListener('meter-theme', build);
+        return;
+      }
+      if (!combo.contains(e.target)) close();
+    };
+    document.addEventListener('pointerdown', onDoc);
+    window.addEventListener('meter-theme', build); // the meter type or the choice changed
+    build();
+    return card;
+  }
+
   function buildCard(s, def) {
     const el = App.el('div', 'card cfg-card');
     el.dataset.card = def.id;
@@ -9735,6 +9887,7 @@ const App = (() => {
         const panel = App.el('div', 'cfg-panel');
         panel.hidden = true;
         if (sec.id === 'general') {
+          panel.append(buildThemeCard(s));
           s.hero = App.el('div', 'cfg-hero');
           s.hero.append(App.el('div', 'cfg-hero-label', 'This device'), App.el('div', 'chips'));
           panel.append(s.hero);
