@@ -22,6 +22,21 @@ struct Rect {
 
 void init();
 
+/// Pause after a step (ms) of the process while a WebUI follows the cycle
+constexpr int PAUSE_STEP_MS = 2000; // raw image, alignment
+constexpr int PAUSE_ROI_MS = 400;   // each ROI
+
+/// A WebUI is open (it asks for the status regularly): the steps of the process are paused for the live view
+void markWatched();
+
+/**
+ * @brief Pause the process if a WebUI is open (GET /api/status or /api/live was requested within the last seconds)
+ *
+ * The device is too busy while it processes to answer in real time. With a short pause after each step the WebUI can
+ * show the steps one after another. Nobody watching: no pause, the process is not slowed down.
+ */
+void stepPause(int ms);
+
 /// A new cycle starts: forget the data of the last one
 void begin(int cycle);
 

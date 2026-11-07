@@ -4,6 +4,7 @@
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
+#include <freertos/task.h>
 
 
 namespace LiveFlow {
@@ -30,6 +31,7 @@ int alignDy = 0;
 Rect alignMarkers[2];
 int alignMarkerCount = 0;
 std::vector<RoiResult> rois;
+volatile TickType_t lastPollTick = 0; // last request of /api/live (0: never)
 
 // Short wait: the web server must not block the flow and the other way round
 struct Lock {
@@ -130,8 +132,24 @@ void roiDone(const std::string &sequence, const char *kind, const std::string &r
 }
 
 
+void markWatched()
+{
+    lastPollTick = xTaskGetTickCount() | 1; // never 0
+}
+
+
+void stepPause(int ms)
+{
+    const TickType_t last = lastPollTick;
+    if (last != 0 && (xTaskGetTickCount() - last) < pdMS_TO_TICKS(8000)) {
+        vTaskDelay(pdMS_TO_TICKS(ms));
+    }
+}
+
+
 cJSON *liveJson(bool running, const std::string &state)
 {
+    markWatched();
     cJSON *root = cJSON_CreateObject();
     if (root == NULL) {
         return NULL;

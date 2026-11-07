@@ -4373,8 +4373,9 @@ const App = (() => {
      *   rois:Array<{seq:string, kind:'digit'|'analog', name:string, value:string, confidence?:number, rejected:boolean}>}>} null: not available (older firmware)
      */
     async live(signal) {
-      const res = await apiCall('/api/live', { signal, timeout: 4000 }, { parseType: 'json' });
-      return res.ok && res.data && res.data.api_name ? res.data : null;
+      const res = await apiCall('/api/live', { signal, timeout: 8000 }, { parseType: 'json' });
+      if (res.ok && res.data && res.data.api_name) return res.data;
+      return res.status === 404 || res.status === 405 ? 'unsupported' : null; // null: no answer (the device is busy)
     },
 
     /**
@@ -5175,15 +5176,17 @@ const App = (() => {
         S.firstSeq = seq;
         for (const r of live.rois) if (r.seq === seq && byKind[r.kind]) byKind[r.kind].push(r);
         let idx = 0;
+        let batch = 0; // results of one answer: one after another
         for (const kind of ['digit', 'analog']) {
           const slots = S.rois.filter((r) => r.kind === kind);
           slots.forEach((slot, i) => {
             const res = byKind[kind][i];
             if (res && slot.doneAt === null) {
               Object.assign(slot, evalRoi(kind, res.value, res.confidence, res.rejected));
-              slot.doneAt = now;
+              slot.doneAt = now + batch * 200;
               slot.name = res.name;
-              S.hooks.onRoi?.(S.rois.indexOf(slot), slot);
+              S.hooks.onRoi?.(S.rois.indexOf(slot), slot, batch * 200);
+              batch++;
             }
           });
           idx += slots.length;
@@ -5785,15 +5788,14 @@ const App = (() => {
         const live = await Api.process.live(st.abort.signal);
         st.liveBusy = false;
         if (!st.liveOn || st.dead) return;
-        if (live === null) {
-          if (st.liveOk === null) { // older firmware: the animation follows after the cycle
-            st.liveOk = false;
-            st.liveSession = false;
-            st.reveal.abortLive();
-            stopLive();
-          }
+        if (live === 'unsupported') { // older firmware: the animation follows after the cycle
+          st.liveOk = false;
+          st.liveSession = false;
+          st.reveal.abortLive();
+          stopLive();
           return;
         }
+        if (live === null) return; // busy: try again with the next tick
         st.liveOk = true;
         // data of the previous cycle (the new one has not started on the device yet) is ignored
         if (st.idleCycle !== undefined && live.cycle <= st.idleCycle) return;
@@ -5811,9 +5813,9 @@ const App = (() => {
         st.liveOn = true;
         st.reveal.beginLive({
           rois,
-          onRoi: (i, roi) => {
+          onRoi: (i, roi, delay = 0) => {
             if (!st.liveTiles) buildLiveTiles(rois);
-            fillLiveTile(i, roi);
+            setTimeout(() => { if (!st.dead) fillLiveTile(i, roi); }, delay);
           },
           onDone: () => {
             stopLive();
@@ -5880,6 +5882,7 @@ const App = (() => {
           ref.replay.hidden = true;
           if (st.stageHold) hideStage();
           ref.img.hidden = st.capturing;
+          if (!st.capturing) loadRoiImage();
           return;
         }
         ref.replay.hidden = false;
@@ -6070,7 +6073,7 @@ const App = (() => {
 
           // Manual refresh always reloads the image; auto refresh only when cycle or step changed
           if (!st.capturing && (!auto || key !== st.lastImageKey)) {
-            const [, rec] = await Promise.all([loadRoiImage(), loadRecognition()]);
+            const rec = await loadRecognition();
             st.lastImageKey = key;
             st.plot?.load();
             await applyReveal(rec);
@@ -6104,8 +6107,7 @@ const App = (() => {
         st.lastImageKey = await loadProcessData();
         if (st.dead) return;
         if (!st.capturing) {
-          await loadRoiImage();
-          applyReveal(await loadRecognition());
+          applyReveal(await loadRecognition()); // the device picture (alg_roi.jpg) is only loaded if the animation view is not possible
         } else {
           loadRecognition();
         }

@@ -245,6 +245,7 @@ static const char *getCycleStartAvailability(void)
 
 esp_err_t handler_api_status(httpd_req_t *req)
 {
+    LiveFlow::markWatched(); // the WebUI polls the status regularly: someone is looking
     cJSON *root = cJSON_CreateObject();
     if (root == NULL) {
         return apiSendJson(req, "200 OK", NULL);

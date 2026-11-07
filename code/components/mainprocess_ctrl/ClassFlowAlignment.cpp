@@ -161,6 +161,7 @@ bool ClassFlowAlignment::doFlow(std::string time)
 
     // Result for the WebUI: aligned image = shift applied after the rotation around the image center
     LiveFlow::alignmentDone(alignmentOk, totalRotation, shiftX, shiftY, liveMarker, liveMarkerCount);
+    LiveFlow::stepPause(LiveFlow::PAUSE_STEP_MS);
 
     if (getFlowState()->isSuccessful) {
         flowctrl.drawDigitRoi(imgAlgRoi);

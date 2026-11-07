@@ -91,6 +91,7 @@ bool ClassFlowTakeImage::doFlow(std::string zwtime)
 
     if (flowImageData->imgRaw && flowImageData->imgProcess->saveJpgToContainer(flowImageData->imgRaw) == ESP_OK) {
         LiveFlow::rawReady();
+        LiveFlow::stepPause(LiveFlow::PAUSE_STEP_MS);
     }
 
     if (cfgDataPtr->debug.saveAllFiles) {
