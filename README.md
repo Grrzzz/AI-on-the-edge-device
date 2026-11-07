@@ -15,6 +15,23 @@ backend and a one-click update from GitHub, and trims the firmware to the `esp32
   <img src="docs/images/ui-dashboard.png" width="800" alt="Dashboard">
 </p>
 
+## What is new in 2.2
+
+- **Picture animation in the dashboard** - the image card follows the device while a cycle runs: the scan scene ("Taking image", the
+  step names), the raw image grows out of the scan icon, the markers are searched, the image is rotated and shifted onto the reference,
+  the regions of interest appear and every digit and analog region takes the color of its result (green recognized, orange uncertain,
+  red low confidence) while the device evaluates it. The recognition card is blurred while the new results are on the way and its tiles
+  fill one after another. A replay button runs the animation again. While a web interface is open the device pauses briefly after each step
+  so the steps can be followed (no slow down without a web interface)
+- **Firmware: `GET /api/live`** reports the progress of the running cycle, `/img_tmp/raw.jpg` the raw camera image of the last cycle,
+  `/api/recognition` the alignment (rotation and shift), the confidence and the rectangle of every ROI
+  ([API docs](docs/API/REST/live.md))
+- **Hint for newer releases** - an info icon next to the version and a dot at the Update menu; the update page checks right away.
+  Development builds can always be updated to the official release
+- **Migration of v16** now keeps the MQTT password
+- Tab title starts with the host name (with several devices in narrow tabs), favicon with a status dot, mobile dashboard shows the
+  camera image as the second card
+
 ## What is new in 2.1
 
 - **Countdown and pause** - in automatic mode the sidebar shows the countdown to the next run instead of the idle time. A mini pause
