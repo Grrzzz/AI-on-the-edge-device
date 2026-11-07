@@ -6665,6 +6665,18 @@ const App = (() => {
                   </div>
                 </div>
               </div>
+
+              <div class="card setup-marker-rec">
+                <div class="card-header">
+                  <span>Recognition</span>
+                  <button type="button" class="button" data-click="recRefresh">Refresh</button>
+                </div>
+                <div class="side-body">
+                  <div class="setup-rec-hint">Result of the last cycle: a good alignment shows in the recognition.</div>
+                  <div class="setup-rec-align" data-ref="recAlign" hidden></div>
+                  <div class="rec" data-ref="recBody"><span class="dash-log-empty">Loading ...</span></div>
+                </div>
+              </div>
             </div>
 
             <div class="setup-contents" data-ref="panelRoi" hidden>
@@ -7975,11 +7987,84 @@ const App = (() => {
       }
     }
 
+    let lastRecTab = '';
+    // Markers tab: recognition of the last cycle next to the marker, to judge the alignment by its result
+    const recTileValue = (kind, r) => {
+      if (r.na) return ['N', 'err'];
+      const n = parseFloat(r.value);
+      const label = Number.isNaN(n) ? String(r.value) : kind === 'digit' ? String(Math.round(n) % 10) : n.toFixed(1);
+      const c = r.confidence;
+      return [label, c === null || c === undefined ? 'ok' : c >= 90 ? 'ok' : c >= 60 ? 'warn' : 'err'];
+    };
+    async function loadMarkerRecognition() {
+      if (destroyed || !R.recBody) return;
+      const data = await Api.process.recognition();
+      if (destroyed) return;
+      const body = R.recBody;
+      body.textContent = '';
+      R.recAlign.hidden = true;
+      if (!data || !data.ready) {
+        const msg = document.createElement('span');
+        msg.className = 'dash-log-empty';
+        msg.textContent = data ? 'Waiting for the first completed cycle' : 'Recognition details not available';
+        body.append(msg);
+        return;
+      }
+      const al = data.alignment;
+      if (al) {
+        R.recAlign.hidden = false;
+        R.recAlign.textContent = al.ok === false ? 'Alignment failed in the last cycle' : `Last alignment: rotation ${(+al.rotation).toFixed(1)}°, shift ${al.dx} / ${al.dy} px`;
+        R.recAlign.classList.toggle('is-error', al.ok === false);
+      }
+      const seq = data.sequences[0];
+      for (const [kind, title] of [['digit', 'Digit ROIs'], ['analog', 'Analog ROIs']]) {
+        const block = seq[kind];
+        if (!block.enabled || !block.rois.length) continue;
+        const wrap = document.createElement('div');
+        wrap.className = 'rec-roi-block';
+        const h = document.createElement('div');
+        h.className = 'rec-roi-title';
+        h.textContent = title;
+        const grid = document.createElement('div');
+        grid.className = `rec-roi-grid is-${kind}`;
+        for (const r of block.rois) {
+          const [label, status] = recTileValue(kind, r);
+          const tile = document.createElement('div');
+          tile.className = 'rec-roi-tile';
+          tile.dataset.status = status;
+          const v = document.createElement('div');
+          v.className = 'rec-roi-value';
+          v.textContent = label;
+          tile.append(v);
+          if (!r.na && r.image) {
+            const img = document.createElement('img');
+            img.className = 'rec-roi-img';
+            img.src = Api.process.imageUrl(r.image);
+            img.alt = `ROI ${label}`;
+            tile.append(img);
+          }
+          grid.append(tile);
+        }
+        wrap.append(h, grid);
+        body.append(wrap);
+      }
+    }
+    // a finished cycle has new results
+    let recWasRunning = false;
+    const onCycleForRec = (e) => {
+      const running = !!e.detail?.running;
+      if (recWasRunning && !running && mode === 'markers') loadMarkerRecognition();
+      recWasRunning = running;
+    };
+    window.addEventListener('cycle-status', onCycleForRec);
+
     function updateTabsUI() {
       all('.setup-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === mode));
       const isRoi = isRoiMode();
       R.panelImage.hidden = mode !== 'image';
       R.panelMarkers.hidden = mode !== 'markers';
+      if (mode === 'markers' && lastRecTab !== 'markers') loadMarkerRecognition();
+      lastRecTab = mode;
       R.panelRoi.hidden = !isRoi;
       R.side.hidden = mode === 'image';
       R.layout.classList.toggle('single', mode === 'image');
@@ -8168,6 +8253,7 @@ const App = (() => {
       showActual: () => showReference(),
       take: () => doTake(),
       updateMarker: () => requestMarkerCut(),
+      recRefresh: () => loadMarkerRecognition(),
       newSequence: () => onClickNewSequence(),
       renameSequence: () => onClickRenameSequence(),
       deleteSequence: () => onClickDeleteSequence(),
@@ -8284,6 +8370,7 @@ const App = (() => {
       if (destroyed) return;
       destroyed = true;
       if (typeof offTheme === 'function') offTheme();
+      window.removeEventListener('cycle-status', onCycleForRec);
       root.removeEventListener('click', onRootClick);
       root.removeEventListener('change', onRootChange);
       root.removeEventListener('input', onRootInput);

@@ -5829,3 +5829,55 @@ a .rst-content .admonition-title {
   60% { transform: scale(1.06); }
   to { transform: scale(1); opacity: 1; }
 }
+
+/* Configuration > Markers: recognition of the last cycle */
+.setup-marker-rec .card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.setup-rec-hint {
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.setup-rec-align {
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  border-radius: 0.5rem;
+  background: var(--surface);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.setup-rec-align.is-error {
+  background: color-mix(in srgb, var(--error) 14%, transparent);
+  color: var(--error);
+}
+
+.setup-marker-rec .rec-roi-grid.is-digit {
+  grid-template-columns: repeat(auto-fill, 36px);
+  gap: 6px;
+}
+
+.setup-marker-rec .rec-roi-grid.is-analog {
+  grid-template-columns: repeat(auto-fill, 52px);
+  gap: 6px;
+}
+
+.setup-marker-rec .rec-roi-tile {
+  padding: 3px 2px;
+  border-radius: 0.5rem;
+}
+
+.setup-marker-rec .rec-roi-value {
+  font-size: 0.74rem;
+}
+.setup-marker-rec .card-header .button {
+  width: auto;
+  padding: 4px 12px;
+  font-size: 0.78rem;
+}
