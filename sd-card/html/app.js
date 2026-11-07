@@ -9861,7 +9861,6 @@ const App = (() => {
     overrideBox.type = 'checkbox';
     overrideLabel.append(overrideBox, ' Override');
     ctl.append(combo.el, overrideLabel);
-    ctl.append(App.el('p', 'cfg-hint', 'Main color of the interface. It follows the meter type (blue for Generic) until you override it. Icons always follow the meter type. This choice is stored in this browser.'));
     body.append(row);
 
     const update = () => {
