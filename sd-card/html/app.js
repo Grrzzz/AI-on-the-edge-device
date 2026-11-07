@@ -4414,14 +4414,23 @@ const App = (() => {
       const d = res.data;
       if (!d.ready) return { ready: false, state: d.state ?? '' };
 
+      // optional per ROI: confidence (0 to 100) and rect {x, y, w, h} in the aligned image (otherwise the configuration is used)
       const rois = (g) => ({
         enabled: !!g?.enabled,
-        rois: (g?.rois ?? []).map((r) => ({ value: r.valid ? r.value : 'N/A', na: !r.valid, image: r.valid ? r.image : null })),
+        rois: (g?.rois ?? []).map((r) => ({
+          value: r.valid ? r.value : 'N/A',
+          na: !r.valid,
+          image: r.valid ? r.image : null,
+          confidence: typeof r.confidence === 'number' ? r.confidence : null,
+          rect: r.rect && typeof r.rect.x === 'number' ? r.rect : null,
+        })),
       });
       return {
         ready: true,
         sequences: d.sequences.map((s) => ({ name: s.name, rawValue: s.rawValue, actualValue: s.actualValue, digit: rois(s.digit), analog: rois(s.analog) })),
         image: d.image ?? null,
+        // optional: raw camera image and the pose of the raw image against the aligned image (rotation in degrees, scale, shift in pixels)
+        alignment: d.alignment && d.alignment.rawImage ? d.alignment : null,
       };
     },
   };
@@ -4450,6 +4459,9 @@ const App = (() => {
   };
   const show = (v) => (v === null || v === undefined || v === '' ? '--' : String(v));
 
+  // Status of a recognized ROI: ok / warn (uncertain) / err (not recognized or low confidence)
+  const roiStatus = (roi) => (roi.na ? 'err' : roi.confidence === null || roi.confidence === undefined ? 'ok' : roi.confidence >= 90 ? 'ok' : roi.confidence >= 60 ? 'warn' : 'err');
+
   // Result tiles of one ROI kind (digit / analog): value of the recognition and the cut-out image
   const recRoiSection = (title, block, kind = '') => {
     const wrap = el('div', 'rec-roi-block');
@@ -4458,6 +4470,8 @@ const App = (() => {
       const grid = el('div', `rec-roi-grid${kind ? ` is-${kind}` : ''}`);
       for (const roi of block.rois) {
         const tile = el('div', 'rec-roi-tile');
+        tile.dataset.status = roiStatus(roi);
+        tile.dataset.roi = kind;
         if (!roi.na && roi.image) {
           const img = el('img', 'rec-roi-img');
           img.src = Api.process.imageUrl(roi.image);
@@ -4577,9 +4591,14 @@ const App = (() => {
 
       <div class="card dash-image" data-ref="imageCard">
         <img class="dash-bg" data-ref="imgBg" alt="" aria-hidden="true" />
+        <canvas class="dash-bg dash-bg-canvas" data-ref="bgCanvas" hidden aria-hidden="true"></canvas>
         <div class="dash-shade"></div>
         <img class="dash-img is-loading" data-ref="img" alt="Image view" />
+        <canvas class="dash-canvas" data-ref="canvas" hidden></canvas>
         <div class="dash-stage" data-ref="stage" hidden></div>
+        <button class="dash-replay" data-ref="replay" type="button" hidden title="Replay the reading" aria-label="Replay the reading">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.6-5.9M4 4v4.5h4.5" /></svg>
+        </button>
       </div>
     </main>
 
@@ -4607,6 +4626,412 @@ const App = (() => {
 
   let dashSeq = 0;
   let dashActive = null; // state of the mounted dashboard view
+
+  // ------------------------------------------------------------------------
+  // Picture animation of the dashboard image card: "Taking image" scene -> raw image grows out of the scan icon ->
+  // rotation and alignment (if the device reports the raw image and the pose) -> regions of interest -> zoom -> recognition
+  // (every frame takes the color of its status, the recognized digit pops up) -> zoom out. Calculated in the browser.
+  // ------------------------------------------------------------------------
+  function createImageReveal({ card, canvas, bgCanvas, stage }) {
+    const ctx = canvas.getContext('2d');
+    const bgCtx = bgCanvas.getContext('2d');
+    const clamp = (t) => Math.max(0, Math.min(1, t));
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+    const easeOutBack = (t) => 1 + 2.70158 * Math.pow(t - 1, 3) + 1.70158 * Math.pow(t - 1, 2);
+    const loadImg = (src) => new Promise((resolve) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => resolve(null);
+      i.src = src;
+    });
+    const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+    const DUR = { stage: 2600, reveal: 1700, hold: 900, rotate: 1300, align: 1300, regions: 800, zoom: 1700, recog: 1700, zoomout: 1200 };
+    let d = null; // { alg, raw, pose, rois, W, H }
+    let lay = null;
+    let tl = null; // timeline { names, start, ms, total }
+    let geo = null; // viewfinder of the scan icon in image coordinates
+    let raf = 0;
+    let t0 = 0;
+    let hooks = {};
+    let colors = {};
+    let revealStarted = false;
+    const api = { playing: false, ready: false };
+
+    function layout() {
+      if (!d) return false;
+      const cw = card.clientWidth;
+      const ch = card.clientHeight;
+      if (!cw || !ch) return false;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(cw * dpr);
+      canvas.height = Math.round(ch * dpr);
+      const k = Math.min(cw / d.W, ch / d.H);
+      lay = { cw, ch, dpr, k, vx: (cw - d.W * k) / 2, vy: (ch - d.H * k) / 2 };
+      bgCanvas.width = 160; // blurred fill: low resolution is enough
+      bgCanvas.height = Math.max(1, Math.round((160 * ch) / cw));
+      return true;
+    }
+
+    function timeline(withStage) {
+      const names = [];
+      if (withStage) names.push('stage');
+      names.push('reveal');
+      if (d.pose) names.push('hold', 'rotate', 'align');
+      names.push('regions', 'zoom', 'recog', 'zoomout');
+      const start = {};
+      let total = 0;
+      for (const n of names) {
+        start[n] = total;
+        total += DUR[n];
+      }
+      return { names, start, total };
+    }
+
+    // viewfinder (corner brackets) of the scan icon in image coordinates, with the size it has right now
+    function measureIcon() {
+      const svg = stage.querySelector('svg.scan-icon');
+      if (!svg || !lay) return { cx: d.W / 2, cy: d.H / 2, sq: d.H * 0.2, sw: 6, arm: 12 };
+      const r = svg.getBoundingClientRect();
+      const c = card.getBoundingClientRect();
+      let sc = 1;
+      try {
+        const m = new DOMMatrix(getComputedStyle(svg.querySelector('.scan-corners')).transform);
+        sc = m.a || 1;
+      } catch (e) { }
+      const u = (r.width / 64) * sc; // css px per svg unit
+      const toImg = (px, off) => (px - off) / lay.k;
+      return {
+        cx: toImg(r.left + r.width / 2 - c.left, lay.vx),
+        cy: toImg(r.top + r.height / 2 - c.top, lay.vy),
+        sq: ((53 - 11 - 5) * u) / lay.k, // inner edge of the corner brackets
+        sw: (5 * u) / lay.k,
+        arm: (10 * u) / lay.k,
+        swPx: 5 * u,
+      };
+    }
+
+    function statusColor(st) {
+      return st === 'err' ? colors.err : st === 'warn' ? colors.warn : colors.ok;
+    }
+
+    // blurred fill of the card: the picture in its current state (raw image, rotated, aligned), covering the whole card
+    function drawBg(P) {
+      const { W, H } = d;
+      const bw = bgCanvas.width, bh = bgCanvas.height;
+      bgCtx.setTransform(1, 0, 0, 1, 0, 0);
+      bgCtx.clearRect(0, 0, bw, bh);
+      bgCtx.save();
+      bgCtx.translate(bw / 2, bh / 2);
+      const kc = Math.max(bw / W, bh / H);
+      bgCtx.scale(kc, kc);
+      bgCtx.translate(-W / 2, -H / 2);
+      const pose = d.pose;
+      if (pose) {
+        bgCtx.translate(W / 2, H / 2);
+        const kk = lerp(1, 1 / pose.scale, P.shift);
+        bgCtx.scale(kk, kk);
+        bgCtx.rotate(lerp(0, -pose.theta, P.rot));
+        bgCtx.translate(-W / 2, -H / 2);
+        bgCtx.translate(-pose.dx * P.shift, -pose.dy * P.shift);
+      }
+      bgCtx.globalAlpha = P.bg;
+      bgCtx.drawImage(pose && d.raw ? d.raw : d.alg, 0, 0, W, H);
+      bgCtx.restore();
+    }
+
+    function draw(P) {
+      if (!d || !lay) return;
+      const { W, H } = d;
+      drawBg(P);
+      const N = d.rois.length;
+      ctx.setTransform(lay.dpr, 0, 0, lay.dpr, 0, 0);
+      ctx.clearRect(0, 0, lay.cw, lay.ch);
+      ctx.setTransform(lay.dpr * lay.k, 0, 0, lay.dpr * lay.k, lay.dpr * lay.vx, lay.dpr * lay.vy);
+
+      // zoom target: the regions of interest
+      const bx0 = Math.min(...d.rois.map((r) => r.x)), bx1 = Math.max(...d.rois.map((r) => r.x + r.w));
+      const by0 = Math.min(...d.rois.map((r) => r.y)), by1 = Math.max(...d.rois.map((r) => r.y + r.h));
+      const zoomK = Math.min(((lay.cw / lay.k) * 0.9) / (bx1 - bx0), ((lay.ch / lay.k) * 0.8) / (by1 - by0 + 30));
+      const zc = [(bx0 + bx1) / 2, (by0 + by1) / 2];
+
+      const win = P.reveal < 1 ? { cx: lerp(geo.cx, W / 2, P.reveal), cy: lerp(geo.cy, H / 2, P.reveal), w: lerp(geo.sq, W, P.reveal), h: lerp(geo.sq, H, P.reveal) } : null;
+      ctx.save();
+      if (win) {
+        ctx.beginPath();
+        ctx.rect(win.cx - win.w / 2, win.cy - win.h / 2, win.w, win.h);
+        ctx.clip();
+      }
+      // view: zoom to the regions
+      ctx.translate(W / 2, H / 2);
+      const sc = lerp(1, zoomK, P.z);
+      ctx.scale(sc, sc);
+      ctx.translate(-lerp(W / 2, zc[0], P.z), -lerp(H / 2, zc[1], P.z));
+      // reveal: the picture first covers the square window (centered) and zooms out to its real size while the window opens
+      if (win) {
+        ctx.translate(win.cx, win.cy);
+        const rs = lerp(geo.sq / H, 1, P.reveal);
+        ctx.scale(rs, rs);
+        ctx.translate(-W / 2, -H / 2);
+      }
+
+      // picture: raw image moved back by the inverse pose (rotation first, then scale and shift)
+      const pose = d.pose;
+      ctx.save();
+      if (pose) {
+        ctx.translate(W / 2, H / 2);
+        const kk = lerp(1, 1 / pose.scale, P.shift);
+        ctx.scale(kk, kk);
+        ctx.rotate(lerp(0, -pose.theta, P.rot));
+        ctx.translate(-W / 2, -H / 2);
+        ctx.translate(-pose.dx * P.shift, -pose.dy * P.shift);
+      }
+      ctx.globalAlpha = P.imgAlpha;
+      ctx.drawImage(pose && d.raw ? d.raw : d.alg, 0, 0, W, H);
+      ctx.globalAlpha = 1;
+      // markers found in the raw image travel with it onto the reference position
+      if (pose && P.markers > 0 && pose.markers.length) {
+        ctx.save();
+        ctx.translate(W / 2 + pose.dx, H / 2 + pose.dy);
+        ctx.rotate(pose.theta);
+        ctx.scale(pose.scale, pose.scale);
+        ctx.translate(-W / 2, -H / 2);
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = `rgba(239,68,68,${(0.55 + 0.45 * (0.5 + 0.5 * Math.sin(P.t / 140))) * P.markers})`;
+        for (const m of pose.markers) ctx.strokeRect(m.x, m.y, m.w, m.h);
+        ctx.restore();
+      }
+      ctx.restore();
+
+      // soft picture edges (like the former image view): fade the outer 10 percent
+      if (P.edge > 0) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-out';
+        const fx = W * 0.1, fy = H * 0.1;
+        const edge = (x0, y0, x1, y1, rx, ry, rw, rh) => {
+          const g = ctx.createLinearGradient(x0, y0, x1, y1);
+          g.addColorStop(0, `rgba(0,0,0,${P.edge})`);
+          g.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = g;
+          ctx.fillRect(rx, ry, rw, rh);
+        };
+        edge(0, 0, fx, 0, 0, 0, fx, H);
+        edge(W, 0, W - fx, 0, W - fx, 0, fx, H);
+        edge(0, 0, 0, fy, 0, 0, W, fy);
+        edge(0, H, 0, H - fy, 0, H - fy, W, fy);
+        ctx.restore();
+      }
+
+      // regions of interest: white frames; in the recognition every frame is scanned in turn, takes the color of its status
+      // and the recognized digit pops up above it
+      if (P.regions > 0) {
+        d.rois.forEach((r, i) => {
+          const appear = clamp(P.regions * 1.6 - i * 0.08);
+          const q = P.recog < 0 ? 0 : clamp(P.recog - i);
+          const col = q > 0.15 ? statusColor(r.status) : '#f8fafc';
+          const flash = q > 0 && q < 1 ? Math.sin(q * Math.PI) : 0;
+          ctx.save();
+          ctx.globalAlpha = appear * (q > 0.15 ? 0.16 + flash * 0.25 : 0.1);
+          ctx.fillStyle = col;
+          ctx.fillRect(r.x, r.y, r.w, r.h);
+          ctx.restore();
+          ctx.globalAlpha = appear;
+          ctx.lineWidth = 2 + flash * 2;
+          ctx.strokeStyle = col;
+          ctx.strokeRect(r.x - flash * 1.5, r.y - flash * 1.5, r.w + flash * 3, r.h + flash * 3);
+          if (q > 0) {
+            const pop = q < 0.5 ? easeOutBack(q * 2) : 1;
+            ctx.save();
+            ctx.translate(r.x + r.w / 2, r.y - 6);
+            ctx.scale(pop, pop);
+            // digit in the badge, a smaller confidence next to it (bad recognitions only)
+            ctx.font = '700 11px system-ui, sans-serif';
+            const w1 = ctx.measureText(r.label).width;
+            ctx.font = '600 7px system-ui, sans-serif';
+            const w2 = r.pct ? ctx.measureText(r.pct).width + 2 : 0;
+            const tw = w1 + w2 + 8;
+            ctx.fillStyle = col;
+            ctx.globalAlpha = 1;
+            ctx.beginPath();
+            if (ctx.roundRect) ctx.roundRect(-tw / 2, -16, tw, 16, 5);
+            else ctx.rect(-tw / 2, -16, tw, 16);
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'left';
+            ctx.font = '700 11px system-ui, sans-serif';
+            ctx.fillText(r.label, -tw / 2 + 4, -4);
+            if (r.pct) {
+              ctx.font = '600 7px system-ui, sans-serif';
+              ctx.globalAlpha = 0.92;
+              ctx.fillText(r.pct, -tw / 2 + 4 + w1 + 2, -4.5);
+            }
+            ctx.restore();
+          }
+        });
+        ctx.globalAlpha = 1;
+      }
+      ctx.restore();
+
+      // corner brackets of the scan icon stay around the opening window (same line width and arm length at the start)
+      if (P.bracket > 0) {
+        const sw = lerp(geo.sw, 3.5 / lay.k, P.reveal), o = sw / 2, a = lerp(geo.arm, 40 / lay.k, P.reveal);
+        const cxw = lerp(geo.cx, W / 2, P.reveal), cyw = lerp(geo.cy, H / 2, P.reveal), ww = lerp(geo.sq, W, P.reveal), hw = lerp(geo.sq, H, P.reveal);
+        const x0 = cxw - ww / 2 - o, y0 = cyw - hw / 2 - o, x1 = cxw + ww / 2 + o, y1 = cyw + hw / 2 + o;
+        ctx.globalAlpha = P.bracket;
+        ctx.strokeStyle = colors.accent;
+        ctx.lineWidth = sw;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(x0, y0 + a); ctx.lineTo(x0, y0); ctx.lineTo(x0 + a, y0);
+        ctx.moveTo(x1 - a, y0); ctx.lineTo(x1, y0); ctx.lineTo(x1, y0 + a);
+        ctx.moveTo(x1, y1 - a); ctx.lineTo(x1, y1); ctx.lineTo(x1 - a, y1);
+        ctx.moveTo(x0 + a, y1); ctx.lineTo(x0, y1); ctx.lineTo(x0, y1 - a);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      void N;
+    }
+
+    // resting state: aligned picture, all frames in their status color with the recognized digit
+    function drawFinal() {
+      if (!d || !layout()) return;
+      geo = geo || { cx: d.W / 2, cy: d.H / 2, sq: d.H * 0.2, sw: 6, arm: 12 };
+      draw({ reveal: 1, rot: 1, shift: 1, regions: 1, recog: d.rois.length + 2, z: 0, edge: 1, imgAlpha: 1, bg: 1, markers: 0, bracket: 0, t: 0 });
+    }
+
+    function frame(now) {
+      const e = now - t0;
+      const pr = (n) => (tl.start[n] === undefined ? 1 : clamp((e - tl.start[n]) / DUR[n]));
+      const started = (n) => tl.start[n] !== undefined && e >= tl.start[n];
+      if (!revealStarted && e >= tl.start.reveal) {
+        revealStarted = true;
+        stage.classList.add('handoff'); // the corner brackets are drawn by the canvas from now on
+        canvas.hidden = false;
+      }
+      if (e >= tl.start.reveal) {
+        const N = d.rois.length;
+        const reveal = ease(pr('reveal'));
+        const recogStarted = started('recog');
+        const zIn = ease(pr('zoom')), zOut = ease(pr('zoomout'));
+        const P = {
+          reveal,
+          imgAlpha: ease(clamp(pr('reveal') * 2.4)),
+          bg: ease(pr('reveal')), // the blurred fill comes up while the picture grows
+          rot: ease(pr('rotate')),
+          shift: ease(pr('align')),
+          regions: pr('regions'),
+          recog: recogStarted ? pr('recog') * (N + 2) : -1,
+          z: zIn * (1 - zOut),
+          edge: zOut,
+          markers: d.pose && started('hold') ? (started('regions') ? 1 - pr('regions') : 1) : 0,
+          bracket: e < tl.start.reveal + DUR.reveal ? 1 : Math.max(0, 1 - (e - tl.start.reveal - DUR.reveal) / 450),
+          t: e,
+        };
+        if (!recogStarted && !started('regions')) P.regions = 0;
+        draw(P);
+        if (recogStarted) hooks.onRecog?.(Math.min(N, Math.floor(pr('recog') * (N + 2))));
+      }
+      if (e < tl.total) {
+        raf = requestAnimationFrame(frame);
+      } else {
+        finish();
+      }
+    }
+
+    function finish() {
+      cancelAnimationFrame(raf);
+      api.playing = false;
+      stage.hidden = true;
+      stage.textContent = '';
+      stage.classList.remove('handoff');
+      drawFinal();
+      canvas.hidden = false;
+      hooks.onDone?.();
+    }
+
+    Object.assign(api, {
+      // data: { alg, raw, pose, rois } (see prepare)
+      async prepare(rec, cfg) {
+        const seq = rec?.sequences?.[0];
+        if (!seq) return false;
+        const list = [];
+        const kinds = [['digit', seq.digit], ['analog', seq.analog]];
+        for (const [kind, block] of kinds) {
+          if (!block.enabled) continue;
+          for (let i = 0; i < block.rois.length; i++) {
+            const r = block.rois[i];
+            let rect = r.rect;
+            if (!rect) {
+              const c = cfg?.[kind]?.sequence?.[0]?.roi?.[i];
+              if (c && typeof c.x === 'number' && typeof c.dx === 'number') rect = { x: c.x, y: c.y, w: c.dx, h: c.dy };
+            }
+            if (!rect) return false; // no geometry: the plain image view is used
+            const status = roiStatus(r);
+            list.push({ x: rect.x, y: rect.y, w: rect.w, h: rect.h, status, label: r.na ? 'N' : r.value, pct: status !== 'ok' && r.confidence !== null ? `${Math.round(r.confidence)}%` : '' });
+          }
+        }
+        if (!list.length) return false;
+        const al = rec.alignment;
+        const [alg, raw] = await Promise.all([loadImg(Api.process.imageUrl('alg.jpg')), al ? loadImg(Api.process.imageUrl(al.rawImage)) : Promise.resolve(null)]);
+        if (!alg) return false;
+        const pose = raw && al && typeof al.rotation === 'number'
+          ? { theta: (al.rotation * Math.PI) / 180, scale: al.scale || 1, dx: al.dx || 0, dy: al.dy || 0, markers: Array.isArray(al.markers) ? al.markers : [] }
+          : null;
+        d = { alg, raw: pose ? raw : null, pose, rois: list, W: alg.naturalWidth, H: alg.naturalHeight };
+        api.ready = true;
+        api.algUrl = alg.src;
+        return true;
+      },
+
+      // resting state (no animation)
+      showFinal() {
+        if (api.playing) return;
+        geo = null;
+        canvas.hidden = false;
+        drawFinal();
+      },
+
+      // withStage: show the "Taking image" scene first (replay); otherwise the scene is already on screen
+      play({ withStage = false, onRecog, onDone } = {}) {
+        if (!d || !layout()) return;
+        cancelAnimationFrame(raf);
+        hooks = { onRecog, onDone };
+        colors = { ok: css('--success') || '#10b981', warn: css('--warning') || '#f59e0b', err: css('--error') || '#ef4444', accent: css('--meter-accent') || css('--primary') || '#2563eb' };
+        tl = timeline(withStage);
+        revealStarted = false;
+        api.playing = true;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        canvas.hidden = false;
+        stage.classList.remove('handoff');
+        if (withStage) {
+          // restart the icon animation: it is at its normal size after 2 x 1.3 s
+          stage.querySelectorAll('*').forEach((n) => { n.style.animation = 'none'; });
+          void stage.offsetHeight;
+          stage.querySelectorAll('*').forEach((n) => { n.style.animation = ''; });
+        }
+        geo = measureIcon();
+        t0 = performance.now();
+        raf = requestAnimationFrame(frame);
+      },
+
+      // new cycle: stop the animation and clear the canvas
+      cancel() {
+        cancelAnimationFrame(raf);
+        api.playing = false;
+        canvas.hidden = true;
+        stage.classList.remove('handoff');
+      },
+
+      relayout() {
+        if (!d || api.playing) return;
+        if (!canvas.hidden) drawFinal();
+      },
+    });
+    return api;
+  }
 
   // ------------------------------------------------------------------------
   // Readings plot: values of the data log (SD card, /log/data/data_YYYY-MM-DD.csv), minimal line chart.
@@ -5056,34 +5481,126 @@ const App = (() => {
       };
 
       // While the camera takes the picture the device has no image: show the animated scan scene instead of the static state image
-      const setStage = (on) => {
-        if (st.capturing === on) return;
+      // the scene stays while a cycle is running; the title names the step
+      const stageText = (step) => {
+        const t = String(step ?? '');
+        if (/take image/i.test(t)) return ['Taking image ...', 'The camera captures the picture'];
+        if (/align/i.test(t)) return ['Aligning image ...', 'The picture is moved onto the reference'];
+        if (/digit|analog|recogni/i.test(t)) return ['Reading digits ...', 'The AI reads the regions of interest'];
+        if (/publish|post|additional/i.test(t)) return ['Publishing ...', 'The result is processed and sent'];
+        return ['Processing ...', 'The picture is evaluated'];
+      };
+      const renderStageScene = (step = 'Take Image') => {
+        const [title, sub] = stageText(step);
+        ref.stage.innerHTML =
+          `<div class="dash-stage-icon"><div class="dash-stage-rings"><span></span><span></span><span></span></div>${scanIconHtml(150)}</div>` +
+          `<div class="dash-stage-title">${title}</div>` +
+          `<div class="dash-stage-sub">${sub}</div>`;
+        ref.stage.classList.remove('handoff');
+      };
+      const updateStageTitle = (step) => {
+        const [title, sub] = stageText(step);
+        const t = ref.stage.querySelector('.dash-stage-title');
+        const u = ref.stage.querySelector('.dash-stage-sub');
+        if (t && t.textContent !== title) t.textContent = title;
+        if (u && u.textContent !== sub) u.textContent = sub;
+      };
+      const hideStage = () => {
+        ref.stage.hidden = true;
+        ref.stage.textContent = '';
+        ref.stage.classList.remove('handoff');
+        st.stageHold = false;
+      };
+      // recognition tiles appear one after another during the recognition phase of the animation
+      const setTilesPending = (on) => {
+        root.querySelectorAll('.rec-roi-tile').forEach((t) => t.classList.toggle('is-pending', on));
+      };
+      const setTilesShown = (n) => {
+        root.querySelectorAll('.rec-roi-tile').forEach((t, i) => t.classList.toggle('is-pending', i >= n));
+      };
+
+      const setStage = (on, step) => {
+        if (st.capturing === on) {
+          if (on) updateStageTitle(step);
+          return;
+        }
+        const wasCapturing = st.capturing === true; // undefined: first status after opening the page
         st.capturing = on;
-        ref.stage.hidden = !on;
-        ref.img.hidden = on;
+        ref.img.hidden = on || st.stageHold || !!st.revealOk;
         if (on) {
-          ref.stage.innerHTML =
-            `<div class="dash-stage-icon"><div class="dash-stage-rings"><span></span><span></span><span></span></div>${scanIconHtml(150)}</div>` +
-            '<div class="dash-stage-title">Taking image ...</div>' +
-            '<div class="dash-stage-sub">The camera captures the picture</div>';
-        } else {
-          ref.stage.textContent = '';
+          st.reveal.cancel();
+          setTilesPending(false);
+          ref.canvas.hidden = true;
+          ref.replay.hidden = true;
+          st.stageHold = false;
+          ref.stage.hidden = false;
+          renderStageScene(step);
+        } else if (wasCapturing && st.revealOk !== false) {
+          // keep the scene until the new picture is ready: the picture then grows out of the icon
+          st.stageHold = true;
+          clearTimeout(st.holdTimer);
+          st.holdTimer = setTimeout(() => { if (st.stageHold) { hideStage(); ref.img.hidden = !!st.revealOk; if (st.revealOk) st.reveal.showFinal(); } }, 20000);
+        } else if (wasCapturing) {
+          hideStage();
         }
       };
+
+      // picture animation: prepared with the data of the last cycle, played when the capture just ended (live) or on demand
+      const applyReveal = async (rec) => {
+        if (st.reveal.playing) return;
+        const ok = rec?.ready ? await st.reveal.prepare(rec, getConfigFromStorage(0)) : false;
+        if (st.dead) return;
+        st.revealOk = ok;
+        if (!ok) {
+          st.reveal.cancel();
+          ref.canvas.hidden = true;
+          ref.bgCanvas.hidden = true;
+          ref.imgBg.hidden = false;
+          ref.replay.hidden = true;
+          if (st.stageHold) hideStage();
+          ref.img.hidden = st.capturing;
+          return;
+        }
+        ref.replay.hidden = false;
+        ref.img.hidden = true;
+        ref.imgBg.hidden = true; // the blurred fill is drawn together with the picture
+        ref.bgCanvas.hidden = false;
+        if (st.stageHold) {
+          clearTimeout(st.holdTimer);
+          st.stageHold = false;
+          setTilesPending(true);
+          st.reveal.play({ onRecog: setTilesShown, onDone: () => setTilesPending(false) });
+        } else {
+          setTilesPending(false);
+          hideStage();
+          st.reveal.showFinal();
+        }
+      };
+
+      ref.replay.addEventListener('click', () => {
+        if (!st.revealOk || st.reveal.playing || st.capturing) return;
+        ref.stage.hidden = false;
+        renderStageScene();
+        ref.canvas.hidden = false;
+        setTilesPending(true);
+        st.reveal.play({ withStage: true, onRecog: setTilesShown, onDone: () => setTilesPending(false) });
+      });
 
       // the sidebar polls the status every 2 s: switch the scene right away and load the image as soon as the capture is over
       const onCycleStatus = (e) => {
         if (st.dead) return;
-        const capturing = !!(e.detail?.running && /take image/i.test(String(e.detail.state)));
+        const capturing = !!e.detail?.running; // the scene is shown during the whole cycle, the animation plays when it is over
         const wasCapturing = st.capturing;
         const last = formatLastSuccess(e.detail);
         ref.lastRun.textContent = last.text;
         ref.lastRun.title = last.title;
-        setStage(capturing);
+        setStage(capturing, e.detail?.state);
         if (wasCapturing && !capturing) refresh(true);
       };
       window.addEventListener('cycle-status', onCycleStatus);
       st.offStatus = () => window.removeEventListener('cycle-status', onCycleStatus);
+      const lastStatus = typeof CycleMonitor !== 'undefined' ? CycleMonitor.last() : null;
+      if (lastStatus) onCycleStatus({ detail: lastStatus }); // joins a cycle that is already running
 
       // MQTT connection: Connected / Connected (Encrypted) / Disconnected / Disabled (badge hidden)
       const loadMqtt = async () => {
@@ -5102,7 +5619,6 @@ const App = (() => {
         const d = await Api.process.get(st.abort.signal);
         if (!d || st.dead) return null;
         loadMqtt();
-        setStage(/take image/i.test(String(d.process_state)));
 
         try {
           renderSequenceCards(d);
@@ -5153,7 +5669,11 @@ const App = (() => {
         const url = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
         fg.style.maskImage = fg.style.webkitMaskImage = url;
       };
-      const resizeObserver = new ResizeObserver(() => applyFadeMask());
+      st.reveal = createImageReveal({ card: ref.imageCard, canvas: ref.canvas, bgCanvas: ref.bgCanvas, stage: ref.stage });
+      const resizeObserver = new ResizeObserver(() => {
+        applyFadeMask();
+        st.reveal.relayout();
+      });
       resizeObserver.observe(ref.imageCard);
       st.offResize = () => resizeObserver.disconnect();
 
@@ -5204,8 +5724,9 @@ const App = (() => {
 
       const loadRecognition = async () => {
         const data = await Api.process.recognition(st.abort.signal);
-        if (st.dead) return;
+        if (st.dead) return null;
         renderRecognition(data);
+        return data;
       };
 
       const refresh = async (auto = false) => {
@@ -5224,9 +5745,10 @@ const App = (() => {
 
           // Manual refresh always reloads the image; auto refresh only when cycle or step changed
           if (!st.capturing && (!auto || key !== st.lastImageKey)) {
-            await Promise.all([loadRoiImage(), loadRecognition()]);
+            const [, rec] = await Promise.all([loadRoiImage(), loadRecognition()]);
             st.lastImageKey = key;
             st.plot?.load();
+            await applyReveal(rec);
           }
         } catch (error) {
           console.error('Refresh failed:', error);
@@ -5256,8 +5778,12 @@ const App = (() => {
         if (typeof loaderSpinner !== 'undefined') ref.img.src = loaderSpinner;
         st.lastImageKey = await loadProcessData();
         if (st.dead) return;
-        if (!st.capturing) loadRoiImage();
-        loadRecognition();
+        if (!st.capturing) {
+          await loadRoiImage();
+          applyReveal(await loadRecognition());
+        } else {
+          loadRecognition();
+        }
         loadActivity();
         st.plot = createReadingsPlot(ref.plotCard, ref.plotRange, ref.plotBody, st.abort.signal);
         st.plot.load();
@@ -5272,6 +5798,8 @@ const App = (() => {
       clearTimeout(st.timer);
       st.offStatus?.();
       st.offResize?.();
+      st.reveal?.cancel();
+      clearTimeout(st.holdTimer);
       st.abort.abort();
       dashActive = null;
     },
@@ -10757,6 +11285,7 @@ const CycleMonitor = (() => {
   }
 
   return {
+    last: () => status,
     start() {
       $('cycle-start')?.addEventListener('click', start);
       $('cycle-pause')?.addEventListener('click', togglePause);

@@ -5671,3 +5671,115 @@ a .rst-content .admonition-title {
 .nav-group:not(.open) > .nav-parent.has-update::after {
   display: inline-block;
 }
+
+/* ---- picture animation in the dashboard image card ---- */
+.dash .dash-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.dash .dash-canvas[hidden] {
+  display: none;
+}
+
+/* hand-over from "Taking image": the canvas draws the corner brackets (same geometry), the rest fades out softly */
+.dash .dash-stage.handoff {
+  pointer-events: none;
+}
+
+.dash .dash-stage.handoff .scan-corners {
+  animation: none;
+  opacity: 0;
+}
+
+.dash .dash-stage.handoff .scan-line {
+  display: none;
+}
+
+.dash .dash-stage.handoff .scan-glyph {
+  animation: dash-fade-glyph 0.7s ease-out forwards;
+}
+
+.dash .dash-stage.handoff .dash-stage-rings,
+.dash .dash-stage.handoff .dash-stage-title,
+.dash .dash-stage.handoff .dash-stage-sub {
+  opacity: 0;
+  transition: opacity 0.7s ease-out;
+}
+
+@keyframes dash-fade-glyph {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.25); }
+}
+
+.dash .dash-replay {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.55);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.dash .dash-image:hover .dash-replay,
+.dash .dash-replay:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .dash .dash-replay {
+    opacity: 0.8;
+  }
+}
+
+.dash .dash-replay[hidden] {
+  display: none;
+}
+
+.dash .dash-replay svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* recognition tiles: status color, appear one after another during the animation */
+.rec .rec-roi-tile {
+  border: 2px solid transparent;
+  transition: opacity 0.4s, transform 0.4s;
+}
+
+.rec .rec-roi-tile[data-status='ok'] {
+  border-color: var(--success);
+}
+
+.rec .rec-roi-tile[data-status='warn'] {
+  border-color: var(--warning);
+}
+
+.rec .rec-roi-tile[data-status='err'] {
+  border-color: var(--error);
+}
+
+.rec .rec-roi-tile.is-pending {
+  opacity: 0;
+  transform: translateY(12px);
+}
