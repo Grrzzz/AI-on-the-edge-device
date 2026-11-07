@@ -441,16 +441,16 @@ body {
   fill: currentColor;
 }
 
-.cycle[data-kind='paused'] .cycle-pause {
+.cycle[data-paused='1'] .cycle-pause {
   color: var(--primary);
   border-color: var(--primary);
 }
 
-.cycle[data-kind='paused'] .cycle-pause .i-pause {
+.cycle[data-paused='1'] .cycle-pause .i-pause {
   display: none;
 }
 
-.cycle[data-kind='paused'] .cycle-pause .i-play {
+.cycle[data-paused='1'] .cycle-pause .i-play {
   display: block;
 }
 

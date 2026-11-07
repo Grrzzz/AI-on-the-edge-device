@@ -11643,7 +11643,8 @@ const CycleMonitor = (() => {
     $('cycle-timer').textContent = stale ? `${timer} · device is busy` : timer;
 
     pauseBtn.hidden = !status.autoStart;
-    pauseBtn.disabled = busy || stale;
+    pauseBtn.disabled = false; // also usable while a cycle runs or the device is busy
+    panel.dataset.paused = paused ? '1' : '';
     pauseBtn.title = paused ? 'Resume automatic cycles' : 'Pause countdown (config mode)';
     pauseBtn.setAttribute('aria-label', pauseBtn.title);
     const last = formatLastSuccess(status, drift);
@@ -11665,6 +11666,7 @@ const CycleMonitor = (() => {
     try {
       const answer = await Api.process.status();
       if (answer) {
+        if (pausePending !== null) answer.paused = pausePending; // the request is still on its way
         status = answer;
         fetchedAt = performance.now();
         lastAnswerAt = fetchedAt;
@@ -11680,12 +11682,18 @@ const CycleMonitor = (() => {
     render();
   }
 
+  // Pause / resume: the button reacts right away (also while a cycle is running or the device is busy), the status polls
+  // do not overwrite the wish until the device has answered
+  let pausePending = null; // true / false while a request is on its way
   async function togglePause() {
-    if (busy || !status) return;
-    busy = true;
+    if (pausePending !== null || !status) return;
+    const want = !status.paused;
+    pausePending = want;
+    status.paused = want;
     render();
-    await Api.process.setPaused(!status.paused);
-    busy = false;
+    const ok = await Api.process.setPaused(want);
+    pausePending = null;
+    if (!ok && status) status.paused = !want; // not accepted: back to the old state
     await poll();
   }
 
