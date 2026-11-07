@@ -5413,23 +5413,35 @@ a .rst-content .admonition-title {
   flex: 1;
 }
 
-.theme-opt-icon {
+.theme-opt-lead {
   display: inline-flex;
   flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
   line-height: 0;
 }
 
 .theme-opt-name {
   flex: 1;
+  min-width: 0;
   text-align: left;
 }
 
-.theme-opt-dot {
-  flex: none;
-  width: 14px;
-  height: 14px;
+/* round color circle in front of a color theme */
+.theme-dot {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 3px var(--border);
+}
+
+.theme-combo.is-wide {
+  min-width: 0;
+  width: 100%;
+  max-width: 420px;
 }
 
 .theme-combo-list {
@@ -5546,4 +5558,32 @@ a .rst-content .admonition-title {
   font-weight: 600;
   color: var(--text-main);
   font-variant-numeric: tabular-nums;
+}
+
+/* recognition and readings: same height on the desktop */
+@media screen and (min-width: 1157px) {
+  .dash-row:has(.dash-plot:not([hidden])) {
+    align-items: stretch;
+  }
+
+  .dash-row .dash-plot {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .dash-row .dash-plot .plot-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .dash-row .dash-plot .plot-wrap {
+    flex: 1;
+    min-height: 140px;
+  }
+
+  .dash-row .dash-plot .plot-svg {
+    height: 100%;
+    min-height: 140px;
+  }
 }

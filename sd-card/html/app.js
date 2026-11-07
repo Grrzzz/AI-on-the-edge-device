@@ -834,16 +834,24 @@ const METER_THEMES = {
 const METER_TYPE_THEME = {"0": "generic", "1": "water", "2": "water", "3": "water", "4": "water", "15": "water", "16": "water", "5": "gas", "6": "gas", "7": "energy", "8": "energy", "9": "energy", "10": "energy", "11": "temperature", "12": "temperature", "13": "pressure", "14": "pressure"};
 // END METER THEMES
 
-const DEFAULT_THEME = 'water'; // color theme (blue) for the meter type 'generic' or no meter type
+// Color themes of the interface (named by color). The meter type picks one (generic: blue), the setup can override it.
+const COLOR_THEMES = {
+  blue: { label: 'Blue (default)', primary: '#2563eb' },
+  orange: { label: 'Orange', primary: '#ea580c' },
+  amber: { label: 'Amber', primary: '#d97706' },
+  pink: { label: 'Pink', primary: '#db2777' },
+  slate: { label: 'Slate', primary: '#475569' },
+};
+const THEME_COLOR = { generic: 'blue', water: 'blue', gas: 'orange', energy: 'amber', temperature: 'pink', pressure: 'slate' }; // meter theme -> color theme
 let meterThemeId = 'generic'; // icon theme: ALWAYS the meter type of the device
 let deviceThemeId = 'generic'; // theme of the meter type
-let themeOverride = ''; // theme chosen manually in the setup ('' = no override: the colors follow the meter type)
+let themeOverride = ''; // color theme chosen manually in the setup ('' = no override: the colors follow the meter type)
 try {
-  const saved = localStorage.getItem('uiThemeOverride');
-  if (saved) themeOverride = saved;
+  const saved = localStorage.getItem('uiThemeOverride') || '';
+  themeOverride = COLOR_THEMES[saved] ? saved : THEME_COLOR[saved] || ''; // older versions stored the meter theme
 } catch (e) { }
 const meterTheme = () => METER_THEMES[meterThemeId] || METER_THEMES.generic; // icons, logo, favicon, scan icon
-const colorThemeId = () => (themeOverride && METER_THEMES[themeOverride] ? themeOverride : deviceThemeId === 'generic' ? DEFAULT_THEME : deviceThemeId);
+const colorThemeId = () => (COLOR_THEMES[themeOverride] ? themeOverride : THEME_COLOR[deviceThemeId] || 'blue');
 
 // main color of the interface: the primary color of the theme, lighter in the dark mode
 const mixHex = (hex, other, amount) => {
@@ -965,7 +973,7 @@ const MeterTheme = {
 
   // manual choice in the setup: theme id or '' (no override). Stored in this browser. Only the colors change, never the icons.
   setOverride(id) {
-    themeOverride = METER_THEMES[id] ? id : '';
+    themeOverride = COLOR_THEMES[id] ? id : '';
     try { localStorage.setItem('uiThemeOverride', themeOverride); } catch (e) { }
     this.render();
   },
@@ -984,7 +992,7 @@ const MeterTheme = {
     meterThemeId = id;
 
     const t = meterTheme(); // icons
-    const ct = METER_THEMES[colorThemeId()]; // colors of the interface
+    const ct = COLOR_THEMES[colorThemeId()]; // colors of the interface
     const root = document.documentElement;
     root.style.setProperty('--meter-accent', t.colors[0]);
     root.style.setProperty('--theme-primary', ct.primary);
@@ -9719,15 +9727,9 @@ const App = (() => {
     card.items.push({ def: row, el });
   }
 
-  // Theme row (Setup > General > Meter Type & Theme): the main color of the interface follows the meter type (blue for generic).
-  // The combo box is inactive until 'Override' is checked. Icons always follow the meter type. Stored in this browser.
-  function addThemeRow(body) {
-    const row = App.el('div', 'cfg-row cfg-l0 cfg-theme-row');
-    const label = App.el('div', 'cfg-label');
-    label.append(App.el('span', '', 'Theme'));
-    const ctl = App.el('div', 'cfg-ctl');
-    row.append(label, ctl);
-
+  // Custom combo box. items: [{ value, label, lead (HTML of the leading icon or color dot) }]; get(): current value;
+  // pick(value): the user chose an entry. Returns { el, button, sync() }.
+  function createCombo(items, get, pick) {
     const combo = App.el('div', 'theme-combo');
     const btn = App.el('button', 'theme-combo-btn');
     btn.type = 'button';
@@ -9738,27 +9740,13 @@ const App = (() => {
     list.hidden = true;
     combo.append(btn, list);
 
-    const overrideLabel = App.el('label', 'theme-override');
-    const overrideBox = document.createElement('input');
-    overrideBox.type = 'checkbox';
-    overrideLabel.append(overrideBox, ' Override');
-    ctl.append(combo, overrideLabel);
-    ctl.append(App.el('p', 'cfg-hint', 'Main color of the interface. It follows the meter type (blue for Generic) until you override it. Icons always follow the meter type. This choice is stored in this browser.'));
-    body.append(row);
-
-    const themeIds = Object.keys(METER_THEMES).filter((id) => id !== 'generic'); // generic has the colors of water
-    const optionContent = (id, text) => {
-      const t = METER_THEMES[id];
+    const content = (it, suffix = '') => {
       const wrap = App.el('span', 'theme-opt');
-      const icon = App.el('span', 'theme-opt-icon');
-      icon.innerHTML = logoSvg(id, 24);
-      const name = App.el('span', 'theme-opt-name', text);
-      const dot = App.el('span', 'theme-opt-dot');
-      dot.style.background = t.primary;
-      wrap.append(icon, name, dot);
+      const lead = App.el('span', 'theme-opt-lead');
+      lead.innerHTML = it.lead;
+      wrap.append(lead, App.el('span', 'theme-opt-name', it.label + suffix));
       return wrap;
     };
-
     let active = -1;
     const close = () => {
       list.hidden = true;
@@ -9769,43 +9757,42 @@ const App = (() => {
       [...list.children].forEach((li, k) => li.classList.toggle('active', k === i));
       list.children[i]?.scrollIntoView({ block: 'nearest' });
     };
-    const build = () => {
-      const on = !!MeterTheme.override;
-      overrideBox.checked = on;
-      btn.disabled = !on;
-      combo.classList.toggle('is-disabled', !on);
-      const current = MeterTheme.colorId;
-      btn.replaceChildren(optionContent(current, METER_THEMES[current].label + (on ? '' : ' (automatic)')), App.el('span', 'theme-combo-chev', '\u25BE'));
-      list.replaceChildren();
-      themeIds.forEach((id) => {
-        const li = App.el('li', 'theme-combo-item');
-        li.setAttribute('role', 'option');
-        li.dataset.value = id;
-        li.setAttribute('aria-selected', String(on && id === current));
-        li.append(optionContent(id, METER_THEMES[id].label));
-        if (on && id === current) li.classList.add('selected');
-        li.addEventListener('click', () => {
-          MeterTheme.setOverride(id);
-          close();
-          btn.focus();
+    const indexOfCurrent = () => Math.max(0, items.findIndex((it) => String(it.value) === String(get())));
+    const api = {
+      el: combo,
+      button: btn,
+      suffix: '',
+      markSelected: true,
+      sync() {
+        const cur = items[indexOfCurrent()];
+        btn.replaceChildren(content(cur, api.suffix), App.el('span', 'theme-combo-chev', '\u25BE'));
+        list.replaceChildren();
+        items.forEach((it, i) => {
+          const li = App.el('li', 'theme-combo-item');
+          li.setAttribute('role', 'option');
+          const selected = api.markSelected && String(it.value) === String(get());
+          li.setAttribute('aria-selected', String(selected));
+          li.classList.toggle('selected', selected);
+          li.append(content(it));
+          li.addEventListener('click', () => {
+            close();
+            btn.focus();
+            pick(it.value);
+          });
+          li.addEventListener('pointermove', () => mark(i));
+          list.append(li);
         });
-        li.addEventListener('pointermove', () => mark(themeIds.indexOf(id)));
-        list.append(li);
-      });
+      },
     };
     const open = () => {
+      if (btn.disabled) return;
       list.hidden = false;
       btn.setAttribute('aria-expanded', 'true');
-      mark(Math.max(0, themeIds.indexOf(MeterTheme.colorId)));
+      mark(indexOfCurrent());
     };
-    overrideBox.addEventListener('change', () => {
-      close();
-      // override on: starts with the color in use, off: back to the meter type
-      MeterTheme.setOverride(overrideBox.checked ? MeterTheme.colorId : '');
-    });
     btn.addEventListener('click', () => (list.hidden ? open() : close()));
     btn.addEventListener('keydown', (e) => {
-      const n = themeIds.length;
+      const n = items.length;
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
         if (list.hidden) open();
@@ -9821,14 +9808,85 @@ const App = (() => {
     const onDoc = (e) => {
       if (!combo.isConnected) {
         document.removeEventListener('pointerdown', onDoc);
-        window.removeEventListener('meter-theme', build);
         return;
       }
       if (!combo.contains(e.target)) close();
     };
     document.addEventListener('pointerdown', onDoc);
-    window.addEventListener('meter-theme', build); // the meter type or the override changed
-    build();
+    api.close = close;
+    api.sync();
+    return api;
+  }
+
+  // Meter Type: custom combo (icon of the meter type in front) in place of the native select, which stays as the form field
+  function addMeterTypeCombo(s) {
+    const fld = s.byId.mqtt_homeassistant_metertype;
+    if (!fld || fld.meterCombo) return;
+    const sel = fld.el;
+    const items = Array.from(sel.options).map((o) => ({
+      value: o.value,
+      label: o.textContent,
+      lead: logoSvg(METER_TYPE_THEME[Number(o.value)] || 'generic', 24),
+    }));
+    const combo = createCombo(items, () => sel.value, (value) => {
+      sel.value = value;
+      sel.dispatchEvent(new Event('change', { bubbles: true })); // the form takes the change over (delta, save bar)
+      combo.sync();
+      MeterTheme.apply(Number(value)); // icons and colors follow right away
+    });
+    combo.el.classList.add('is-wide');
+    sel.hidden = true;
+    sel.after(combo.el);
+    fld.meterCombo = combo;
+  }
+
+  // Theme row (Setup > General > Meter Type & Theme): the main color of the interface follows the meter type (blue for generic).
+  // The combo box is inactive until 'Override' is checked. Icons always follow the meter type. Stored in this browser.
+  function addThemeRow(body) {
+    const row = App.el('div', 'cfg-row cfg-l0 cfg-theme-row');
+    const label = App.el('div', 'cfg-label');
+    label.append(App.el('span', '', 'Theme'));
+    const ctl = App.el('div', 'cfg-ctl');
+    row.append(label, ctl);
+
+    const items = Object.entries(COLOR_THEMES).map(([id, t]) => ({
+      value: id,
+      label: t.label,
+      lead: `<span class="theme-dot" style="background:${t.primary}"></span>`,
+    }));
+    const combo = createCombo(items, () => MeterTheme.colorId, (id) => MeterTheme.setOverride(id));
+
+    const overrideLabel = App.el('label', 'theme-override');
+    const overrideBox = document.createElement('input');
+    overrideBox.type = 'checkbox';
+    overrideLabel.append(overrideBox, ' Override');
+    ctl.append(combo.el, overrideLabel);
+    ctl.append(App.el('p', 'cfg-hint', 'Main color of the interface. It follows the meter type (blue for Generic) until you override it. Icons always follow the meter type. This choice is stored in this browser.'));
+    body.append(row);
+
+    const update = () => {
+      const on = !!MeterTheme.override;
+      overrideBox.checked = on;
+      combo.button.disabled = !on;
+      combo.el.classList.toggle('is-disabled', !on);
+      combo.markSelected = on;
+      combo.suffix = on ? '' : ' (automatic)';
+      combo.sync();
+    };
+    overrideBox.addEventListener('change', () => {
+      combo.close();
+      // override on: starts with the color in use, off: back to the meter type
+      MeterTheme.setOverride(overrideBox.checked ? MeterTheme.colorId : '');
+    });
+    const onTheme = () => {
+      if (!row.isConnected) {
+        window.removeEventListener('meter-theme', onTheme);
+        return;
+      }
+      update();
+    };
+    window.addEventListener('meter-theme', onTheme); // the meter type or the override changed
+    update();
   }
 
   function buildCard(s, def) {
@@ -9951,6 +10009,7 @@ const App = (() => {
     const cardEls = {};
     for (const def of SCHEMA.cards) cardEls[def.id] = buildCard(s, def);
     addThemeRow(cardEls.metertheme.querySelector('.cfg-body'));
+    addMeterTypeCombo(s);
 
     for (const g of SCHEMA.groups) {
       const label = App.el('div', 'cfg-nav-group', g.label);
@@ -10004,6 +10063,7 @@ const App = (() => {
       const v = s.vals[keyOf(s, f)];
       setValue(fld, v !== undefined ? v : f.def);
     }
+    s.byId.mqtt_homeassistant_metertype?.meterCombo?.sync();
     updatePinUsage(s);
     updateFlashMapping(s);
     attachHelpEvents(s);
@@ -10370,6 +10430,7 @@ const App = (() => {
       const [cfg, models, certs] = await Promise.all([Api.config.load(), Api.config.models().catch(() => []), Api.config.certs().catch(() => [])]);
       if (s.dead) return;
       s.cfg = cfg;
+      MeterTheme.applyFromConfig(); // an unsaved meter type preview is dropped
       s.models = models;
       s.certs = certs;
       buildForm(s);
