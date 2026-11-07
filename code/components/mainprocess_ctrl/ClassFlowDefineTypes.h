@@ -22,6 +22,7 @@ enum CNNType {
 struct FlowImageData {
     CImage *imgProcess = nullptr;
     CImageJpg *imgVisu = nullptr;
+    CImageJpg *imgRaw = nullptr; // Raw camera image of the actual cycle (for the WebUI)
 };
 
 
@@ -46,6 +47,7 @@ struct RoiData { // ROI
     CImage *imageRoi = nullptr;
     CImage *imageRoiResized = nullptr;
     bool isRejected = false;       // Only used for dig-cont models
+    int confidencePct = -1;        // Confidence of the result in percent (0-100), -1: model gives none
     int CNNResult = -10;           // Normalized to 0-99 (exception for class11: 0-10: 0-9+NaN), default: negative number equal to "-1.0"
     std::string sCNNResult = "-1"; // Result clamped and converted to string for visualization purpose
 };

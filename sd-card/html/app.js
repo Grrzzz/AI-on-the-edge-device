@@ -4368,6 +4368,16 @@ const App = (() => {
     },
 
     /**
+     * Progress of the running cycle. GET /api/live
+     * @returns {Promise<null | {running:boolean, state:string, cycle:number, raw:boolean, alignment:Object|null,
+     *   rois:Array<{seq:string, kind:'digit'|'analog', name:string, value:string, confidence?:number, rejected:boolean}>}>} null: not available (older firmware)
+     */
+    async live(signal) {
+      const res = await apiCall('/api/live', { signal, timeout: 4000 }, { parseType: 'json' });
+      return res.ok && res.data && res.data.api_name ? res.data : null;
+    },
+
+    /**
      * State of the main process. GET /api/status
      * @returns {Promise<null | {state:string, stateCode:number, stateSeconds:number, cycle:number, autoStart:boolean,
      *   running:boolean, cycleStart:'ready'|'queued'|'unavailable', processInterval:number, processTime:number, uptime:number, error:number,
@@ -4628,9 +4638,12 @@ const App = (() => {
   let dashActive = null; // state of the mounted dashboard view
 
   // ------------------------------------------------------------------------
-  // Picture animation of the dashboard image card: "Taking image" scene -> raw image grows out of the scan icon ->
-  // rotation and alignment (if the device reports the raw image and the pose) -> regions of interest -> zoom -> recognition
-  // (every frame takes the color of its status, the recognized digit pops up) -> zoom out. Calculated in the browser.
+  // Picture animation of the dashboard image card, in sync with the running cycle:
+  // "Taking image" scene -> raw image grows out of the scan icon (as soon as the device has it) -> markers searched ->
+  // image rotation -> alignment (shift) -> regions of interest -> zoom -> every region takes the color of its status as the
+  // device evaluates it (the recognized digit pops up) -> zoom out. Everything is calculated in the browser.
+  // The animation is a state machine: a step starts when its data is available (GET /api/live) and its minimum time is over.
+  // Without live data (older firmware) and for the replay all data is there at once and the steps simply follow each other.
   // ------------------------------------------------------------------------
   function createImageReveal({ card, canvas, bgCanvas, stage }) {
     const ctx = canvas.getContext('2d');
@@ -4647,128 +4660,103 @@ const App = (() => {
     });
     const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
-    const DUR = { stage: 2600, reveal: 1700, hold: 900, rotate: 1300, align: 1300, regions: 800, zoom: 1700, recog: 1700, zoomout: 1200 };
-    let d = null; // { alg, raw, pose, rois, W, H }
-    let lay = null;
-    let tl = null; // timeline { names, start, ms, total }
-    let geo = null; // viewfinder of the scan icon in image coordinates
-    let raf = 0;
-    let t0 = 0;
-    let hooks = {};
-    let colors = {};
-    let revealStarted = false;
-    const api = { playing: false, ready: false };
+    // minimum durations [ms] of the steps
+    const DUR = { stage: 900, replayStage: 2600, reveal: 1700, hold: 700, rotate: 1300, align: 1300, regions: 800, zoom: 1700, recog: 1200, zoomout: 1200 };
+    const POP = 700; // time a frame needs to take its status color
+    const SETTLE = 900; // time the last result stays before the zoom out
 
-    function layout() {
-      if (!d) return false;
+    let d = null; // resting data: { alg, raw, pose, rois, W, H }
+    let S = null; // running animation (state machine)
+    let lay = null;
+    let geo = null;
+    let raf = 0;
+    let colors = {};
+    const api = { playing: false, ready: false, liveActive: false };
+
+    // ---- resting data ------------------------------------------------------------
+    function layout(W, H) {
       const cw = card.clientWidth;
       const ch = card.clientHeight;
-      if (!cw || !ch) return false;
+      if (!cw || !ch || !W) return false;
       const dpr = window.devicePixelRatio || 1;
       canvas.width = Math.round(cw * dpr);
       canvas.height = Math.round(ch * dpr);
-      const k = Math.min(cw / d.W, ch / d.H);
-      lay = { cw, ch, dpr, k, vx: (cw - d.W * k) / 2, vy: (ch - d.H * k) / 2 };
+      const k = Math.min(cw / W, ch / H);
+      lay = { cw, ch, dpr, k, vx: (cw - W * k) / 2, vy: (ch - H * k) / 2 };
       bgCanvas.width = 160; // blurred fill: low resolution is enough
       bgCanvas.height = Math.max(1, Math.round((160 * ch) / cw));
       return true;
     }
 
-    function timeline(withStage) {
-      const names = [];
-      if (withStage) names.push('stage');
-      names.push('reveal');
-      if (d.pose) names.push('hold', 'rotate', 'align');
-      names.push('regions', 'zoom', 'recog', 'zoomout');
-      const start = {};
-      let total = 0;
-      for (const n of names) {
-        start[n] = total;
-        total += DUR[n];
-      }
-      return { names, start, total };
-    }
-
-    // viewfinder (corner brackets) of the scan icon in image coordinates, with the size it has right now
-    function measureIcon() {
-      const svg = stage.querySelector('svg.scan-icon');
-      if (!svg || !lay) return { cx: d.W / 2, cy: d.H / 2, sq: d.H * 0.2, sw: 6, arm: 12 };
-      const r = svg.getBoundingClientRect();
-      const c = card.getBoundingClientRect();
-      let sc = 1;
-      try {
-        const m = new DOMMatrix(getComputedStyle(svg.querySelector('.scan-corners')).transform);
-        sc = m.a || 1;
-      } catch (e) { }
-      const u = (r.width / 64) * sc; // css px per svg unit
-      const toImg = (px, off) => (px - off) / lay.k;
-      return {
-        cx: toImg(r.left + r.width / 2 - c.left, lay.vx),
-        cy: toImg(r.top + r.height / 2 - c.top, lay.vy),
-        sq: ((53 - 11 - 5) * u) / lay.k, // inner edge of the corner brackets
-        sw: (5 * u) / lay.k,
-        arm: (10 * u) / lay.k,
-        swPx: 5 * u,
-      };
-    }
-
     function ensureColors() {
       colors = { ok: css('--success') || '#10b981', warn: css('--warning') || '#f59e0b', err: css('--error') || '#ef4444', accent: css('--meter-accent') || css('--primary') || '#2563eb' };
     }
+    const statusColor = (st) => (st === 'err' ? colors.err : st === 'warn' ? colors.warn : colors.ok);
 
-    function statusColor(st) {
-      return st === 'err' ? colors.err : st === 'warn' ? colors.warn : colors.ok;
+    // label and status of an evaluated ROI
+    function evalRoi(kind, value, confidence, rejected) {
+      const num = parseFloat(value);
+      let label = String(value ?? '');
+      let status = 'ok';
+      if (Number.isNaN(num)) {
+        label = 'N';
+        status = 'err';
+      } else if (kind === 'digit') {
+        label = String(Math.round(num) % 10); // dig-class100 / dig-cont give e.g. 3.9: the digit is 4
+      } else {
+        label = num.toFixed(1); // analog pointer: position 0.0 to 9.9
+      }
+      const c = typeof confidence === 'number' ? confidence : null;
+      if (status === 'ok' && (rejected || (c !== null && c < 60))) status = 'err';
+      else if (status === 'ok' && c !== null && c < 90) status = 'warn';
+      return { label, status, pct: status !== 'ok' && c !== null ? `${Math.round(c)}%` : '' };
     }
 
-    // blurred fill of the card: the picture in its current state (raw image, rotated, aligned), covering the whole card
-    function drawBg(P) {
-      const { W, H } = d;
+    // ---- drawing -----------------------------------------------------------------
+    // blurred fill of the card: the picture in its current state, covering the whole card
+    function drawBg(P, W, H, pose, raw, alg) {
       const bw = bgCanvas.width, bh = bgCanvas.height;
       bgCtx.setTransform(1, 0, 0, 1, 0, 0);
       bgCtx.clearRect(0, 0, bw, bh);
-      bgCtx.save();
-      bgCtx.translate(bw / 2, bh / 2);
       const kc = Math.max(bw / W, bh / H);
-      bgCtx.scale(kc, kc);
-      bgCtx.translate(-W / 2, -H / 2);
-      const pose = d.pose;
-      if (pose) {
-        bgCtx.translate(W / 2, H / 2);
-        const kk = lerp(1, 1 / pose.scale, P.shift);
-        bgCtx.scale(kk, kk);
-        bgCtx.rotate(lerp(0, -pose.theta, P.rot));
-        bgCtx.translate(-W / 2, -H / 2);
-        bgCtx.translate(-pose.dx * P.shift, -pose.dy * P.shift);
-      }
-      if (pose && d.raw && P.algMix < 1) {
-        bgCtx.globalAlpha = P.bg * (1 - P.algMix);
-        bgCtx.drawImage(d.raw, 0, 0, W, H);
-      }
-      bgCtx.restore();
-      // in the end the fill is the final processed picture
-      if (!pose || P.algMix > 0) {
-        bgCtx.save();
+      const base = () => {
         bgCtx.translate(bw / 2, bh / 2);
         bgCtx.scale(kc, kc);
         bgCtx.translate(-W / 2, -H / 2);
-        bgCtx.globalAlpha = P.bg * (pose ? P.algMix : 1);
-        bgCtx.drawImage(d.alg, 0, 0, W, H);
+      };
+      if (pose && raw && P.algMix < 1) {
+        bgCtx.save();
+        base();
+        bgCtx.translate(pose.dx * P.shift, pose.dy * P.shift);
+        bgCtx.translate(W / 2, H / 2);
+        bgCtx.rotate(pose.theta * P.rot);
+        bgCtx.translate(-W / 2, -H / 2);
+        bgCtx.globalAlpha = P.bg * (1 - P.algMix);
+        bgCtx.drawImage(raw, 0, 0, W, H);
+        bgCtx.restore();
+      }
+      if (alg && (!pose || !raw || P.algMix > 0)) {
+        bgCtx.save();
+        base();
+        bgCtx.globalAlpha = P.bg * (pose && raw ? P.algMix : 1);
+        bgCtx.drawImage(alg, 0, 0, W, H);
         bgCtx.restore();
       }
     }
 
-    function draw(P) {
-      if (!d || !lay) return;
-      const { W, H } = d;
-      drawBg(P);
-      const N = d.rois.length;
+    function draw(P, D) {
+      const { W, H, pose, rois } = D;
+      const raw = D.raw, alg = D.alg;
+      if (!lay) return;
+      drawBg(P, W, H, pose, raw, alg);
       ctx.setTransform(lay.dpr, 0, 0, lay.dpr, 0, 0);
       ctx.clearRect(0, 0, lay.cw, lay.ch);
       ctx.setTransform(lay.dpr * lay.k, 0, 0, lay.dpr * lay.k, lay.dpr * lay.vx, lay.dpr * lay.vy);
 
       // zoom target: the regions of interest
-      const bx0 = Math.min(...d.rois.map((r) => r.x)), bx1 = Math.max(...d.rois.map((r) => r.x + r.w));
-      const by0 = Math.min(...d.rois.map((r) => r.y)), by1 = Math.max(...d.rois.map((r) => r.y + r.h));
+      const have = rois.length > 0;
+      const bx0 = have ? Math.min(...rois.map((r) => r.x)) : 0, bx1 = have ? Math.max(...rois.map((r) => r.x + r.w)) : W;
+      const by0 = have ? Math.min(...rois.map((r) => r.y)) : 0, by1 = have ? Math.max(...rois.map((r) => r.y + r.h)) : H;
       const zoomK = Math.min(((lay.cw / lay.k) * 0.9) / (bx1 - bx0), ((lay.ch / lay.k) * 0.8) / (by1 - by0 + 30));
       const zc = [(bx0 + bx1) / 2, (by0 + by1) / 2];
 
@@ -4779,12 +4767,10 @@ const App = (() => {
         ctx.rect(win.cx - win.w / 2, win.cy - win.h / 2, win.w, win.h);
         ctx.clip();
       }
-      // view: zoom to the regions
       ctx.translate(W / 2, H / 2);
       const sc = lerp(1, zoomK, P.z);
       ctx.scale(sc, sc);
       ctx.translate(-lerp(W / 2, zc[0], P.z), -lerp(H / 2, zc[1], P.z));
-      // reveal: the picture first covers the square window (centered) and zooms out to its real size while the window opens
       if (win) {
         ctx.translate(win.cx, win.cy);
         const rs = lerp(geo.sq / H, 1, P.reveal);
@@ -4792,43 +4778,40 @@ const App = (() => {
         ctx.translate(-W / 2, -H / 2);
       }
 
-      // picture: raw image moved back by the inverse pose (rotation first, then scale and shift)
-      const pose = d.pose;
+      // picture: the device first rotates the raw image around its center, then shifts it
       ctx.save();
       if (pose) {
+        ctx.translate(pose.dx * P.shift, pose.dy * P.shift);
         ctx.translate(W / 2, H / 2);
-        const kk = lerp(1, 1 / pose.scale, P.shift);
-        ctx.scale(kk, kk);
-        ctx.rotate(lerp(0, -pose.theta, P.rot));
+        ctx.rotate(pose.theta * P.rot);
         ctx.translate(-W / 2, -H / 2);
-        ctx.translate(-pose.dx * P.shift, -pose.dy * P.shift);
       }
-      if (pose && d.raw && P.algMix < 1) {
+      if (raw && (!pose || P.algMix < 1 || !alg)) {
         ctx.globalAlpha = P.imgAlpha;
-        ctx.drawImage(d.raw, 0, 0, W, H);
+        ctx.drawImage(raw, 0, 0, W, H);
+        ctx.globalAlpha = 1;
       }
-      ctx.globalAlpha = 1;
-      // markers found in the raw image travel with it onto the reference position
+      // reference markers: they sit where the device found them in the raw image and travel onto the reference position
       if (pose && P.markers > 0 && pose.markers.length) {
         ctx.save();
-        ctx.translate(W / 2 + pose.dx, H / 2 + pose.dy);
-        ctx.rotate(pose.theta);
-        ctx.scale(pose.scale, pose.scale);
+        ctx.translate(W / 2, H / 2);
+        ctx.rotate(-pose.theta);
         ctx.translate(-W / 2, -H / 2);
+        ctx.translate(-pose.dx, -pose.dy);
         ctx.lineWidth = 2.5;
         ctx.strokeStyle = `rgba(239,68,68,${(0.55 + 0.45 * (0.5 + 0.5 * Math.sin(P.t / 140))) * P.markers})`;
         for (const m of pose.markers) ctx.strokeRect(m.x, m.y, m.w, m.h);
         ctx.restore();
       }
       ctx.restore();
-      // the processed picture of the device replaces the moved raw image (cross-fade), at the end only it is shown
-      if (!pose || P.algMix > 0) {
-        ctx.globalAlpha = P.imgAlpha * (pose ? P.algMix : 1);
-        ctx.drawImage(d.alg, 0, 0, W, H);
+      // the aligned picture of the device replaces the moved raw image (cross-fade), at the end only it is shown
+      if (alg && (!raw || !pose || P.algMix > 0)) {
+        ctx.globalAlpha = P.imgAlpha * (raw && pose ? P.algMix : 1);
+        ctx.drawImage(alg, 0, 0, W, H);
         ctx.globalAlpha = 1;
       }
 
-      // soft picture edges (like the former image view): fade the outer 10 percent
+      // soft picture edges: fade the outer 10 percent
       if (P.edge > 0) {
         ctx.save();
         ctx.globalCompositeOperation = 'destination-out';
@@ -4847,21 +4830,23 @@ const App = (() => {
         ctx.restore();
       }
 
-      // regions of interest: white frames; in the recognition every frame is scanned in turn, takes the color of its status
-      // and the recognized digit pops up above it
+      // regions of interest (digit and analog): white frames; evaluated ones take the color of their status and show the result
       if (P.regions > 0) {
-        d.rois.forEach((r, i) => {
+        const firstPending = rois.findIndex((r, i) => P.q[i] <= 0);
+        rois.forEach((r, i) => {
           const appear = clamp(P.regions * 1.6 - i * 0.08);
-          const q = P.recog < 0 ? 0 : clamp(P.recog - i);
+          const q = P.q[i];
           const col = q > 0.15 ? statusColor(r.status) : '#f8fafc';
           const flash = q > 0 && q < 1 ? Math.sin(q * Math.PI) : 0;
+          // the region the device works on right now breathes
+          const scan = q <= 0 && P.scanning && i === firstPending ? 0.5 + 0.5 * Math.sin(P.t / 120) : 0;
           ctx.save();
-          ctx.globalAlpha = appear * (q > 0.15 ? 0.16 + flash * 0.25 : 0.1);
+          ctx.globalAlpha = appear * (q > 0.15 ? 0.16 + flash * 0.25 : 0.1 + scan * 0.18);
           ctx.fillStyle = col;
           ctx.fillRect(r.x, r.y, r.w, r.h);
           ctx.restore();
           ctx.globalAlpha = appear;
-          ctx.lineWidth = 2 + flash * 2;
+          ctx.lineWidth = 2 + flash * 2 + scan;
           ctx.strokeStyle = col;
           ctx.strokeRect(r.x - flash * 1.5, r.y - flash * 1.5, r.w + flash * 3, r.h + flash * 3);
           if (q > 0) {
@@ -4869,7 +4854,7 @@ const App = (() => {
             ctx.save();
             ctx.translate(r.x + r.w / 2, r.y - 6);
             ctx.scale(pop, pop);
-            // digit in the badge, a smaller confidence next to it (bad recognitions only)
+            // result in the badge, a smaller confidence next to it (bad recognitions only)
             ctx.font = '700 11px system-ui, sans-serif';
             const w1 = ctx.measureText(r.label).width;
             ctx.font = '600 7px system-ui, sans-serif';
@@ -4915,76 +4900,191 @@ const App = (() => {
         ctx.stroke();
         ctx.globalAlpha = 1;
       }
-      void N;
     }
 
-    // resting state: aligned picture, all frames in their status color with the recognized digit
+    // resting state: aligned picture, all frames in their status color with the result
     function drawFinal() {
-      if (!d || !layout()) return;
+      if (!d || !layout(d.W, d.H)) return;
       ensureColors();
       geo = geo || { cx: d.W / 2, cy: d.H / 2, sq: d.H * 0.2, sw: 6, arm: 12 };
-      draw({ reveal: 1, rot: 1, shift: 1, regions: 1, recog: d.rois.length + 2, z: 0, edge: 1, imgAlpha: 1, bg: 1, algMix: 1, markers: 0, bracket: 0, t: 0 });
+      draw({ reveal: 1, rot: 1, shift: 1, regions: 1, q: d.rois.map(() => 1), z: 0, edge: 1, imgAlpha: 1, bg: 1, algMix: 1, markers: 0, bracket: 0, scanning: false, t: 0 }, d);
     }
 
-    function frame(now) {
-      const e = now - t0;
-      const pr = (n) => (tl.start[n] === undefined ? 1 : clamp((e - tl.start[n]) / DUR[n]));
-      const started = (n) => tl.start[n] !== undefined && e >= tl.start[n];
-      if (!revealStarted && e >= tl.start.reveal) {
-        revealStarted = true;
+    // ---- icon geometry -----------------------------------------------------------
+    // viewfinder (corner brackets) of the scan icon in image coordinates, with the size it has right now
+    function measureIcon(W, H) {
+      const svg = stage.querySelector('svg.scan-icon');
+      if (!svg || !lay) return { cx: W / 2, cy: H / 2, sq: H * 0.2, sw: 6, arm: 12 };
+      const r = svg.getBoundingClientRect();
+      const c = card.getBoundingClientRect();
+      let sc = 1;
+      try {
+        sc = new DOMMatrix(getComputedStyle(svg.querySelector('.scan-corners')).transform).a || 1;
+      } catch (e) { }
+      const u = (r.width / 64) * sc; // css px per svg unit
+      return {
+        cx: (r.left + r.width / 2 - c.left - lay.vx) / lay.k,
+        cy: (r.top + r.height / 2 - c.top - lay.vy) / lay.k,
+        sq: ((53 - 11 - 5) * u) / lay.k, // inner edge of the corner brackets
+        sw: (5 * u) / lay.k,
+        arm: (10 * u) / lay.k,
+      };
+    }
+
+    // ---- state machine -----------------------------------------------------------
+    const poseOf = (al) => (al && al.ok !== false ? { theta: ((al.rotation || 0) * Math.PI) / 180, dx: al.dx || 0, dy: al.dy || 0, markers: Array.isArray(al.markers) ? al.markers : [] } : null);
+
+    function go(phase, now) {
+      S.phase = phase;
+      S.t = now;
+      if (phase === 'reveal') {
+        S.W = S.W || (S.alg || S.raw).naturalWidth;
+        S.H = S.H || (S.alg || S.raw).naturalHeight;
+        layout(S.W, S.H);
+        S.revealGeo = measureIcon(S.W, S.H);
+        geo = S.revealGeo;
         stage.classList.add('handoff'); // the corner brackets are drawn by the canvas from now on
         canvas.hidden = false;
       }
-      if (e >= tl.start.reveal) {
-        const N = d.rois.length;
-        const reveal = ease(pr('reveal'));
-        const recogStarted = started('recog');
-        const zIn = ease(pr('zoom')), zOut = ease(pr('zoomout'));
-        const P = {
-          reveal,
-          imgAlpha: ease(clamp(pr('reveal') * 2.4)),
-          bg: ease(pr('reveal')), // the blurred fill comes up while the picture grows
-          algMix: d.pose ? ease(pr('regions')) : 1,
-          rot: ease(pr('rotate')),
-          shift: ease(pr('align')),
-          regions: pr('regions'),
-          recog: recogStarted ? pr('recog') * (N + 2) : -1,
-          z: zIn * (1 - zOut),
-          edge: zOut,
-          markers: d.pose && started('hold') ? (started('regions') ? 1 - pr('regions') : 1) : 0,
-          bracket: e < tl.start.reveal + DUR.reveal ? 1 : Math.max(0, 1 - (e - tl.start.reveal - DUR.reveal) / 450),
-          t: e,
-        };
-        if (!recogStarted && !started('regions')) P.regions = 0;
-        draw(P);
-        if (recogStarted) hooks.onRecog?.(Math.min(N, Math.floor(pr('recog') * (N + 2))));
+    }
+
+    // next step when its data is available and the minimum time of the current one is over
+    function advance(now) {
+      const e = now - S.t;
+      if (!S.pose && S.alignment && S.raw) {
+        S.pose = poseOf(S.alignment); // known as soon as the device reports the alignment: the markers show while we wait
+        S.hasPose = !!S.pose;
       }
-      if (e < tl.total) {
-        raf = requestAnimationFrame(frame);
-      } else {
+      const roisDone = S.rois.length > 0 && S.rois.every((r) => r.doneAt !== null);
+      const shiftSig = S.pose && Math.abs(S.pose.dx) + Math.abs(S.pose.dy) >= 1;
+      const rotSig = S.pose && Math.abs(S.pose.theta) >= 0.0017; // 0.1 degree
+      switch (S.phase) {
+        case 'stage':
+          if (e >= (S.replay ? DUR.replayStage : DUR.stage) && (S.raw || (S.alg && S.alignment))) go('reveal', now);
+          break;
+        case 'reveal':
+          if (e >= DUR.reveal) go(S.raw ? 'hold' : 'regions', now);
+          break;
+        case 'hold':
+          if (e >= DUR.hold && S.alignment && S.alg) {
+            go(S.pose && rotSig ? 'rotate' : S.pose && shiftSig ? 'align' : 'regions', now);
+          }
+          break;
+        case 'rotate':
+          if (e >= DUR.rotate) go(shiftSig ? 'align' : 'regions', now);
+          break;
+        case 'align':
+          if (e >= DUR.align) go('regions', now);
+          break;
+        case 'regions':
+          if (e >= DUR.regions) go(S.rois.length ? 'zoom' : 'done', now);
+          break;
+        case 'zoom':
+          if (e >= DUR.zoom) {
+            go('recog', now);
+            if (S.stagger) S.rois.forEach((r, i) => { r.doneAt = now + i * 160; S.hooks.onRoi?.(i, r, i * 160); }); // complete data: results follow each other
+          }
+          break;
+        case 'recog':
+          if (e >= DUR.recog && S.cycleDone) {
+            const lastDone = roisDone ? Math.max(...S.rois.map((r) => r.doneAt)) : null;
+            const settled = lastDone !== null && now - lastDone >= SETTLE;
+            const stuck = now - S.cycleDoneAt > 4000; // a region without result must not hold the animation
+            if (settled || stuck) go('zoomout', now);
+          }
+          break;
+        case 'zoomout':
+          if (e >= DUR.zoomout) go('done', now);
+          break;
+        default:
+          break;
+      }
+    }
+
+    function params(now) {
+      const e = now - S.t;
+      const ph = S.phase;
+      const order = ['stage', 'reveal', 'hold', 'rotate', 'align', 'regions', 'zoom', 'recog', 'zoomout', 'done'];
+      const at = (p) => order.indexOf(ph) >= order.indexOf(p); // phase p reached
+      const prog = (p, dur) => (ph === p ? clamp(e / dur) : at(p) && order.indexOf(ph) > order.indexOf(p) ? 1 : 0);
+      const reveal = ease(prog('reveal', DUR.reveal));
+      const hasPose = !!S.pose && !!S.raw;
+      return {
+        reveal,
+        imgAlpha: ease(clamp(prog('reveal', DUR.reveal) * 2.4)),
+        bg: reveal,
+        rot: hasPose ? ease(prog('rotate', DUR.rotate)) : 0,
+        shift: hasPose ? ease(prog('align', DUR.align)) : 0,
+        regions: prog('regions', DUR.regions),
+        algMix: hasPose ? (ph === 'regions' ? ease(clamp(e / DUR.regions)) : at('zoom') ? 1 : 0) : 1,
+        z: ph === 'zoom' ? ease(clamp(e / DUR.zoom)) : ph === 'recog' ? 1 : ph === 'zoomout' ? 1 - ease(clamp(e / DUR.zoomout)) : 0,
+        edge: ph === 'zoomout' ? ease(clamp(e / DUR.zoomout)) : 0,
+        q: S.rois.map((r) => (r.doneAt === null ? 0 : clamp((now - r.doneAt) / POP))),
+        scanning: ph === 'recog' && !S.cycleDone,
+        // markers search the raw image while the device aligns it, then fade out
+        markers: S.alignment && hasPose ? (ph === 'hold' || ph === 'rotate' || ph === 'align' ? 1 : ph === 'regions' ? 1 - clamp(e / DUR.regions) : 0) : 0,
+        bracket: ph === 'reveal' ? 1 : ph === 'hold' ? Math.max(0, 1 - e / 450) : 0,
+        t: now,
+      };
+    }
+
+    function frame(now) {
+      if (!S) return;
+      advance(now);
+      if (S.phase === 'done') {
         finish();
+        return;
       }
+      if (S.phase !== 'stage') {
+        draw(params(now), { W: S.W, H: S.H, raw: S.raw, alg: S.alg, pose: S.raw ? S.pose : null, rois: S.rois });
+      }
+      raf = requestAnimationFrame(frame);
     }
 
     function finish() {
       cancelAnimationFrame(raf);
+      const done = S;
+      S = null;
       api.playing = false;
+      api.liveActive = false;
       stage.hidden = true;
       stage.textContent = '';
       stage.classList.remove('handoff');
+      if (done.alg) {
+        d = { alg: done.alg, raw: done.hasPose ? done.raw : null, pose: done.hasPose ? done.pose : null, rois: done.rois.map((r) => ({ ...r, doneAt: undefined })), W: done.W, H: done.H };
+        api.ready = true;
+      }
       drawFinal();
       canvas.hidden = false;
-      hooks.onDone?.();
+      done.hooks.onDone?.();
+    }
+
+    function newSession(mode, hooks) {
+      cancelAnimationFrame(raf);
+      ensureColors();
+      api.playing = true;
+      api.liveActive = mode === 'live';
+      return {
+        mode, phase: 'stage', t: performance.now(), hooks: hooks || {},
+        raw: null, alg: null, pose: null, hasPose: false, alignment: null, rois: [], W: 0, H: 0,
+        cycleDone: false, cycleDoneAt: 0, replay: false, stagger: false,
+      };
+    }
+
+    function restartStageAnimation() {
+      stage.querySelectorAll('*').forEach((n) => { n.style.animation = 'none'; });
+      void stage.offsetHeight;
+      stage.querySelectorAll('*').forEach((n) => { n.style.animation = ''; });
     }
 
     Object.assign(api, {
-      // data: { alg, raw, pose, rois } (see prepare)
+      // ---- resting data and replay -------------------------------------------------
+      // rec: Api.process.recognition(), cfg: configuration (ROI geometry if the device does not send it)
       async prepare(rec, cfg) {
         const seq = rec?.sequences?.[0];
         if (!seq) return false;
         const list = [];
-        const kinds = [['digit', seq.digit], ['analog', seq.analog]];
-        for (const [kind, block] of kinds) {
+        for (const [kind, block] of [['digit', seq.digit], ['analog', seq.analog]]) {
           if (!block.enabled) continue;
           for (let i = 0; i < block.rois.length; i++) {
             const r = block.rois[i];
@@ -4994,24 +5094,20 @@ const App = (() => {
               if (c && typeof c.x === 'number' && typeof c.dx === 'number') rect = { x: c.x, y: c.y, w: c.dx, h: c.dy };
             }
             if (!rect) return false; // no geometry: the plain image view is used
-            const status = roiStatus(r);
-            list.push({ x: rect.x, y: rect.y, w: rect.w, h: rect.h, status, label: r.na ? 'N' : r.value, pct: status !== 'ok' && r.confidence !== null ? `${Math.round(r.confidence)}%` : '' });
+            const ev = r.na ? { label: 'N', status: 'err', pct: '' } : evalRoi(kind, r.value, r.confidence, false);
+            list.push({ kind, x: rect.x, y: rect.y, w: rect.w, h: rect.h, ...ev, doneAt: null });
           }
         }
         if (!list.length) return false;
         const al = rec.alignment;
         const [alg, raw] = await Promise.all([loadImg(Api.process.imageUrl('alg.jpg')), al ? loadImg(Api.process.imageUrl(al.rawImage)) : Promise.resolve(null)]);
         if (!alg) return false;
-        const pose = raw && al && typeof al.rotation === 'number'
-          ? { theta: (al.rotation * Math.PI) / 180, scale: al.scale || 1, dx: al.dx || 0, dy: al.dy || 0, markers: Array.isArray(al.markers) ? al.markers : [] }
-          : null;
+        const pose = raw ? poseOf(al) : null;
         d = { alg, raw: pose ? raw : null, pose, rois: list, W: alg.naturalWidth, H: alg.naturalHeight };
         api.ready = true;
-        api.algUrl = alg.src;
         return true;
       },
 
-      // resting state (no animation)
       showFinal() {
         if (api.playing) return;
         geo = null;
@@ -5019,43 +5115,122 @@ const App = (() => {
         drawFinal();
       },
 
-      // withStage: show the "Taking image" scene first (replay); otherwise the scene is already on screen
-      play({ withStage = false, onRecog, onDone } = {}) {
-        if (!d || !layout()) return;
-        cancelAnimationFrame(raf);
-        hooks = { onRecog, onDone };
-        ensureColors();
-        tl = timeline(withStage);
-        revealStarted = false;
-        api.playing = true;
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // replay of the finished cycle: all data is there, the steps follow each other (withStage: with the scan scene first)
+      playComplete({ withStage = true, onRoi, onDone } = {}) {
+        if (!d) return;
+        S = newSession('complete', { onRoi, onDone });
+        S.alg = d.alg;
+        S.raw = d.raw;
+        S.alignment = d.pose ? { ok: true } : { ok: false };
+        S.pose = d.pose;
+        S.hasPose = !!d.pose;
+        S.W = d.W;
+        S.H = d.H;
+        S.rois = d.rois.map((r) => ({ ...r, doneAt: null }));
+        S.cycleDone = true;
+        S.cycleDoneAt = performance.now();
+        S.stagger = true;
+        S.replay = withStage;
         canvas.hidden = false;
         stage.classList.remove('handoff');
-        if (withStage) {
-          // restart the icon animation: it is at its normal size after 2 x 1.3 s
-          stage.querySelectorAll('*').forEach((n) => { n.style.animation = 'none'; });
-          void stage.offsetHeight;
-          stage.querySelectorAll('*').forEach((n) => { n.style.animation = ''; });
-        }
-        geo = measureIcon();
-        t0 = performance.now();
+        if (withStage) restartStageAnimation();
+        else S.t -= DUR.stage;
+        layout(S.W, S.H);
         raf = requestAnimationFrame(frame);
       },
 
-      // new cycle: stop the animation and clear the canvas
+      // ---- live: follows the running cycle -----------------------------------------
+      // rois: [{ kind, x, y, w, h }] from the configuration (digits first, then analog)
+      beginLive({ rois, onRoi, onDone }) {
+        S = newSession('live', { onRoi, onDone });
+        S.rois = rois.map((r) => ({ ...r, label: '', status: 'ok', pct: '', doneAt: null }));
+        S.counts = { digit: 0, analog: 0 };
+        S.firstSeq = null;
+        canvas.hidden = true;
+        stage.classList.remove('handoff');
+        raf = requestAnimationFrame(frame);
+      },
+
+      // answer of GET /api/live
+      updateLive(live) {
+        if (!S || S.mode !== 'live' || !live) return;
+        const now = performance.now();
+        if (live.raw && !S.rawLoading) {
+          S.rawLoading = true;
+          loadImg(Api.process.imageUrl(live.alignment?.rawImage || '/img_tmp/raw.jpg')).then((img) => { if (S && S.mode === 'live') S.raw = img; });
+        }
+        if (live.alignment && !S.alignLoading) {
+          S.alignLoading = true;
+          S.alignment = live.alignment;
+          loadImg(Api.process.imageUrl('alg.jpg')).then((img) => {
+            if (S && S.mode === 'live') {
+              S.alg = img;
+              if (!S.raw && !S.rawLoading) S.pose = null;
+            }
+          });
+        }
+        // results of the ROIs (digits and analog) in the order of the configuration
+        const byKind = { digit: [], analog: [] };
+        const seq = S.firstSeq || (live.rois[0] && live.rois[0].seq) || null;
+        S.firstSeq = seq;
+        for (const r of live.rois) if (r.seq === seq && byKind[r.kind]) byKind[r.kind].push(r);
+        let idx = 0;
+        for (const kind of ['digit', 'analog']) {
+          const slots = S.rois.filter((r) => r.kind === kind);
+          slots.forEach((slot, i) => {
+            const res = byKind[kind][i];
+            if (res && slot.doneAt === null) {
+              Object.assign(slot, evalRoi(kind, res.value, res.confidence, res.rejected));
+              slot.doneAt = now;
+              slot.name = res.name;
+              S.hooks.onRoi?.(S.rois.indexOf(slot), slot);
+            }
+          });
+          idx += slots.length;
+        }
+        void idx;
+        if (!live.running && live.cycle) api.endLive();
+      },
+
+      endLive() {
+        if (S && S.mode === 'live' && !S.cycleDone) {
+          S.cycleDone = true;
+          S.cycleDoneAt = performance.now();
+        }
+      },
+
+      // live not available (older firmware) or cycle without usable data: drop the session, the scene stays with the caller
+      abortLive() {
+        if (S && S.mode === 'live') {
+          cancelAnimationFrame(raf);
+          S = null;
+          api.playing = false;
+          api.liveActive = false;
+          canvas.hidden = true;
+          stage.classList.remove('handoff');
+        }
+      },
+
+      // new cycle (or leaving the page): stop everything
       cancel() {
         cancelAnimationFrame(raf);
+        S = null;
         api.playing = false;
+        api.liveActive = false;
         canvas.hidden = true;
         stage.classList.remove('handoff');
       },
 
       relayout() {
-        if (!d || api.playing) return;
+        if (!d || S) return;
         if (!canvas.hidden) drawFinal();
       },
+
+      resumeStage() {
+        restartStageAnimation();
+      },
     });
+    Object.defineProperty(api, 'algUrl', { get: () => (d ? d.alg.src : '') });
     return api;
   }
 
@@ -5537,12 +5712,124 @@ const App = (() => {
         ref.stage.classList.remove('handoff');
         st.stageHold = false;
       };
-      // recognition tiles appear one after another during the recognition phase of the animation
-      const setTilesPending = (on) => {
-        root.querySelectorAll('.rec-roi-tile').forEach((t) => t.classList.toggle('is-pending', on));
+
+      // ---- recognition card: blurred while a cycle runs (new results are on the way) -------------------
+      const recCard = root.querySelector('.dash-rec');
+      const setRecUpdating = (on) => recCard.classList.toggle('is-updating', on);
+      // complete data (end of cycle, replay): the tiles appear one after another
+      const setTilesPending = (on) => root.querySelectorAll('.rec-roi-tile').forEach((t) => t.classList.toggle('is-pending', on));
+      const revealTile = (i, roi, delay = 0) => {
+        const tile = root.querySelectorAll('.rec-roi-tile')[i];
+        if (tile) setTimeout(() => tile.classList.remove('is-pending'), delay);
       };
-      const setTilesShown = (n) => {
-        root.querySelectorAll('.rec-roi-tile').forEach((t, i) => t.classList.toggle('is-pending', i >= n));
+      // live: placeholders for all regions, every tile is filled when the device has its result
+      const buildLiveTiles = (list) => {
+        ref.recBody.textContent = '';
+        for (const kind of ['digit', 'analog']) {
+          const items = list.filter((r) => r.kind === kind);
+          if (!items.length) continue;
+          const wrap = el('div', 'rec-roi-block');
+          wrap.append(el('div', 'rec-roi-title', kind === 'digit' ? 'Digit ROIs' : 'Analog ROIs'));
+          const grid = el('div', `rec-roi-grid is-${kind}`);
+          for (let i = 0; i < items.length; i++) {
+            const tile = el('div', 'rec-roi-tile is-waiting');
+            tile.append(el('div', 'rec-roi-value', '\u2026'));
+            grid.append(tile);
+          }
+          wrap.append(grid);
+          ref.recBody.append(wrap);
+        }
+        st.liveTileEls = [...ref.recBody.querySelectorAll('.rec-roi-tile')];
+        st.liveTiles = true;
+        setRecUpdating(false);
+      };
+      const fillLiveTile = (i, roi) => {
+        const tile = st.liveTileEls?.[i];
+        if (!tile) return;
+        tile.classList.remove('is-waiting');
+        tile.dataset.status = roi.status;
+        tile.textContent = '';
+        tile.append(el('div', 'rec-roi-value', roi.label));
+        if (roi.name) {
+          const img = el('img', 'rec-roi-img');
+          img.src = Api.process.imageUrl(`${roi.name}_org.jpg`);
+          img.alt = `ROI ${roi.label}`;
+          tile.append(img);
+        }
+        tile.classList.add('is-pop');
+      };
+
+      // ---- live view: follows the device while the cycle runs --------------------------------------------
+      const cfgRois = () => {
+        const out = [];
+        try {
+          const c = getConfigFromStorage(0);
+          for (const kind of ['digit', 'analog']) {
+            if (!c?.[kind] || c[kind].enabled === false) continue;
+            for (const r of c[kind].sequence?.[0]?.roi ?? []) {
+              if (typeof r.x === 'number' && typeof r.dx === 'number') out.push({ kind, x: r.x, y: r.y, w: r.dx, h: r.dy });
+            }
+          }
+        } catch (e) { }
+        return out;
+      };
+      const stopLive = () => {
+        clearInterval(st.liveTimer);
+        st.liveTimer = null;
+        st.liveBusy = false;
+        st.liveOn = false;
+      };
+      const livePoll = async () => {
+        if (st.liveBusy || !st.liveOn || st.dead) return;
+        st.liveBusy = true;
+        const live = await Api.process.live(st.abort.signal);
+        st.liveBusy = false;
+        if (!st.liveOn || st.dead) return;
+        if (live === null) {
+          if (st.liveOk === null) { // older firmware: the animation follows after the cycle
+            st.liveOk = false;
+            st.liveSession = false;
+            st.reveal.abortLive();
+            stopLive();
+          }
+          return;
+        }
+        st.liveOk = true;
+        // data of the previous cycle (the new one has not started on the device yet) is ignored
+        if (st.idleCycle !== undefined && live.cycle <= st.idleCycle) return;
+        st.reveal.updateLive(live);
+      };
+      const startLive = () => {
+        const rois = cfgRois();
+        if (!rois.length) {
+          st.liveSession = false;
+          return;
+        }
+        st.liveSession = true;
+        st.liveOk = null;
+        st.liveTiles = false;
+        st.liveOn = true;
+        st.reveal.beginLive({
+          rois,
+          onRoi: (i, roi) => {
+            if (!st.liveTiles) buildLiveTiles(rois);
+            fillLiveTile(i, roi);
+          },
+          onDone: () => {
+            stopLive();
+            st.liveSession = false;
+            st.revealOk = true;
+            st.stageHold = false;
+            ref.replay.hidden = false;
+            ref.img.hidden = true;
+            setRecUpdating(false);
+          },
+        });
+        ref.bgCanvas.hidden = false;
+        ref.imgBg.hidden = true;
+        clearInterval(st.liveTimer);
+        st.liveTimer = setInterval(livePoll, 900);
+        livePoll();
       };
 
       const setStage = (on, step) => {
@@ -5555,27 +5842,35 @@ const App = (() => {
         ref.img.hidden = on || st.stageHold || !!st.revealOk;
         if (on) {
           st.reveal.cancel();
+          stopLive();
           setTilesPending(false);
           ref.canvas.hidden = true;
           ref.replay.hidden = true;
           st.stageHold = false;
           ref.stage.hidden = false;
           renderStageScene(step);
-        } else if (wasCapturing && st.revealOk !== false) {
-          // keep the scene until the new picture is ready: the picture then grows out of the icon
-          st.stageHold = true;
-          clearTimeout(st.holdTimer);
-          st.holdTimer = setTimeout(() => { if (st.stageHold) { hideStage(); ref.img.hidden = !!st.revealOk; if (st.revealOk) st.reveal.showFinal(); } }, 20000);
+          setRecUpdating(true);
+          startLive();
         } else if (wasCapturing) {
-          hideStage();
+          if (st.liveSession) {
+            st.reveal.endLive(); // the animation runs to its end, the device data is already there
+          } else if (st.revealOk !== false) {
+            // no live data: keep the scene until the new picture is ready, the animation then follows
+            st.stageHold = true;
+            clearTimeout(st.holdTimer);
+            st.holdTimer = setTimeout(() => { if (st.stageHold) { hideStage(); ref.img.hidden = !!st.revealOk; setRecUpdating(false); if (st.revealOk) st.reveal.showFinal(); } }, 20000);
+          } else {
+            hideStage();
+            setRecUpdating(false);
+          }
         }
       };
 
-      // picture animation: prepared with the data of the last cycle, played when the capture just ended (live) or on demand
+      // picture animation after the cycle (no live data) and at rest: prepared with the data of the last cycle
       const applyReveal = async (rec) => {
         if (st.reveal.playing) return;
         const ok = rec?.ready ? await st.reveal.prepare(rec, getConfigFromStorage(0)) : false;
-        if (st.dead) return;
+        if (st.dead || st.reveal.playing) return;
         st.revealOk = ok;
         if (!ok) {
           st.reveal.cancel();
@@ -5595,7 +5890,8 @@ const App = (() => {
           clearTimeout(st.holdTimer);
           st.stageHold = false;
           setTilesPending(true);
-          st.reveal.play({ onRecog: setTilesShown, onDone: () => setTilesPending(false) });
+          setRecUpdating(false);
+          st.reveal.playComplete({ withStage: false, onRoi: revealTile, onDone: () => setTilesPending(false) });
         } else {
           setTilesPending(false);
           hideStage();
@@ -5609,7 +5905,7 @@ const App = (() => {
         renderStageScene();
         ref.canvas.hidden = false;
         setTilesPending(true);
-        st.reveal.play({ withStage: true, onRecog: setTilesShown, onDone: () => setTilesPending(false) });
+        st.reveal.playComplete({ withStage: true, onRoi: revealTile, onDone: () => setTilesPending(false) });
       });
 
       // the sidebar polls the status every 2 s: switch the scene right away and load the image as soon as the capture is over
@@ -5617,6 +5913,7 @@ const App = (() => {
         if (st.dead) return;
         const capturing = !!e.detail?.running; // the scene is shown during the whole cycle, the animation plays when it is over
         const wasCapturing = st.capturing;
+        if (!capturing) st.idleCycle = e.detail?.cycle; // number of the last finished cycle
         const last = formatLastSuccess(e.detail);
         ref.lastRun.textContent = last.text;
         ref.lastRun.title = last.title;
@@ -5751,7 +6048,9 @@ const App = (() => {
       const loadRecognition = async () => {
         const data = await Api.process.recognition(st.abort.signal);
         if (st.dead) return null;
-        renderRecognition(data);
+        // while the cycle runs the live view builds the tiles itself
+        if (!(st.liveTiles && (st.reveal.liveActive || st.capturing))) renderRecognition(data);
+        if (!st.capturing && !st.reveal.liveActive) setRecUpdating(false);
         return data;
       };
 

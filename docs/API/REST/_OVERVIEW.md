@@ -19,6 +19,7 @@ Further details can be found in the respective REST API endpoint description.
 | [/api/fallback](fallback.md)         | Read / Set Fallback Value                          | JSON        | 
 | [/api/flow/*](flow.md)               | Parametrization Helper (copy, cut reference)       | JSON        | 
 | [/api/recognition](recognition.md)|Image Recognition Details of the last cycle     | JSON        |
+| [/api/live](live.md)                |Progress of the running cycle (raw image, alignment, ROI results) | JSON        |
 | [/camera](camera.md)                 | Camera Capture, Stream, Parametrization + Flashlight| HTML       | 
 | [/gpio](gpio.md)                     | Read / Control GPIO                                | JSON + HTML | 
 | [/api/mqtt/*](mqtt.md)               | Publish HA discovery topics / Device info topics   | JSON        | 

@@ -11,6 +11,7 @@
 #include "ClassLogFile.h"
 #include "MainFlowControl.h"
 #include "helper.h"
+#include "ClassFlowLive.h"
 
 
 static const char *TAG = "ALIGN";
@@ -128,10 +129,26 @@ bool ClassFlowAlignment::doFlow(std::string time)
     // 2. Perform alignment algorithm (template match)
     // Note: Only if any additional alignment algo is configured
     // *******************************************
+    float totalRotation = (rotation != 0.0f && cfgDataPtr->alignmentAlgo != ALIGNALGO_OFF) ? rotation : 0.0f;
+    int shiftX = 0;
+    int shiftY = 0;
+    LiveFlow::Rect liveMarker[2];
+    int liveMarkerCount = 0;
+    bool alignmentOk = true;
+
     if (cfgDataPtr->alignmentAlgo == ALIGNALGO_ROTATE_AND_ALIGN_SAD_1CH ||
         cfgDataPtr->alignmentAlgo == ALIGNALGO_ROTATE_AND_ALIGN_SAD_3CH) {
+        TplMatchResult tplResult;
         TplMatchStatus alignRetval = CImageTplMatch::invokeTplMatch(*flowImageData->imgProcess, imgAlgRoi, alignmentMarker[0],
-                                                                    alignmentMarker[1]);
+                                                                    alignmentMarker[1], TplMatchAlgorithm::SAD, &tplResult);
+        totalRotation += tplResult.angle;
+        shiftX = tplResult.dx;
+        shiftY = tplResult.dy;
+        alignmentOk = alignRetval != TPL_MATCH_FAILED;
+        for (int i = 0; i < 2; i++) {
+            liveMarker[i] = {alignmentMarker[i].targetX, alignmentMarker[i].targetY, alignmentMarker[i].width, alignmentMarker[i].height};
+        }
+        liveMarkerCount = 2;
         if (alignRetval == TPL_MATCH_FAILED) { // Alignment not successful
             LogFile.writeToFile(ESP_LOG_ERROR, TAG,
                                 "Fine alignment unsuccessful. Use alignment marker areas with sharp edges, unique shapes and high contrast "
@@ -141,6 +158,9 @@ bool ClassFlowAlignment::doFlow(std::string time)
 
         drawAlignmentMarker(imgAlgRoi);
     }
+
+    // Result for the WebUI: aligned image = shift applied after the rotation around the image center
+    LiveFlow::alignmentDone(alignmentOk, totalRotation, shiftX, shiftY, liveMarker, liveMarkerCount);
 
     if (getFlowState()->isSuccessful) {
         flowctrl.drawDigitRoi(imgAlgRoi);

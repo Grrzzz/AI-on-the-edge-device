@@ -695,6 +695,12 @@ esp_err_t ClassFlowControl::sendProcessImages(httpd_req_t *req, const char *file
             }
         }
     }
+    else if (strcmp("raw.jpg", filename) == 0) { // Raw camera image of the actual cycle
+        if (flowImageData && flowImageData->imgRaw && flowImageData->imgRaw->isValid()) {
+            return flowImageData->imgRaw->sendJpgToHttp(req);
+        }
+        return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Raw image not available");
+    }
     else if (strcmp("alg.jpg", filename) == 0) { // Aligned image without overlays (ROI)
         if (flowImageData && flowImageData->imgProcess->isValid()) {
             return flowImageData->imgProcess->sendJpgToHttp(req);

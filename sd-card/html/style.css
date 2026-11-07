@@ -5783,3 +5783,49 @@ a .rst-content .admonition-title {
   opacity: 0;
   transform: translateY(12px);
 }
+
+/* recognition card while a cycle runs: blurred, new results are on the way */
+.dash-rec {
+  position: relative;
+}
+
+.dash-rec .rec-body {
+  transition: filter 0.4s, opacity 0.4s;
+}
+
+.dash-rec.is-updating .rec-body {
+  filter: blur(3px);
+  opacity: 0.55;
+}
+
+.dash-rec.is-updating .card-header::after {
+  content: 'Updating ...';
+  margin-left: auto;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  animation: dash-updating 1.2s ease-in-out infinite;
+}
+
+@keyframes dash-updating {
+  50% { opacity: 0.45; }
+}
+
+/* live tiles: placeholder until the device has the result, then a short pop */
+.rec .rec-roi-tile.is-waiting {
+  opacity: 0.5;
+  animation: dash-updating 1.2s ease-in-out infinite;
+}
+
+.rec .rec-roi-tile.is-pop {
+  animation: dash-tile-pop 0.45s ease-out;
+}
+
+@keyframes dash-tile-pop {
+  from { transform: scale(0.8); opacity: 0.3; }
+  60% { transform: scale(1.06); }
+  to { transform: scale(1); opacity: 1; }
+}

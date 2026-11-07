@@ -24,6 +24,7 @@
 #include "connect_wlan.h"
 #include "psram.h"
 #include "CImageMod.h"
+#include "ClassFlowLive.h"
 
 #ifdef ENABLE_MQTT
 #include "interface_mqtt.h"
@@ -785,12 +786,32 @@ static void addRecognitionRois(cJSON *parent, const char *key, const auto &roiLi
             cJSON_AddBoolToObject(item, "valid", true);
             cJSON_AddStringToObject(item, "value", roi->sCNNResult.c_str());
             cJSON_AddStringToObject(item, "image", ("/img_tmp/" + roi->param->roiName + "_org.jpg").c_str());
+            if (roi->confidencePct >= 0) {
+                cJSON_AddNumberToObject(item, "confidence", roi->confidencePct);
+            }
         }
         else {
             cJSON_AddBoolToObject(item, "valid", false);
         }
+        cJSON *rect = cJSON_AddObjectToObject(item, "rect"); // Position in the aligned image
+        cJSON_AddNumberToObject(rect, "x", roi->param->x);
+        cJSON_AddNumberToObject(rect, "y", roi->param->y);
+        cJSON_AddNumberToObject(rect, "w", roi->param->dx);
+        cJSON_AddNumberToObject(rect, "h", roi->param->dy);
         cJSON_AddItemToArray(rois, item);
     }
+}
+
+
+// GET /api/live: Progress of the running cycle (raw image, alignment result, ROI results as they are evaluated)
+// {"api_name":"live:v1","running":true,"state":"...","cycle":842,"raw":true,"alignment":{"ok":true,"rotation":-3.2,"dx":22,"dy":-16,
+//  "rawImage":"/img_tmp/raw.jpg","scale":1,"markers":[{"x":240,"y":312,"w":56,"h":34}]},
+//  "rois":[{"seq":"main","kind":"digit","name":"main_dig1","value":"4.0","confidence":98,"rejected":false}]}
+esp_err_t handler_api_live(httpd_req_t *req)
+{
+    const bool running = taskAutoFlowState == FLOW_TASK_STATE_IMG_PROCESSING || taskAutoFlowState == FLOW_TASK_STATE_PUBLISH_DATA ||
+                         taskAutoFlowState == FLOW_TASK_STATE_ADDITIONAL_TASKS;
+    return apiSendJson(req, "200 OK", LiveFlow::liveJson(running, flowctrl.getActualProcessState()));
 }
 
 
@@ -828,6 +849,7 @@ esp_err_t handler_recognition_details(httpd_req_t *req)
             cJSON_AddItemToArray(sequences, item);
         }
         cJSON_AddStringToObject(root, "image", "/img_tmp/alg_roi.jpg");
+        LiveFlow::addAlignment(root); // raw image and pose of the last cycle (if available)
     }
 
     char *json = cJSON_PrintUnformatted(root);
@@ -1058,6 +1080,7 @@ void task_autodoFlow(void *pvParameter)
             // Clear separation between runs
             LogFile.writeToFile(ESP_LOG_DEBUG, TAG, "--------------------------------");
             LogFile.writeToFile(ESP_LOG_INFO, TAG, "Cycle #" + std::to_string(++cycleCounter) + " started");
+            LiveFlow::begin(cycleCounter);
             cycleStartTime = getUptime();
             cycleStartUptime = cycleStartTime;
             cycleStartActualTime = esp_timer_get_time();
@@ -1249,6 +1272,8 @@ void task_autodoFlow(void *pvParameter)
 
 void createMainFlowTask()
 {
+    LiveFlow::init();
+
 #ifdef DEBUG_DETAIL_ON
     LogFile.writeHeapInfo("CreateFlowTask: start");
 #endif // DEBUG_DETAIL_ON
@@ -1326,6 +1351,12 @@ void registerMainFlowTaskUri(httpd_handle_t server)
     camuri.method = HTTP_POST;
     camuri.uri = "/api/flow/cutref";
     camuri.handler = HTTP_AUTH_BASIC(handler_api_flow_cutref);
+    camuri.user_ctx = NULL;
+    httpd_register_uri_handler(server, &camuri);
+
+    camuri.method = HTTP_GET;
+    camuri.uri = "/api/live";
+    camuri.handler = HTTP_AUTH_BASIC(handler_api_live);
     camuri.user_ctx = NULL;
     httpd_register_uri_handler(server, &camuri);
 

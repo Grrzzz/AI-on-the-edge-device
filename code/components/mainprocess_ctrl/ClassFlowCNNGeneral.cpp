@@ -11,6 +11,7 @@
 #include "ClassControlCamera.h"
 #include "CImageMod.h"
 #include "helper.h"
+#include "ClassFlowLive.h"
 
 
 static const char *TAG = "CNN";
@@ -265,6 +266,14 @@ bool ClassFlowCNNGeneral::doInvokeCnn(const std::string time)
                     }
 
                     int num = tflite->getOutClassification();
+                    {
+                        // Confidence: probability of the winning class and its direct neighbors (the 100 classes are fine steps)
+                        float mass = 0.0f;
+                        for (int k = -2; k <= 2; k++) {
+                            mass += tflite->getOutputValue((num + k + 100) % 100);
+                        }
+                        roi->confidencePct = std::clamp((int)lroundf(mass * 100.0f), 0, 100);
+                    }
                     roi->CNNResult = roi->param->ccw ? (100 - num) % 100 : num;
                     roi->CNNResult = std::clamp(roi->CNNResult, 0, 99);
                     roi->sCNNResult = to_stringWithPrecision(roi->CNNResult / 10.0, 1);
@@ -305,6 +314,7 @@ bool ClassFlowCNNGeneral::doInvokeCnn(const std::string time)
                     roi->sCNNResult = to_stringWithPrecision(roi->CNNResult / 10.0, 1);
 
                     roi->isRejected = (fit < cnnGoodThreshold);
+                    roi->confidencePct = std::clamp((int)lroundf(fit * 100.0f), 0, 100);
                     logImageResult = roi->isRejected ? -roi->CNNResult : roi->CNNResult;
 
 #ifdef DEBUG_DETAIL_ON
@@ -350,6 +360,7 @@ bool ClassFlowCNNGeneral::doInvokeCnn(const std::string time)
                     }
 
                     roi->CNNResult = tflite->getOutClassification();
+                    roi->confidencePct = std::clamp((int)lroundf(tflite->getOutputValue(roi->CNNResult) * 100.0f), 0, 100);
                     roi->sCNNResult = (roi->CNNResult == 10) ? "N" : std::to_string(roi->CNNResult);
                     logImageResult = roi->CNNResult;
                     break;
@@ -366,6 +377,8 @@ bool ClassFlowCNNGeneral::doInvokeCnn(const std::string time)
 
             LogFile.writeToFile(ESP_LOG_DEBUG, TAG, modelTypeMsg);
             LogFile.writeToFile(ESP_LOG_DEBUG, TAG, "Result: " + roi->sCNNResult);
+            LiveFlow::roiDone(sequence->sequenceName, sectionDigitPtr ? "digit" : "analog", roiName, roi->sCNNResult, roi->confidencePct,
+                              roi->isRejected);
 
             if (saveImagesEnabled) {
                 const std::string roiNameResized = roiName + "_resized";

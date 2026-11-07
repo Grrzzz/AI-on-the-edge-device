@@ -17,8 +17,12 @@ static const char *TAG = "IMG_TPLMATCH";
 
 
 TplMatchStatus IRAM_ATTR CImageTplMatch::invokeTplMatch(CImage &img, CImage &imgTarget, AlignmentMarker &marker1, AlignmentMarker &marker2,
-                                                        TplMatchAlgorithm tplMatchAlgorithm)
+                                                        TplMatchAlgorithm tplMatchAlgorithm, TplMatchResult *result)
 {
+    if (result) {
+        *result = TplMatchResult();
+    }
+
     if (!img.isValid()) {
         LogFile.writeToFile(ESP_LOG_ERROR, TAG, "invokeTplMatch: Invalid source image");
         return TPL_MATCH_ERROR_IMAGE;
@@ -121,20 +125,35 @@ TplMatchStatus IRAM_ATTR CImageTplMatch::invokeTplMatch(CImage &img, CImage &img
     if ((deltaX1 > 0 && deltaX2 > 0 && deltaY1 > 0 && deltaY2 > 0) || (deltaX1 < 0 && deltaX2 < 0 && deltaY1 < 0 && deltaY2 < 0)) {
         LogFile.writeToFile(ESP_LOG_DEBUG, TAG, "Alignment: Correction by linear X + Y only");
         CImageMod::translate(img, deltaX1, deltaY1, imgTarget, true);
+        if (result) {
+            result->dx = deltaX1;
+            result->dy = deltaY1;
+        }
     }
     else if ((deltaX1 > 0 && deltaX2 > 0) || (deltaX1 < 0 && deltaX2 < 0)) {
         LogFile.writeToFile(ESP_LOG_DEBUG, TAG, "Alignment: Correction by rotation + linear X");
         CImageMod::rotate(img, angleDeviation, imgTarget, true);
         CImageMod::translate(img, deltaX1 / 2, 0, imgTarget, true); // Adjust with half translation
+        if (result) {
+            result->angle = angleDeviation;
+            result->dx = deltaX1 / 2;
+        }
     }
     else if ((deltaY1 > 0 && deltaY2 > 0) || (deltaY1 < 0 && deltaY2 < 0)) {
         LogFile.writeToFile(ESP_LOG_DEBUG, TAG, "Alignment: Correction by rotation + linear Y");
         CImageMod::rotate(img, angleDeviation, imgTarget, true);
         CImageMod::translate(img, 0, deltaY1 / 2, imgTarget, true); // Adjust with half translation
+        if (result) {
+            result->angle = angleDeviation;
+            result->dy = deltaY1 / 2;
+        }
     }
     else {
         LogFile.writeToFile(ESP_LOG_DEBUG, TAG, "Alignment: Correction by rotation only");
         CImageMod::rotate(img, angleDeviation, imgTarget, true);
+        if (result) {
+            result->angle = angleDeviation;
+        }
     }
 
     // Reset error messages on success

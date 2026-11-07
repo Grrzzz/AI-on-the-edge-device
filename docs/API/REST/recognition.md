@@ -40,15 +40,17 @@ Result of the last fully completed image recognition cycle as JSON (replaces the
 * A ROI with `"valid": false` has no CNN result and no image.
 * `enabled: false` means the digit / analog recognition is switched off in the configuration; `rois` is empty then.
 
-### Optional fields for the picture animation (WebUI)
-
-The dashboard plays an animation when a cycle ends (taking image, raw image, rotation and alignment, regions, recognition). It works with the data above; the following optional fields enrich it. Without them the steps are skipped or approximated (the ROI geometry is then taken from the configuration, every recognized ROI counts as `ok`).
+### Alignment, confidence and ROI rectangle (WebUI picture animation)
 
 ```json
-{ "alignment": { "rawImage": "/img_tmp/raw.jpg", "rotation": 3.2, "scale": 0.93, "dx": -22, "dy": 16,
+{ "alignment": { "rawImage": "/img_tmp/raw.jpg", "ok": true, "rotation": -3.2, "dx": 22, "dy": -16, "scale": 1,
                  "markers": [ { "x": 240, "y": 312, "w": 56, "h": 34 } ] },
-  "sequences": [ { "digit": { "rois": [ { "name": "d1", "valid": true, "value": "5", "confidence": 98, "rect": { "x": 93, "y": 183, "w": 30, "h": 54 } } ] } } ] }
+  "sequences": [ { "digit": { "rois": [ { "name": "main_dig1", "valid": true, "value": "4.0", "confidence": 98,
+                                           "rect": { "x": 93, "y": 167, "w": 30, "h": 54 } } ] } } ] }
 ```
 
-* `alignment.rawImage`: camera image before the alignment; `rotation` (degrees), `scale`, `dx`, `dy`: pose of the raw image against the aligned image (`/img_tmp/alg.jpg`); `markers`: reference markers (aligned image)
-* per ROI: `confidence` (0 to 100; 90 or more is `ok`, 60 or more `uncertain`, below that `low`) and `rect` (position and size in the aligned image)
+* `alignment` (last cycle, only if the raw image is available): the aligned image (`/img_tmp/alg.jpg`) is the raw image (`rawImage`) **rotated by `rotation` degrees around the image center (positive is clockwise) and then shifted by `dx`, `dy` pixels**. `rotation` is the initial rotation plus the correction of the alignment, `markers` are the reference markers in the aligned image. `ok: false`: the alignment failed
+* per ROI: `confidence` (0 to 100; 90 or more is `ok`, 60 or more `uncertain`, below that `low`; missing for models without a confidence) and `rect` (position and size in the aligned image, analog ROIs included)
+* `/img_tmp/raw.jpg` is the raw camera image of the last cycle (kept in RAM, about 190 KB of PSRAM)
+
+See also [live](live.md) for the same data while the cycle is running.

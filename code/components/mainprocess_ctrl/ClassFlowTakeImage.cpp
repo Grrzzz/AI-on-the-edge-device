@@ -1,4 +1,5 @@
 #include "ClassFlowTakeImage.h"
+#include "ClassFlowLive.h"
 #include "../../include/defines.h"
 
 #include <time.h>
@@ -57,6 +58,12 @@ bool ClassFlowTakeImage::loadParameter()
         return false;
     }
 
+    // Raw image of the actual cycle for the WebUI (optional: the process works without it)
+    flowImageData->imgRaw = new CImageJpg("imgRaw", IMAGE_JPG_MAX_SIZE);
+    if (!flowImageData->imgRaw) {
+        LogFile.writeToFile(ESP_LOG_WARN, TAG, "Failed to initialize CImageJpg imgRaw. Raw image not available in WebUI");
+    }
+
     // Parameter used in ClassLogImage
     saveImagesEnabled = cfgDataPtr->debug.saveRawImages;
     imagesLocation = "/sdcard" + cfgDataPtr->debug.rawImagesLocation;
@@ -81,6 +88,10 @@ bool ClassFlowTakeImage::doFlow(std::string zwtime)
     }
 
     flowImageData->imgProcess->saveJpgToContainer(flowImageData->imgVisu);
+
+    if (flowImageData->imgRaw && flowImageData->imgProcess->saveJpgToContainer(flowImageData->imgRaw) == ESP_OK) {
+        LiveFlow::rawReady();
+    }
 
     if (cfgDataPtr->debug.saveAllFiles) {
         flowImageData->imgVisu->saveJpgToFile("/sdcard/img_tmp/raw.jpg");
@@ -138,4 +149,5 @@ ClassFlowTakeImage::~ClassFlowTakeImage()
 
     delete flowImageData->imgProcess;
     delete flowImageData->imgVisu;
+    delete flowImageData->imgRaw;
 }
