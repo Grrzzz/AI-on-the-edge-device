@@ -4712,6 +4712,10 @@ const App = (() => {
       };
     }
 
+    function ensureColors() {
+      colors = { ok: css('--success') || '#10b981', warn: css('--warning') || '#f59e0b', err: css('--error') || '#ef4444', accent: css('--meter-accent') || css('--primary') || '#2563eb' };
+    }
+
     function statusColor(st) {
       return st === 'err' ? colors.err : st === 'warn' ? colors.warn : colors.ok;
     }
@@ -4736,9 +4740,21 @@ const App = (() => {
         bgCtx.translate(-W / 2, -H / 2);
         bgCtx.translate(-pose.dx * P.shift, -pose.dy * P.shift);
       }
-      bgCtx.globalAlpha = P.bg;
-      bgCtx.drawImage(pose && d.raw ? d.raw : d.alg, 0, 0, W, H);
+      if (pose && d.raw && P.algMix < 1) {
+        bgCtx.globalAlpha = P.bg * (1 - P.algMix);
+        bgCtx.drawImage(d.raw, 0, 0, W, H);
+      }
       bgCtx.restore();
+      // in the end the fill is the final processed picture
+      if (!pose || P.algMix > 0) {
+        bgCtx.save();
+        bgCtx.translate(bw / 2, bh / 2);
+        bgCtx.scale(kc, kc);
+        bgCtx.translate(-W / 2, -H / 2);
+        bgCtx.globalAlpha = P.bg * (pose ? P.algMix : 1);
+        bgCtx.drawImage(d.alg, 0, 0, W, H);
+        bgCtx.restore();
+      }
     }
 
     function draw(P) {
@@ -4787,8 +4803,10 @@ const App = (() => {
         ctx.translate(-W / 2, -H / 2);
         ctx.translate(-pose.dx * P.shift, -pose.dy * P.shift);
       }
-      ctx.globalAlpha = P.imgAlpha;
-      ctx.drawImage(pose && d.raw ? d.raw : d.alg, 0, 0, W, H);
+      if (pose && d.raw && P.algMix < 1) {
+        ctx.globalAlpha = P.imgAlpha;
+        ctx.drawImage(d.raw, 0, 0, W, H);
+      }
       ctx.globalAlpha = 1;
       // markers found in the raw image travel with it onto the reference position
       if (pose && P.markers > 0 && pose.markers.length) {
@@ -4803,6 +4821,12 @@ const App = (() => {
         ctx.restore();
       }
       ctx.restore();
+      // the processed picture of the device replaces the moved raw image (cross-fade), at the end only it is shown
+      if (!pose || P.algMix > 0) {
+        ctx.globalAlpha = P.imgAlpha * (pose ? P.algMix : 1);
+        ctx.drawImage(d.alg, 0, 0, W, H);
+        ctx.globalAlpha = 1;
+      }
 
       // soft picture edges (like the former image view): fade the outer 10 percent
       if (P.edge > 0) {
@@ -4897,8 +4921,9 @@ const App = (() => {
     // resting state: aligned picture, all frames in their status color with the recognized digit
     function drawFinal() {
       if (!d || !layout()) return;
+      ensureColors();
       geo = geo || { cx: d.W / 2, cy: d.H / 2, sq: d.H * 0.2, sw: 6, arm: 12 };
-      draw({ reveal: 1, rot: 1, shift: 1, regions: 1, recog: d.rois.length + 2, z: 0, edge: 1, imgAlpha: 1, bg: 1, markers: 0, bracket: 0, t: 0 });
+      draw({ reveal: 1, rot: 1, shift: 1, regions: 1, recog: d.rois.length + 2, z: 0, edge: 1, imgAlpha: 1, bg: 1, algMix: 1, markers: 0, bracket: 0, t: 0 });
     }
 
     function frame(now) {
@@ -4919,6 +4944,7 @@ const App = (() => {
           reveal,
           imgAlpha: ease(clamp(pr('reveal') * 2.4)),
           bg: ease(pr('reveal')), // the blurred fill comes up while the picture grows
+          algMix: d.pose ? ease(pr('regions')) : 1,
           rot: ease(pr('rotate')),
           shift: ease(pr('align')),
           regions: pr('regions'),
@@ -4998,7 +5024,7 @@ const App = (() => {
         if (!d || !layout()) return;
         cancelAnimationFrame(raf);
         hooks = { onRecog, onDone };
-        colors = { ok: css('--success') || '#10b981', warn: css('--warning') || '#f59e0b', err: css('--error') || '#ef4444', accent: css('--meter-accent') || css('--primary') || '#2563eb' };
+        ensureColors();
         tl = timeline(withStage);
         revealStarted = false;
         api.playing = true;
