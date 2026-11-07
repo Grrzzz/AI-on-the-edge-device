@@ -412,7 +412,10 @@ bool legacyIniToJson(std::string &json)
             if (const std::string *v = firstValue(m, "ClientID")) j.str({"mqtt"}, "clientid", *v);
             const std::string *user = firstValue(m, "user");
             j.num({"mqtt"}, "authmode", user ? 1 : 0);
-            if (user) j.str({"mqtt"}, "username", *user);
+            if (user) {
+                j.str({"mqtt"}, "username", *user);
+                if (const std::string *pw = firstValue(m, "password")) j.str({"mqtt"}, "password", *pw); // keep the broker password
+            }
             j.num({"mqtt"}, "processdatanotation", 1); // v16 published single topics
             if (const std::string *v = firstValue(m, "RetainMessages")) j.boolean({"mqtt"}, "retainprocessdata", asBool(*v));
             if (const std::string *v = firstValue(m, "ValidateServerCert")) {

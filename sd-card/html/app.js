@@ -889,17 +889,37 @@ function logoSvg(themeId, size, stateKind = '') {
 
 // Tab title badge ("(!) Dashboard | gasmeter") and favicon status dot, driven by the cycle monitor
 let titleBadge = '';
+let titleHost = '';
+let titlePage = '';
 let faviconState = '';
+
+// Tab title: host name first (several devices in narrow tabs stay distinguishable), then the status badge and the page
+function refreshTitle() {
+  document.title = `${titleHost || 'AI-on-the-Edge'}${titleBadge ? ` ${titleBadge}` : ''}${titlePage ? ` | ${titlePage}` : ''}`;
+}
 function setTitleBadge(badge) {
+  badge = badge.trim();
   if (badge === titleBadge) return;
-  document.title = badge + document.title.slice(titleBadge.length);
   titleBadge = badge;
+  refreshTitle();
+}
+
+// The favicon link is replaced as a whole: browsers reliably pick up a new element, but often ignore a changed href.
+// The static .ico link is dropped, otherwise some browsers keep showing it instead of the SVG.
+function writeFavicon(svg) {
+  document.head.querySelectorAll('link[rel~="icon"]').forEach((l) => l.remove());
+  const link = document.createElement('link');
+  link.rel = 'icon';
+  link.type = 'image/svg+xml';
+  link.sizes = 'any';
+  link.id = 'favicon-svg';
+  link.href = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  document.head.append(link);
 }
 function setFaviconState(kind) {
   if (kind === faviconState) return;
   faviconState = kind;
-  const favicon = document.getElementById('favicon-svg');
-  if (favicon) favicon.href = `data:image/svg+xml,${encodeURIComponent(logoSvg(meterThemeId, 64, kind))}`;
+  writeFavicon(logoSvg(meterThemeId, 64, kind));
 }
 
 // "4 min ago" for the age of the last successful cycle [s]
@@ -1000,8 +1020,7 @@ const MeterTheme = {
     root.dataset.meter = id;
     const logo = document.getElementById('brand-logo');
     if (logo) logo.innerHTML = logoSvg(id);
-    const favicon = document.getElementById('favicon-svg');
-    if (favicon) favicon.href = `data:image/svg+xml,${encodeURIComponent(logoSvg(id, 64, faviconState))}`;
+    writeFavicon(logoSvg(id, 64, faviconState));
     const scan = document.getElementById('cycle-scan');
     if (scan) scan.innerHTML = scanIconHtml(20);
     loaderSpinner = buildLoaderSpinner();
@@ -1411,7 +1430,9 @@ const App = (() => {
 
   function setTitle(title) {
     const t = title || 'AI-on-the-Edge';
-    document.title = titleBadge + (hostname ? `${t} | ${hostname}` : `${t} | AI-on-the-Edge Device`);
+    titleHost = hostname;
+    titlePage = t;
+    refreshTitle();
     const bar = document.getElementById('topbar-title');
     if (bar) bar.textContent = hostname || t;
   }
