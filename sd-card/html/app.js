@@ -3064,15 +3064,19 @@ const App = (() => {
         }
       });
 
-      Api.system.info('board_type', 'board type').then((v) => {
+      const boardLoaded = Api.system.info('board_type', 'board type').then((v) => {
         if (v === null || !alive) return;
         boardType = v;
         r.board.textContent = v;
       });
-      Api.system.info('firmware_version', 'firmware version').then((v) => {
+      const firmwareLoaded = Api.system.info('firmware_version', 'firmware version').then((v) => {
         if (v === null || !alive) return;
         firmwareVersion = v;
         r.firmware.textContent = v;
+      });
+      // look for a newer release right away (board and installed version are needed for the comparison)
+      Promise.all([boardLoaded, firmwareLoaded]).then(() => {
+        if (alive && boardType && firmwareVersion) checkForUpdate();
       });
     },
 
