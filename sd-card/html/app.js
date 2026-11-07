@@ -1533,6 +1533,7 @@ const App = (() => {
     }
     const label = document.getElementById('fw-version');
     if (label && info.firmware_version) label.textContent = info.firmware_version;
+    if (info.firmware_version) UpdateHint.check(info.firmware_version);
 
     const fw = info.firmware_version;
     const ui = info.html_version;
@@ -2610,6 +2611,30 @@ const App = (() => {
     }
     return /\+\s*$/.test(String(installed || ''));
   }
+
+  // Newer release? Used by the sidebar hint. The browser asks GitHub (at most every 6 hours, the answer is remembered), errors stay silent.
+  // Resolves to { tag, url } when the release is newer than the installed version, otherwise null.
+  window.UpdateCheck = {
+    async newer(installed) {
+      const KEY = 'latestRelease';
+      const TTL = 6 * 3600 * 1000;
+      let rel = null;
+      try {
+        const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+        if (saved && Date.now() - saved.at < TTL) rel = saved;
+      } catch (e) { }
+      if (!rel) {
+        try {
+          const latest = await Api.ota.latestRelease(UPDATE_REPO);
+          rel = { at: Date.now(), tag: latest ? latest.tag : '', url: latest ? latest.htmlUrl : '' };
+        } catch (e) {
+          rel = { at: Date.now() - TTL + 10 * 60 * 1000, tag: '', url: '' }; // failed: try again in 10 minutes
+        }
+        try { localStorage.setItem(KEY, JSON.stringify(rel)); } catch (e) { }
+      }
+      return rel.tag && isNewer(rel.tag, installed) ? { tag: rel.tag, url: rel.url } : null;
+    },
+  };
 
   function updateTemplate() {
     return `
@@ -10564,6 +10589,24 @@ const App = (() => {
 /* ========================================================================== */
 /* Cycle monitor (sidebar): state of the main process, seconds counter, manual start */
 /* ========================================================================== */
+
+// Hint for a newer release: info icon next to the version in the sidebar footer and a dot at the Update menu item
+const UpdateHint = {
+  async check(installed) {
+    const rel = window.UpdateCheck ? await window.UpdateCheck.newer(installed).catch(() => null) : null;
+    const btn = document.getElementById('update-hint');
+    if (btn) {
+      btn.hidden = !rel;
+      if (rel) {
+        const text = `Newer version available: ${rel.tag}`;
+        btn.title = text;
+        btn.setAttribute('aria-label', text);
+        btn.onclick = () => App.navigate('#/system/update');
+      }
+    }
+    document.querySelectorAll('[data-route="system-update"], .nav-parent').forEach((n) => n.classList.toggle('has-update', !!rel));
+  },
+};
 
 const CycleMonitor = (() => {
   const POLL_MS = 2000;
