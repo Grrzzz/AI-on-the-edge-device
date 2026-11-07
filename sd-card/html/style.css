@@ -5587,3 +5587,18 @@ a .rst-content .admonition-title {
     min-height: 140px;
   }
 }
+
+/* MQTT connection badge in the Wi-Fi card */
+.dash .stat-value .dash-mqtt {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.dash .stat-value .dash-mqtt[hidden] {
+  display: none;
+}

@@ -2646,6 +2646,7 @@ const App = (() => {
     let timer = null;
     let t0 = 0;
     let refs = {};
+    let expected = 0; // expected total duration [s] of the whole process (0: only the elapsed time is shown)
 
     const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
@@ -2667,8 +2668,10 @@ const App = (() => {
     };
 
     const api = {
-      open(title, text, stepLabels) {
+      // opts.expected: total duration in seconds (countdown and time based bar over the whole process, e.g. 60 for an update)
+      open(title, text, stepLabels, opts = {}) {
         if (!el) build();
+        expected = opts.expected || 0;
         el.classList.remove('sys-ov-fail');
         refs.spin.hidden = false;
         refs.close.hidden = true;
@@ -2682,8 +2685,23 @@ const App = (() => {
         (stepLabels || []).forEach((label, i) => refs.steps.append(App.el('li', '', `${i + 1} · ${label}`)));
         t0 = Date.now();
         clearInterval(timer);
-        timer = setInterval(() => { refs.right.textContent = `Elapsed ${fmt((Date.now() - t0) / 1000)}`; }, 1000);
-        refs.right.textContent = 'Elapsed 0:00';
+        const tick = () => {
+          const elapsed = (Date.now() - t0) / 1000;
+          if (!expected) {
+            refs.right.textContent = `Elapsed ${fmt(elapsed)}`;
+            return;
+          }
+          // total countdown: the bar and the remaining time cover download/upload, installation and restart together
+          refs.bar.hidden = false;
+          const left = expected - elapsed;
+          refs.bar.classList.toggle('sys-ov-indeterminate', left <= 0);
+          if (left > 0) refs.fill.style.width = `${Math.min(99, (elapsed / expected) * 100)}%`;
+          else refs.fill.style.width = '';
+          refs.right.textContent = left > 0 ? `About ${fmt(Math.ceil(left))} left` : 'Finishing ...';
+        };
+        timer = setInterval(tick, 1000);
+        tick();
+        if (!expected) refs.right.textContent = 'Elapsed 0:00';
         el.hidden = false;
       },
       title(t) { refs.title.textContent = t; },
@@ -2695,6 +2713,10 @@ const App = (() => {
       // pct: 0..100, null = unknown (animated bar)
       progress(pct, left = '') {
         refs.bar.hidden = false;
+        if (expected) {
+          refs.left.textContent = left; // the bar shows the total countdown, the step detail stays as text
+          return;
+        }
         refs.bar.classList.toggle('sys-ov-indeterminate', pct === null);
         refs.fill.style.width = pct === null ? '' : `${Math.max(0, Math.min(100, pct))}%`;
         refs.left.textContent = left;
@@ -2830,7 +2852,7 @@ const App = (() => {
         r.checkBtn.disabled = true;
         picker.setBusy(true);
         r.install.disabled = true;
-        overlay.open(`Updating to ${latestRelease.tag}`, 'Starting ...', ['Download', 'Install', 'Restart']);
+        overlay.open(`Updating to ${latestRelease.tag}`, 'Starting ...', ['Download', 'Install', 'Restart'], { expected: 60 });
         overlay.step(1);
         overlay.progress(0);
 
@@ -2950,7 +2972,7 @@ const App = (() => {
         r.install.disabled = true;
         r.checkBtn.disabled = true;
         picker.setBusy(true);
-        overlay.open(`Installing ${name}`, 'Uploading ...', ['Upload', 'Install', 'Restart']);
+        overlay.open(`Installing ${name}`, 'Uploading ...', ['Upload', 'Install', 'Restart'], { expected: 60 });
         overlay.step(1);
         overlay.progress(0);
 
@@ -4497,6 +4519,7 @@ const App = (() => {
                 <rect class="bar" x="19" y="0" width="3" height="16" rx="1" />
               </svg>
               <output data-ref="rssi">-</output>
+              <span class="dash-mqtt" data-ref="mqttBox" hidden>MQTT <span class="badge" data-ref="mqtt"></span></span>
             </div>
           </div>
         </div>
@@ -5012,9 +5035,23 @@ const App = (() => {
       window.addEventListener('cycle-status', onCycleStatus);
       st.offStatus = () => window.removeEventListener('cycle-status', onCycleStatus);
 
+      // MQTT connection: Connected / Connected (Encrypted) / Disconnected / Disabled (badge hidden)
+      const loadMqtt = async () => {
+        let text = '';
+        try {
+          text = await Api.system.infoQuiet('mqtt_status');
+        } catch (e) { }
+        if (st.dead) return;
+        const box = ref.mqttBox;
+        box.hidden = !/^(Connected|Disconnected)/.test(text);
+        ref.mqtt.textContent = text;
+        ref.mqtt.className = `badge ${text.startsWith('Connected') ? 'badge-success' : 'badge-error'}`;
+      };
+
       const loadProcessData = async () => {
         const d = await Api.process.get(st.abort.signal);
         if (!d || st.dead) return null;
+        loadMqtt();
         setStage(/take image/i.test(String(d.process_state)));
 
         try {
