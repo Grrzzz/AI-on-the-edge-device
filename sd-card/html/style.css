@@ -563,49 +563,40 @@ body {
     grid-template-rows: minmax(0, 1fr);
   }
 
+  /* the bar with menu button and host name floats above the content, hidden while scrolling down */
   .topbar {
     position: fixed;
     z-index: 120;
-    top: 10px;
-    left: 10px;
+    top: 0;
+    left: 0;
+    right: 0;
     display: flex;
-    padding: 0;
-    pointer-events: none;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--bg-sidebar);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow);
     transition: transform 0.25s ease, opacity 0.25s ease;
   }
 
-  /* the menu button floats above the content, hidden while scrolling down */
   .topbar.is-hidden {
-    transform: translateY(-64px);
+    transform: translateY(-100%);
     opacity: 0;
-  }
-
-  .topbar .icon-btn {
-    pointer-events: auto;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow);
+    pointer-events: none;
   }
 
   .topbar-title {
-    display: none;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .content {
-    padding-top: 54px; /* room for the floating menu button */
-  }
-
-  /* compact dashboard header: the page name is enough */
-  .dash .dash-head {
-    padding-bottom: 10px;
-  }
-
-  .dash .dash-head .page-sub {
-    display: none;
-  }
-
-  .dash .dash-head .container-title {
-    font-size: 1.3rem;
+    padding-top: 60px; /* room for the floating bar */
   }
 
   .icon-btn {
