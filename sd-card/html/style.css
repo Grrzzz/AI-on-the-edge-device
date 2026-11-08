@@ -5881,3 +5881,10 @@ a .rst-content .admonition-title {
   padding: 4px 12px;
   font-size: 0.78rem;
 }
+
+/* menu entries are links (middle click opens a new tab) */
+a.nav-item,
+a.nav-sub-item {
+  text-decoration: none;
+  box-sizing: border-box;
+}

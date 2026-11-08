@@ -1510,7 +1510,10 @@ const App = (() => {
 
     document.querySelectorAll('[data-route]').forEach((btn) => {
       if (btn.classList.contains('nav-parent')) return;
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        // the entries are real links: middle click, Ctrl/Shift/Cmd + click and the context menu open a new tab / window
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button !== 0) return;
+        e.preventDefault();
         navigate(btn.dataset.href);
         closeNav();
       });
