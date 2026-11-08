@@ -15,6 +15,16 @@ backend and a one-click update from GitHub, and trims the firmware to the `esp32
   <img src="docs/images/ui-dashboard.png" width="800" alt="Dashboard">
 </p>
 
+## What is new in 2.3
+
+- **Menu entries are real links** - the middle mouse button, Ctrl/Shift + click and the context menu open a page in a new tab
+- **Mobile:** the top bar with the host name floats above the content, hides while scrolling down and comes back after a short scroll up
+- **Configuration > Markers** shows the recognition of the last cycle (results and the last alignment), so a marker change can be judged
+  by its effect; it reloads after every cycle
+- **Pause button** reacts right away, also while a cycle runs or the device is busy
+- A tab in the background is no lost connection any more (the title says "(no connection)" only if the device really does not answer)
+- Fix: the dashboard opened while a cycle is running no longer fails. The refresh button is gone (the dashboard follows the device)
+
 ## What is new in 2.2
 
 - **Picture animation in the dashboard** - the image card follows the device while a cycle runs: the scan scene ("Taking image", the
