@@ -5925,8 +5925,7 @@ const App = (() => {
       };
       window.addEventListener('cycle-status', onCycleStatus);
       st.offStatus = () => window.removeEventListener('cycle-status', onCycleStatus);
-      const lastStatus = typeof CycleMonitor !== 'undefined' ? CycleMonitor.last() : null;
-      if (lastStatus) onCycleStatus({ detail: lastStatus }); // joins a cycle that is already running
+
 
       // MQTT connection: Connected / Connected (Encrypted) / Disconnected / Disabled (badge hidden)
       const loadMqtt = async () => {
@@ -6102,6 +6101,10 @@ const App = (() => {
       });
 
       // ---- init ----------------------------------------------------------
+      // joins a cycle that is already running (everything the status handler needs exists now)
+      const lastStatus = typeof CycleMonitor !== 'undefined' ? CycleMonitor.last() : null;
+      if (lastStatus) onCycleStatus({ detail: lastStatus });
+
       (async () => {
         if (typeof loaderSpinner !== 'undefined') ref.img.src = loaderSpinner;
         st.lastImageKey = await loadProcessData();
