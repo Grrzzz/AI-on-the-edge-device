@@ -11603,8 +11603,9 @@ const CycleMonitor = (() => {
 
     // While the device computes an image it does not answer for a while: keep the last state ("busy") and
     // only report 'not reachable' when the silence lasts much longer than a cycle step
+    // A tab in the background does not ask the device: that is no loss of connection, the last state stays
     const silence = performance.now() - lastAnswerAt;
-    const unreachable = !status || silence > (status.running ? 90000 : 15000);
+    const unreachable = !status || (!document.hidden && silence > (status.running ? 90000 : 15000));
 
     if (unreachable) {
       panel.dataset.kind = 'offline';
@@ -11618,7 +11619,7 @@ const CycleMonitor = (() => {
       pauseBtn.hidden = true;
       lastRow.hidden = true;
       setFaviconState('offline');
-      setTitleBadge('(offline) ');
+      setTitleBadge('(no connection) ');
       return;
     }
 
@@ -11722,7 +11723,11 @@ const CycleMonitor = (() => {
     start() {
       $('cycle-start')?.addEventListener('click', start);
       $('cycle-pause')?.addEventListener('click', togglePause);
-      document.addEventListener('visibilitychange', () => !document.hidden && poll());
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) return;
+        lastAnswerAt = performance.now(); // back in the tab: time for the first answer before 'no connection' is shown
+        poll();
+      });
       poll();
       pollTimer = setInterval(poll, POLL_MS);
       tickTimer = setInterval(render, 1000); // seconds counter between two polls
