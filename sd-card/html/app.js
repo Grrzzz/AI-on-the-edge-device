@@ -1498,6 +1498,29 @@ const App = (() => {
     document.getElementById('nav-toggle')?.addEventListener('click', toggleNav);
     document.getElementById('nav-scrim')?.addEventListener('click', closeNav);
 
+    // Floating menu button (narrow screens): hidden while scrolling down, back after scrolling up a little (not only at the top)
+    const content = document.querySelector('.content');
+    const topbar = document.querySelector('.topbar');
+    if (content && topbar) {
+      let lastY = content.scrollTop;
+      let upDistance = 0;
+      content.addEventListener('scroll', () => {
+        const y = content.scrollTop;
+        const dy = y - lastY;
+        lastY = y;
+        if (y < 48) {
+          topbar.classList.remove('is-hidden'); // at the top
+          upDistance = 0;
+        } else if (dy > 0) {
+          upDistance = 0;
+          topbar.classList.add('is-hidden');
+        } else if (dy < 0) {
+          upDistance -= dy;
+          if (upDistance > 36) topbar.classList.remove('is-hidden'); // a short scroll up is enough
+        }
+      }, { passive: true });
+    }
+
     // Accordion: one group open at a time
     document.querySelectorAll('.nav-parent').forEach((btn) =>
       btn.addEventListener('click', () => {
@@ -4552,12 +4575,6 @@ const App = (() => {
         <div class="container-title">Dashboard</div>
         <div class="page-sub">Live reading and process state of your meter.</div>
       </div>
-      <div class="refresh-group">
-        <div class="refresh-loader">
-          <div class="loader" data-ref="loader">${scanIconHtml(24)}</div>
-          <button type="button" class="button btn-action dash-refresh-btn" data-action="refresh">Refresh</button>
-        </div>
-      </div>
     </header>
 
     <main class="dash-grid">
@@ -6064,10 +6081,6 @@ const App = (() => {
         if (auto && st.editingSeq !== null) return; // keep an open editor untouched
         st.running = true;
 
-        const btn = root.querySelector('[data-action="refresh"]');
-        if (!auto) btn.disabled = true;
-        ref.loader.classList.add('is-loading');
-
         try {
           const key = await loadProcessData();
           if (key === null) return; // device not answering: skip the image
@@ -6083,10 +6096,6 @@ const App = (() => {
         } catch (error) {
           console.error('Refresh failed:', error);
         } finally {
-          setTimeout(() => {
-            if (!auto) btn.disabled = false;
-            ref.loader.classList.remove('is-loading');
-          }, 100);
           st.running = false;
         }
       };
@@ -6098,10 +6107,6 @@ const App = (() => {
           refresh(true).then(scheduleAuto);
         }, st.capturing ? 1500 : AUTO_REFRESH_MS);
       };
-
-      root.addEventListener('click', (e) => {
-        if (e.target.closest('[data-action="refresh"]')) refresh();
-      });
 
       // ---- init ----------------------------------------------------------
       // joins a cycle that is already running (everything the status handler needs exists now)

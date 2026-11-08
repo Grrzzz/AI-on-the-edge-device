@@ -564,21 +564,48 @@ body {
   }
 
   .topbar {
+    position: fixed;
+    z-index: 120;
+    top: 10px;
+    left: 10px;
     display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 14px;
-    background: var(--bg-sidebar);
-    border-bottom: 1px solid var(--border);
+    padding: 0;
+    pointer-events: none;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+  }
+
+  /* the menu button floats above the content, hidden while scrolling down */
+  .topbar.is-hidden {
+    transform: translateY(-64px);
+    opacity: 0;
+  }
+
+  .topbar .icon-btn {
+    pointer-events: auto;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
   }
 
   .topbar-title {
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: none;
+  }
+
+  .content {
+    padding-top: 54px; /* room for the floating menu button */
+  }
+
+  /* compact dashboard header: the page name is enough */
+  .dash .dash-head {
+    padding-bottom: 10px;
+  }
+
+  .dash .dash-head .page-sub {
+    display: none;
+  }
+
+  .dash .dash-head .container-title {
+    font-size: 1.3rem;
   }
 
   .icon-btn {
@@ -3132,10 +3159,6 @@ a .rst-content .admonition-title {
   justify-content: space-between;
   gap: 12px 24px;
   padding: 4px 0 18px;
-}
-
-.dash .dash-refresh-btn {
-  width: 120px;
 }
 
 .dash .dash-grid {
