@@ -1,6 +1,6 @@
 # AGENTS.md - briefing for AI assistants working on this repository
 
-Read this first. It describes the project, the current state (release **2.3 "Grrzzz"**, tag `v2.3.0-Grrzzz`), how to build and test, the
+Read this first. It describes the project, the current state (release **2.4 "Grrzzz"**, tag `v2.4.0-Grrzzz`), how to build and test, the
 rules of the owner and the pitfalls we already ran into. The owner speaks **German**: answer in German, keep code, commit messages and
 documentation in English.
 
@@ -76,9 +76,10 @@ Single page app, hash routes, no framework. Read `docs/WebUI/README.md`. Key par
   `GET /api/live`, falls back to a replay when the firmware has no `/api/live`).
 - Setup (schema driven, `SCHEMA`), Configuration editor (image, markers, digits, analog), wizard, file explorer, backup/restore, v16 import
   (`LegacyImport`).
-Configuration editor on phones (max-width 860 px): an extra control layer (`.m-only`: sequence bar, region chips, pad with jog, steppers) drives the same
-functions as the desktop fields (`onValueManualChanged`, `markerValueChanged`, ...); the desktop cards are hidden by `.m-hide`. On a phone the canvas moves the
-selected region by dragging instead of drawing it. Desktop is untouched. Design proof: `tools/webui/mock/poc/config-digits-mobile.html`.
+Configuration editor (all widths): a control layer (`.m-only`: sequence bar, region combo with move, copy and delete per entry, pad with jog, zoom switch over the image, steppers, options) drives the same
+functions as the original fields (`onValueManualChanged`, `markerValueChanged`, ...); the original cards are hidden by `.m-hide` but still work. The canvas moves
+the selected region by dragging, the size is changed with the steppers. Below 1256 px the image stays in view (sticky), below 860 px tabs and the image tab are
+compacted. Design proof: `tools/webui/mock/poc/config-digits-mobile.html`.
 Conventions: no emojis, no inline handlers, ids/classes carry the view prefix (`dash-`, `rec-`, `setup-`, `cfg-`, `sys-`), tokens in
 `:root` (light/dark) in `style.css`, mobile breakpoint 860 px (menu) / 1156 px (dashboard layout).
 
@@ -104,7 +105,8 @@ Conventions: no emojis, no inline handlers, ids/classes carry the view prefix (`
 - Confidence: the class100 models (`dig-class100*`, `ana-class100*`) end with a fully connected layer **without softmax** (checked in the
   .tflite files), their outputs are raw logits. The confidence therefore applies a softmax first (`ClassFlowCNNGeneral.cpp`); the earlier
   sum of the raw outputs gave 0 % for digits and 100 % for analog. `dig-class11` and `dig-cont` have a softmax. Not yet verified on a device.
-- Open questions: analog ROIs of the live view are only tested with the mock.
+- Open questions: analog ROIs of the live view are only tested with the mock. The MCP server is marked **beta** (never run for a longer time on a
+  device); the configuration editor was only tested in the mock (phone width in the browser, not on a real touch screen).
 
 ## Releasing (only when the owner asks)
 

@@ -6,6 +6,9 @@ Optional [Model Context Protocol](https://modelcontextprotocol.io) server on the
 streaming). An AI assistant such as Claude Code can read the device, move alignment markers and regions of interest, change settings
 and start cycles. **Off by default.** Switch it on in the WebUI: `System > MCP`.
 
+> **Beta.** The MCP server is new in 2.4. It compiles and the WebUI side is tested against the mock, but it has not run for a long
+> time on a device yet. Expect rough edges and report them. The tool set and the answers may still change.
+
 ### Access token
 
 * Created by the device (32 bytes from the hardware random generator, hex) when the server is switched on for the first time, or with

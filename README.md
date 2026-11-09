@@ -15,6 +15,27 @@ backend and a one-click update from GitHub, and trims the firmware to the `esp32
   <img src="docs/images/ui-dashboard.png" width="800" alt="Dashboard">
 </p>
 
+## What is new in 2.4
+
+- **Configuration for phones and tablets - and for the desktop** - the editor was rebuilt around one control layer: a number sequence
+  combo box with the switches for digits and analog (rename, delete and add right in the list), a region combo box with a preview of every
+  region (move up and down, copy, delete, add), a position pad with a jog stick, steppers for the size and options. The image floats
+  while you scroll, regions can be dragged with the finger, and "Zoom in" follows the selected region. The same layout is used on
+  the desktop (image left, controls right). Regions and markers are drawn like on the dashboard, the selected one in the accent color
+- **Image tab simplified** - one "Update image" button, the settings are blurred until a picture was taken. Rotation, zoom, flash,
+  brightness and the other camera values are sliders with -/+ buttons, mirror and flip are switches, everything rarely needed sits behind
+  an **Advanced** switch (remembered in the browser)
+- **MCP server (beta)** - optional [Model Context Protocol](docs/API/REST/mcp.md) server on the device. An assistant such as Claude can read
+  status, recognition and images, place alignment markers and regions, change settings and start cycles. Off by default, protected by a
+  token that the device generates (it survives restarts), system actions (delete files, reboot, update) behind a second switch.
+  Manage it under `System > MCP`. **Beta: compiled and tested against the web interface mock, not yet over a longer time on a device**
+- **Dashboard** - a pill with the number of cycles in the uptime card, a services card (MQTT, MCP), rolling counter digits, the
+  countdown as a pill in the process state, no second animation after a manual start
+- **Models** - the model combo shows age, size and typical use of each model with a short help text
+- Fix: the confidence of the `class100` models is computed with a softmax (digits showed 0 %, analog 100 %). Compiled, not yet checked
+  on a device
+- Fix: toggling digits or analog in the configuration no longer jumps to another tab
+
 ## What is new in 2.3
 
 - **Menu entries are real links** - the middle mouse button, Ctrl/Shift + click and the context menu open a page in a new tab
@@ -96,8 +117,13 @@ backend and a one-click update from GitHub, and trims the firmware to the `esp32
 |:---:|:---:|
 | <img src="docs/images/ui-files.png" width="400"> | <img src="docs/images/ui-dashboard-dark.png" width="400"> |
 
+| MCP server (beta) |
+|:---:|
+| <img src="docs/images/ui-mcp.png" width="400"> |
+
 <p align="center">
   <img src="docs/images/ui-mobile.png" width="260" alt="Mobile dashboard">
+  <img src="docs/images/ui-mobile-config.png" width="260" alt="Mobile configuration">
 </p>
 
 ## Key features
@@ -106,6 +132,7 @@ backend and a one-click update from GitHub, and trims the firmware to the `esp32
 - **On-device AI** - TensorFlow Lite models for digital and analog counters
 - **Integrations** - [Home Assistant discovery](docs/API/MQTT/home-assistant-discovery.md), [MQTT](docs/API/MQTT/_OVERVIEW.md)
   (TLS supported), InfluxDB v1/v2, webhook, [REST](docs/API/REST/_OVERVIEW.md)
+- **AI assistants (beta)** - optional [MCP server](docs/API/REST/mcp.md) so that Claude and friends can place markers and look after the device
 - **Flashlight** - onboard LED or external PWM or smart LEDs
 - **Easy maintenance** - backup and restore, file explorer, OTA update, dynamic config reload without reboot
 
