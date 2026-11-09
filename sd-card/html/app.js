@@ -4375,7 +4375,7 @@ const App = (() => {
             <div class="card cfg-card">
               <div class="card-header"><span class="cfg-card-title">MCP server</span><span class="beta-pill">Beta</span></div>
               <div class="card-body cfg-body">
-                <div class="mcp-note"><b>Beta:</b> new and so far tested only in the web interface mock, not yet over a longer time on a device. The assistant can read the device, move alignment markers and regions, change settings and start cycles.
+                <div class="mcp-note"><b>Beta:</b> new, first tested on a device (reading, moving a region) but not yet over a longer time. The assistant can read the device, move alignment markers and regions, change settings and start cycles.
                   It is off by default. Everyone with the token has this access, so use it only in a network you trust.</div>
                 ${switchRow('Server', 'on', 'onText')}
                 ${switchRow('System actions', 'sys', 'sysText', 'delete files, reboot, update')}

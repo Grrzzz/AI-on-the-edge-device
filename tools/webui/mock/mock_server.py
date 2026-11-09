@@ -58,7 +58,7 @@ IMG = b"""<svg xmlns='http://www.w3.org/2000/svg' width='800' height='560' viewB
 <circle cx='250' cy='380' r='80'/><circle cx='400' cy='430' r='80'/><circle cx='550' cy='380' r='80'/></g></svg>"""
 
 INFO = {
-    "hostname": "gasmeter", "board_type": "esp32cam", "firmware_version": "v2.4.0-Grrzzz Mock", "html_version": "v2.4.0-Grrzzz Mock",
+    "hostname": "gasmeter", "board_type": "esp32cam", "firmware_version": "v2.4.1-Grrzzz Mock", "html_version": "v2.4.1-Grrzzz Mock",
     "mqtt_status": "Connected",  # dashboard badge (the full /info list below has the same service states)
 }
 CONFIG = {"webui": {"autorefresh": {"dashboard": {"enabled": True, "refreshtime": 5}}}, "mqtt": {"enabled": True, "homeassistant": {"discoveryenabled": True}}}
@@ -559,7 +559,7 @@ class H(SimpleHTTPRequestHandler):
                 "sd_partition_alloc_size": 32768, "sd_partition_size": 29.5, "sd_partition_free": 27.1,
                 "heap_total_free": 8123456, "heap_spiram_free": 7900000, "heap_spiram_largest_free": 7800000, "heap_spiram_min_free": 7500000,
                 "heap_internal_free": 223456, "heap_internal_largest_free": 110000, "heap_internal_min_free": 90000,
-                "firmware_version": "v2.4.0-Grrzzz Mock", "html_version": "v2.4.0-Grrzzz Mock", "build_time": "2026-11-05 10:12", "config_version": 3, "idf_version": "v6.1.0"})
+                "firmware_version": "v2.4.1-Grrzzz Mock", "html_version": "v2.4.1-Grrzzz Mock", "build_time": "2026-11-05 10:12", "config_version": 3, "idf_version": "v6.1.0"})
         if p == "/log":
             lines = [
                 ("INF", "FLOWCTRL", "Cycle 842 finished, value 530.0080"),

@@ -15,6 +15,14 @@ backend and a one-click update from GitHub, and trims the firmware to the `esp32
   <img src="docs/images/ui-dashboard.png" width="800" alt="Dashboard">
 </p>
 
+## What is new in 2.4.1
+
+- **Fix: MCP server** - the first request of an assistant could get a "Parse error" and crash the device (a race when the request was handed
+  to its task). Tested on a device now: connection through `mcp-remote` (Claude Desktop) and placing an analog region over MCP work.
+  The MCP server stays marked **beta**
+- **Fix: update screen** - the install step says "Installing ..." while the device installs and restarts, step 3 follows when it is back
+- **Fix: dashboard** - the blurred fill behind the picture follows the zoom, so after the animation it is the blurred zoomed view
+
 ## What is new in 2.4
 
 - **Configuration for phones and tablets - and for the desktop** - the editor was rebuilt around one control layer: a number sequence

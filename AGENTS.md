@@ -1,6 +1,6 @@
 # AGENTS.md - briefing for AI assistants working on this repository
 
-Read this first. It describes the project, the current state (release **2.4 "Grrzzz"**, tag `v2.4.0-Grrzzz`), how to build and test, the
+Read this first. It describes the project, the current state (release **2.4.1 "Grrzzz"**, tag `v2.4.1-Grrzzz`), how to build and test, the
 rules of the owner and the pitfalls we already ran into. The owner speaks **German**: answer in German, keep code, commit messages and
 documentation in English.
 
@@ -44,7 +44,7 @@ them personally.
 Firmware and packaged WebUI:
 ```
 cd code
-platformio run -e esp32cam            # RELEASE_VERSION=v2.4.0 builds .builds/AI-on-the-edge-device__esp32cam__grrzzz_release_v2.4.0.zip
+platformio run -e esp32cam            # RELEASE_VERSION=v2.4.1 builds .builds/AI-on-the-edge-device__esp32cam__grrzzz_release_v2.4.1.zip
 ```
 - The firmware version string comes from `git describe --exact-match --tags` at configure time: a build on an untagged commit reports
   `Develop: <branch> @ <hash>`, a dirty tree adds `+`. After tagging or when the string is stale, `touch code/main/CMakeLists.txt`.
@@ -105,8 +105,7 @@ Conventions: no emojis, no inline handlers, ids/classes carry the view prefix (`
 - Confidence: the class100 models (`dig-class100*`, `ana-class100*`) end with a fully connected layer **without softmax** (checked in the
   .tflite files), their outputs are raw logits. The confidence therefore applies a softmax first (`ClassFlowCNNGeneral.cpp`); the earlier
   sum of the raw outputs gave 0 % for digits and 100 % for analog. `dig-class11` and `dig-cont` have a softmax. Not yet verified on a device.
-- Open questions: analog ROIs of the live view are only tested with the mock. The MCP server is marked **beta** (never run for a longer time on a
-  device); the configuration editor was only tested in the mock (phone width in the browser, not on a real touch screen).
+- Open questions: analog ROIs of the live view are only tested with the mock. The MCP server is marked **beta** (tested on a device with mcp-remote since 2.4.1, but never run for a longer time); the configuration editor was only tested in the mock (phone width in the browser, not on a real touch screen).
 
 ## Releasing (only when the owner asks)
 
