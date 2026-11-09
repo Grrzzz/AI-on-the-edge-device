@@ -1135,6 +1135,115 @@ function confirmDialog({ title = 'Are you sure?', text = '', okLabel = 'Confirm'
 }
 
 /**
+ * Copy button that shows its result without changing size: all three texts (label, "Copied" with a check mark, "Copy failed") are
+ * stacked in one grid cell, so the button always has the width of the widest one and only the visible one changes.
+ */
+function prepareCopyButton(btn) {
+  if (btn.querySelector('.btn-states')) return btn;
+  const label = btn.textContent;
+  const wrap = document.createElement('span');
+  wrap.className = 'btn-states';
+  wrap.dataset.state = 'label';
+  const mk = (state, ...nodes) => {
+    const el = document.createElement('span');
+    el.dataset.s = state;
+    el.append(...nodes);
+    return el;
+  };
+  const check = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  check.setAttribute('viewBox', '0 0 24 24');
+  check.setAttribute('class', 'copy-check');
+  check.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'M5 12.5l4.5 4.5L19 7.5');
+  check.append(path);
+  wrap.append(mk('label', label), mk('ok', check, 'Copied'), mk('fail', 'Copy failed'));
+  btn.textContent = '';
+  btn.append(wrap);
+  return btn;
+}
+
+/** Copies text and shows the result on the button for a moment: green with a check mark, or "Copy failed" if the browser refused. */
+async function copyWithFeedback(btn, text) {
+  prepareCopyButton(btn);
+  const wrap = btn.querySelector('.btn-states');
+  clearTimeout(btn._copyTimer);
+  let ok = true;
+  try { await navigator.clipboard.writeText(text); } catch (e) { ok = false; }
+  btn.classList.toggle('is-copied', ok);
+  wrap.dataset.state = ok ? 'ok' : 'fail';
+  btn._copyTimer = setTimeout(() => {
+    btn.classList.remove('is-copied');
+    wrap.dataset.state = 'label';
+  }, 1800);
+}
+
+/**
+ * Modal that shows a secret once (e.g. a new access token): the value, copy buttons, a single close button.
+ * The value only lives in this dialog and is gone when it is closed.
+ * @param {{title?: string, text?: string, token: string, copies?: Array<{label: string, text: string}>, closeLabel?: string}} opts
+ * @returns {Promise<void>} resolves when the dialog is closed
+ */
+function tokenDialog({ title = 'Access token', text = '', token, copies = [], closeLabel = 'Done' } = {}) {
+  return new Promise((resolve) => {
+    const dlg = document.createElement('dialog');
+    dlg.className = 'dlg dlg-token';
+    const body = document.createElement('div');
+    body.className = 'dlg-body';
+    const h = document.createElement('h2');
+    h.textContent = title;
+    body.append(h);
+    if (text) {
+      const p = document.createElement('p');
+      p.textContent = text;
+      body.append(p);
+    }
+    const code = document.createElement('code');
+    code.className = 'dlg-code';
+    code.textContent = token;
+    body.append(code);
+
+    const buttons = document.createElement('div');
+    buttons.className = 'dlg-copies';
+    for (const item of [{ label: 'Copy token', text: token }, ...copies]) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'button';
+      b.textContent = item.label;
+      b.onclick = () => copyWithFeedback(b, item.text);
+      prepareCopyButton(b);
+      buttons.append(b);
+    }
+    body.append(buttons);
+
+    const actions = document.createElement('div');
+    actions.className = 'dlg-actions';
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'button btn-action';
+    close.textContent = closeLabel;
+    actions.append(close);
+    body.append(actions);
+    dlg.append(body);
+
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      if (dlg.open) dlg.close();
+      dlg.remove();
+      resolve();
+    };
+    close.onclick = settle;
+    dlg.addEventListener('close', settle);
+    // no backdrop click: the value must not vanish by accident before it was copied
+    document.body.append(dlg);
+    dlg.showModal();
+    close.focus();
+  });
+}
+
+/**
  * Modal text input (replaces window.prompt).
  * @returns {Promise<string|null>} entered text, null if cancelled
  */
@@ -1320,6 +1429,23 @@ const Api = {
     const isPlain = isObj(body) && !(body instanceof Blob) && !(body instanceof FormData) && !(body instanceof ArrayBuffer);
     const headers = isPlain ? { 'Content-Type': 'application/json', ...init.headers } : init.headers;
     return apiCallNotify(endpoint, { ...init, method: 'POST', headers, body: isPlain ? JSON.stringify(body) : body }, notify);
+  },
+};
+
+/** MCP server of the device (optional): state and access token. GET/POST /api/mcp */
+Api.mcp = {
+  /** @returns {Promise<null | {enabled:boolean, allowSystem:boolean, tokenSet:boolean, endpoint:string}>} null: firmware without MCP */
+  async get() {
+    const res = await apiCall('/api/mcp', { timeout: 8000 }, { parseType: 'json' });
+    return res.ok && res.data && res.data.ok ? res.data : null;
+  },
+  /** change: {enabled?, allowSystem?, regenerate?}. A new token is only in this answer (field `token`), the device keeps just its hash */
+  async set(change) {
+    const res = await Api.post('/api/mcp', change, { action: 'MCP settings' });
+    if (!res.ok) return null;
+    let d = res.data;
+    try { if (typeof d === 'string') d = JSON.parse(d); } catch (e) { d = null; }
+    return d && d.ok ? d : null;
   },
 };
 
@@ -1720,7 +1846,7 @@ const App = (() => {
 /* ========================================================================== */
 
 /* ==========================================================================
-   System area: views system-info, system-update, system-backup, system-files, system-reboot
+   System area: views system-info, system-update, system-backup, system-files, system-mcp, system-reboot
    Api layer:   Api.system, Api.files, Api.ota
    ========================================================================== */
 (() => {
@@ -4220,6 +4346,187 @@ const App = (() => {
   });
 
   /* ======================================================================== */
+  /* View: system-mcp (optional MCP server of the device for AI assistants)   */
+  /* ======================================================================== */
+
+  App.register('system-mcp', {
+    title: 'MCP',
+
+    mount(root) {
+      root.classList.add('cfg', 'sys', 'sys-mcp');
+      const url = `${location.origin}/mcp`;
+      const switchRow = (label, ref, textRef, hint = '') => `
+        <div class="cfg-row cfg-l0">
+          <div class="cfg-label"><span>${label}</span></div>
+          <div class="cfg-ctl">
+            <span class="cfg-switch-wrap">
+              <label class="cfg-switch"><input type="checkbox" data-r="${ref}" aria-label="${label}" /><span></span></label>
+              <span class="cfg-switch-text" data-r="${textRef}">Off</span>
+            </span>
+            ${hint ? `<span class="mcp-hint">${hint}</span>` : ''}
+          </div>
+        </div>`;
+      root.innerHTML = `
+        <div class="container">
+          ${viewHeader('MCP', 'Let an AI assistant such as Claude work with this device.')}
+          <div class="container-content">
+
+            <div class="card cfg-card">
+              <div class="card-header"><span class="cfg-card-title">MCP server</span></div>
+              <div class="card-body cfg-body">
+                <div class="mcp-note">The assistant can read the device, move alignment markers and regions, change settings and start cycles.
+                  It is off by default. Everyone with the token has this access, so use it only in a network you trust.</div>
+                ${switchRow('Server', 'on', 'onText')}
+                ${switchRow('System actions', 'sys', 'sysText', 'delete files, reboot, update')}
+                <div class="cfg-row cfg-l0">
+                  <div class="cfg-label"><span>Access token</span></div>
+                  <div class="cfg-ctl">
+                    <span class="mcp-hint" data-r="tokenText"></span>
+                    <button class="button" type="button" data-r="renew">Create new token</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card cfg-card">
+              <div class="card-header"><span class="cfg-card-title">Connect an assistant</span></div>
+              <div class="card-body cfg-body">
+                <div class="mcp-step">
+                  <div class="mcp-step-title">Endpoint</div>
+                  <div class="mcp-snippet"><code class="mcp-code" data-r="endpoint"></code><button class="button" type="button" data-copy="endpoint">Copy</button></div>
+                </div>
+                <div class="mcp-step">
+                  <div class="mcp-step-title">Claude Code <span class="mcp-hint">(terminal)</span></div>
+                  <div class="mcp-snippet"><code class="mcp-code" data-r="cc"></code><button class="button" type="button" data-copy="cc">Copy</button></div>
+                </div>
+                <div class="mcp-step">
+                  <div class="mcp-step-title">Claude Desktop <span class="mcp-hint">(add to claude_desktop_config.json, needs Node.js)</span></div>
+                  <div class="mcp-snippet"><code class="mcp-code mcp-pre" data-r="desktop"></code><button class="button" type="button" data-copy="desktop">Copy</button></div>
+                </div>
+                <div class="mcp-hint" data-r="snippetNote"></div>
+                <div class="mcp-hint">The web version of Claude (claude.ai) cannot reach a device in your home network. Other MCP clients: server type
+                  "streamable HTTP", header <code>Authorization: Bearer &lt;token&gt;</code>.</div>
+              </div>
+            </div>
+
+            <div class="card cfg-card">
+              <div class="card-header"><span class="cfg-card-title">What the assistant can do</span></div>
+              <div class="card-body cfg-body">
+                <div class="mcp-tools">
+                  <div><b>Read</b><span>status, live progress, recognition with confidence, configuration, images (reference, aligned, regions, markers), camera picture, log, files</span></div>
+                  <div><b>Change</b><span>settings, alignment markers and regions, marker images, fallback value, start a cycle, pause the countdown</span></div>
+                  <div><b>System</b><span>delete files, reboot, firmware update (only with "System actions")</span></div>
+                </div>
+                <div class="mcp-hint">Changes are refused while a cycle runs. Example: the assistant looks at the reference image, places the markers, starts a cycle and
+                  checks the alignment result until it fits.</div>
+              </div>
+            </div>
+
+          </div>
+        </div>`;
+      const r = collectRefs(root);
+      let alive = true;
+      let st = null; // state of the device
+      this._stop = () => { alive = false; };
+
+      r.endpoint.textContent = url;
+
+      const snippetsFor = (t) => {
+        const cc = `claude mcp add --transport http ai-on-the-edge ${url} --header "Authorization: Bearer ${t}"`;
+        const desktop = [
+          '{',
+          '  "mcpServers": {',
+          '    "ai-on-the-edge": {',
+          '      "command": "npx",',
+          `      "args": ["-y", "mcp-remote", "${url}", "--allow-http", "--header", "Authorization:\${AI_TOKEN}"],`,
+          `      "env": { "AI_TOKEN": "Bearer ${t}" }`,
+          '    }',
+          '  }',
+          '}',
+        ].join('\n');
+        return { cc, desktop };
+      };
+      const snippets = () => {
+        const sn = snippetsFor('<token>');
+        r.cc.textContent = sn.cc;
+        r.desktop.textContent = sn.desktop;
+        r.snippetNote.textContent = 'Replace <token> with your access token. The device shows it only once, when it is created.';
+      };
+
+      const sync = () => {
+        r.on.checked = !!st?.enabled;
+        r.on.disabled = !st;
+        r.onText.textContent = st?.enabled ? 'On' : 'Off';
+        r.sys.checked = !!st?.allowSystem;
+        r.sys.disabled = !st?.enabled;
+        r.sysText.textContent = st?.allowSystem ? 'On' : 'Off';
+        r.renew.disabled = !st || (!st.enabled && !st.tokenSet);
+        r.tokenText.textContent = !st
+          ? 'Not available: the firmware has no MCP server.'
+          : st.tokenSet ? 'A token is set. It stays valid after a restart.' : 'No token yet. It is created when you switch the server on.';
+        snippets();
+      };
+
+      const apply = async (change) => {
+        const next = await Api.mcp.set(change);
+        if (!alive) return;
+        if (next) {
+          st = next;
+        }
+        sync();
+        if (next?.token) {
+          // the new token is shown in a dialog, not on the page: it is gone when the dialog is closed
+          await tokenDialog({
+            title: 'Your new access token',
+            text: 'Copy it now. It is shown only once; the device keeps just a hash of it.',
+            token: next.token,
+          });
+        }
+      };
+
+      root.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        const text = btn.dataset.copy ? r[btn.dataset.copy].textContent : null;
+        if (text === null) return;
+        await copyWithFeedback(btn, text);
+      });
+      r.on.addEventListener('change', async () => {
+        await apply({ enabled: r.on.checked });
+      });
+      r.sys.addEventListener('change', async () => {
+        if (r.sys.checked && !(await confirmDialog({
+          title: 'Allow system actions?',
+          text: 'The AI assistant can then delete files and folders on the SD card, restart the device and start a firmware update.',
+          okLabel: 'Allow',
+          danger: true,
+        }))) {
+          r.sys.checked = false;
+          return;
+        }
+        await apply({ allowSystem: r.sys.checked });
+      });
+      r.renew.addEventListener('click', async () => {
+        if (!(await confirmDialog({
+          title: 'Create a new token?',
+          text: 'The current token stops working at once. Every AI client has to be set up again with the new token.',
+          okLabel: 'Create new token',
+          danger: true,
+        }))) return;
+        await apply({ regenerate: true });
+      });
+
+      root.querySelectorAll('[data-copy]').forEach(prepareCopyButton);
+      sync();
+      Api.mcp.get().then((s) => { if (!alive) return; st = s; sync(); });
+    },
+
+    unmount() {
+      this._stop?.();
+    },
+  });
+
+  /* ======================================================================== */
   /* View: system-reboot                                                      */
   /* ======================================================================== */
 
@@ -4527,15 +4834,38 @@ const App = (() => {
   };
 
   // The reading as a counter: black wheels for the whole numbers, red wheels for the decimals ('N' = digit not recognized)
-  const meterEl = (value) => {
+  // With the previous reading (`prev`) the wheels that changed roll on like an odometer: from the old digit up to the new one.
+  const meterEl = (value, prev) => {
     const text = String(value).trim().replace(',', '.');
     const m = /^(-?)([0-9N]+)(?:\.([0-9N]+))?$/.exec(text);
     if (!m) return el('div', 'dash-hero-value', value); // not a number (e.g. 'Outdated'): plain text
     const meter = el('div', 'dash-meter');
     meter.setAttribute('role', 'img');
     meter.setAttribute('aria-label', `Meter reading ${text}`);
+    const old = prev ? /^-?([0-9N]+)(?:\.([0-9N]+))?$/.exec(String(prev).trim().replace(',', '.')) : null;
+    const oldDigits = old ? old[1] + (old[2] ?? '') : '';
+    const newDigits = m[2] + (m[3] ?? '');
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    let pos = 0; // wheels counted from the left
     const wheels = (digits, cls) => {
-      for (const d of digits) meter.append(el('span', `dash-wheel ${cls}${d === 'N' ? ' dash-wheel-na' : ''}`, d));
+      for (const d of digits) {
+        const w = el('span', `dash-wheel ${cls}${d === 'N' ? ' dash-wheel-na' : ''}`);
+        const from = oldDigits.length === newDigits.length ? oldDigits[pos] : undefined; // different length: no animation
+        if (!reduce && from !== undefined && from !== d && /[0-9]/.test(from) && /[0-9]/.test(d)) {
+          const steps = (Number(d) - Number(from) + 10) % 10; // 1..9: always forward
+          const strip = el('span', 'dash-wheel-strip');
+          for (let i = 0; i <= steps; i++) strip.append(el('span', '', String((Number(from) + i) % 10)));
+          strip.style.setProperty('--steps', steps);
+          strip.style.animationDelay = `${(newDigits.length - pos - 1) * 70}ms`; // the last wheel starts first
+          strip.style.animationDuration = `${700 + steps * 90}ms`;
+          w.classList.add('is-rolling');
+          w.append(strip);
+        } else {
+          w.textContent = d;
+        }
+        meter.append(w);
+        pos++;
+      }
     };
     if (m[1]) meter.append(el('span', 'dash-meter-sign', '−'));
     wheels(m[2], '');
@@ -4570,11 +4900,13 @@ const App = (() => {
   const RSSI_THRESHOLDS = [-85, -78, -67, -55]; // Weak, Fair, Good, Excellent
 
   const DASH_HTML = `
+    <div class="dash-syncbar" aria-hidden="true"></div>
     <header class="dash-head">
       <div>
         <div class="container-title">Dashboard</div>
         <div class="page-sub">Live reading and process state of your meter.</div>
       </div>
+      <span class="dash-sync" role="status">Updating ...</span>
     </header>
 
     <main class="dash-grid">
@@ -4588,7 +4920,10 @@ const App = (() => {
 
         <div class="dash-stats">
           <div class="stat wide">
-            <div class="stat-label">Process state</div>
+            <div class="stat-label dash-state-head">
+              <span>Process state</span>
+              <span class="dash-pill" data-ref="stateTimer" hidden></span>
+            </div>
             <div class="stat-value small" data-ref="state">--</div>
             <div class="dash-process-error" data-ref="error"></div>
           </div>
@@ -4597,12 +4932,19 @@ const App = (() => {
             <div class="stat-value small"><output data-ref="lastRun">--</output></div>
           </div>
           <div class="stat">
-            <div class="stat-label">Uptime</div>
+            <div class="stat-label dash-state-head">
+              <span>Uptime</span>
+              <span class="dash-pill" data-ref="cyclesPill" title="Cycles since the start" hidden></span>
+            </div>
             <div class="stat-value"><output data-ref="uptime">--</output></div>
           </div>
           <div class="stat">
-            <div class="stat-label">Cycles</div>
-            <div class="stat-value"><output data-ref="cycles">--</output></div>
+            <div class="stat-label">Services</div>
+            <div class="dash-services">
+              <div class="dash-service" data-ref="mqttBox" hidden><span>MQTT</span><span class="badge" data-ref="mqtt"></span></div>
+              <div class="dash-service" data-ref="mcpBox" hidden><span>MCP</span><span class="badge" data-ref="mcp"></span></div>
+              <div class="dash-service-none" data-ref="noServices">None active</div>
+            </div>
           </div>
           <div class="stat wide" data-ref="rssiBox">
             <div class="stat-label">Wi-Fi signal</div>
@@ -4614,7 +4956,6 @@ const App = (() => {
                 <rect class="bar" x="19" y="0" width="3" height="16" rx="1" />
               </svg>
               <output data-ref="rssi">-</output>
-              <span class="dash-mqtt" data-ref="mqttBox" hidden>MQTT <span class="badge" data-ref="mqtt"></span></span>
             </div>
           </div>
         </div>
@@ -4928,7 +5269,7 @@ const App = (() => {
       if (!d || !layout(d.W, d.H)) return;
       ensureColors();
       geo = geo || { cx: d.W / 2, cy: d.H / 2, sq: d.H * 0.2, sw: 6, arm: 12 };
-      draw({ reveal: 1, rot: 1, shift: 1, regions: 1, q: d.rois.map(() => 1), z: 0, edge: 1, imgAlpha: 1, bg: 1, algMix: 1, markers: 0, bracket: 0, scanning: false, t: 0 }, d);
+      draw({ reveal: 1, rot: 1, shift: 1, regions: 1, q: d.rois.map(() => 1), z: 1, edge: 0, imgAlpha: 1, bg: 1, algMix: 1, markers: 0, bracket: 0, scanning: false, t: 0 }, d);
     }
 
     // ---- icon geometry -----------------------------------------------------------
@@ -5011,7 +5352,7 @@ const App = (() => {
             const lastDone = roisDone ? Math.max(...S.rois.map((r) => r.doneAt)) : null;
             const settled = lastDone !== null && now - lastDone >= SETTLE;
             const stuck = now - S.cycleDoneAt > 4000; // a region without result must not hold the animation
-            if (settled || stuck) go('zoomout', now);
+            if (settled || stuck) go('done', now); // stays zoomed in: the resting state is the zoomed view
           }
           break;
         case 'zoomout':
@@ -5647,7 +5988,11 @@ const App = (() => {
           edit.addEventListener('click', () => openFallbackEditor(card, seq, prefill));
           actions.append(chips, edit);
 
-          card.append(head, meterEl(show(data.actual_value[seq])));
+          const shown = show(data.actual_value[seq]);
+          st.meterPrev = st.meterPrev || {};
+          // first display: the wheels roll in from zero
+          card.append(head, meterEl(shown, st.meterPrev[seq] ?? String(shown).replace(/[1-9]/g, '0')));
+          st.meterPrev[seq] = shown;
           if (statusEntry?.[1]) card.append(el('div', 'dash-hero-note', statusEntry[1]));
           card.append(actions);
           container.appendChild(card);
@@ -5840,6 +6185,7 @@ const App = (() => {
           onDone: () => {
             stopLive();
             st.liveSession = false;
+            st.liveDone = true; // the animation is over, the status may report the end of the cycle later: no second animation
             st.revealOk = true;
             st.stageHold = false;
             ref.replay.hidden = false;
@@ -5872,10 +6218,15 @@ const App = (() => {
           ref.stage.hidden = false;
           renderStageScene(step);
           setRecUpdating(true);
+          st.liveDone = false;
           startLive();
         } else if (wasCapturing) {
           if (st.liveSession) {
             st.reveal.endLive(); // the animation runs to its end, the device data is already there
+          } else if (st.liveDone) {
+            st.liveDone = false; // the live animation already ended: only the data is refreshed (no replay)
+            hideStage();
+            setRecUpdating(false);
           } else if (st.revealOk !== false) {
             // no live data: keep the scene until the new picture is ready, the animation then follows
             st.stageHold = true;
@@ -5946,6 +6297,83 @@ const App = (() => {
       window.addEventListener('cycle-status', onCycleStatus);
       st.offStatus = () => window.removeEventListener('cycle-status', onCycleStatus);
 
+      // countdown pill at the process state: same text as the sidebar, counts down every second
+      const renderStateTimer = () => {
+        const s = CycleMonitor.last();
+        const text = CycleMonitor.timerText();
+        ref.stateTimer.hidden = !text;
+        if (!text) return;
+        ref.stateTimer.textContent = text;
+        ref.stateTimer.dataset.kind = s?.running ? 'running' : s?.paused && s?.autoStart ? 'paused' : 'idle';
+      };
+      renderStateTimer();
+      st.timerTick = setInterval(renderStateTimer, 1000);
+      window.addEventListener('cycle-status', renderStateTimer);
+      st.offTimer = () => { clearInterval(st.timerTick); window.removeEventListener('cycle-status', renderStateTimer); };
+
+      // Back in the tab after a while: nothing was polled meanwhile, so the whole view is out of date (numbers, picture, plot).
+      // The view is marked as "updating" (dimmed, bar, badge), a running animation is dropped and everything is loaded again.
+      const STALE_AFTER_MS = 12000; // the automatic refresh runs every 1.5 to 5 s: older data means the page was not running
+      const resync = async () => {
+        if (st.dead || st.syncing) return;
+        const started = performance.now();
+        st.syncing = true;
+        root.classList.add('is-syncing');
+        clearTimeout(st.holdTimer);
+        st.reveal.cancel();
+        stopLive();
+        st.liveSession = false;
+        st.liveTiles = false;
+        st.capturing = undefined; // the next status tells whether a cycle is running now
+        st.stageHold = false;
+        hideStage();
+        ref.canvas.hidden = true;
+        ref.replay.hidden = true;
+        ref.img.hidden = false;
+        setTilesPending(false);
+        setRecUpdating(true);
+        st.lastImageKey = null;
+        const safety = setTimeout(() => { st.syncing = false; root.classList.remove('is-syncing'); }, 12000);
+        try {
+          for (let i = 0; i < 5 && st.running && !st.dead; i++) await new Promise((r) => setTimeout(r, 400)); // an automatic refresh is in flight
+          await refresh(false);
+          const shown = performance.now() - started;
+          if (shown < 1200) await new Promise((r) => setTimeout(r, 1200 - shown)); // long enough to be noticed
+        } finally {
+          clearTimeout(safety);
+          st.syncing = false;
+          if (!st.dead) {
+            if (!st.capturing) setRecUpdating(false);
+            root.classList.remove('is-syncing');
+          }
+        }
+      };
+      // back in the tab (also when the window was only covered or another window had the focus): check the age of the data
+      // Two signals: the time away (the tab was hidden or lost the focus) and the age of the data (a hidden tab only runs its timers
+      // about once a minute, so the data can be fairly fresh and still be far behind what the device did meanwhile)
+      const AWAY_AFTER_MS = 10000;
+      let leftAt = 0;
+      const onLeave = () => { if (!leftAt) leftAt = performance.now(); };
+      const onBack = () => {
+        if (document.hidden) return;
+        const now = performance.now();
+        const away = leftAt ? now - leftAt : 0;
+        leftAt = 0;
+        const age = st.lastDataAt ? now - st.lastDataAt : 0;
+        if (away > AWAY_AFTER_MS || age > STALE_AFTER_MS) resync();
+      };
+      const onVisibility = () => (document.hidden ? onLeave() : onBack());
+      document.addEventListener('visibilitychange', onVisibility);
+      window.addEventListener('blur', onLeave);
+      window.addEventListener('focus', onBack);
+      window.addEventListener('pageshow', onBack);
+      st.offVis = () => {
+        document.removeEventListener('visibilitychange', onVisibility);
+        window.removeEventListener('blur', onLeave);
+        window.removeEventListener('focus', onBack);
+        window.removeEventListener('pageshow', onBack);
+      };
+
 
       // MQTT connection: Connected / Connected (Encrypted) / Disconnected / Disabled (badge hidden)
       const loadMqtt = async () => {
@@ -5958,19 +6386,36 @@ const App = (() => {
         box.hidden = !/^(Connected|Disconnected)/.test(text);
         ref.mqtt.textContent = text;
         ref.mqtt.className = `badge ${text.startsWith('Connected') ? 'badge-success' : 'badge-error'}`;
+        updateServices();
       };
+
+      // MCP server of the device (optional): shown when the firmware has it. On / Off, a warning color while system actions are allowed
+      const loadMcp = async () => {
+        const m = await Api.mcp.get();
+        if (st.dead) return;
+        ref.mcpBox.hidden = !m;
+        if (m) {
+          ref.mcp.textContent = m.enabled ? (m.allowSystem ? 'On + system' : 'On') : 'Off';
+          ref.mcp.className = `badge ${m.enabled ? (m.allowSystem ? 'badge-warning' : 'badge-success') : ''}`;
+          ref.mcpBox.title = m.enabled ? (m.allowSystem ? 'Enabled, the assistant may also delete files, reboot and update' : 'Enabled') : 'Switched off';
+        }
+        updateServices();
+      };
+      const updateServices = () => { ref.noServices.hidden = !(ref.mqttBox.hidden && ref.mcpBox.hidden); };
 
       const loadProcessData = async () => {
         const d = await Api.process.get(st.abort.signal);
         if (!d || st.dead) return null;
         loadMqtt();
+        loadMcp();
 
         try {
           renderSequenceCards(d);
           ref.state.textContent = d.process_state;
           renderProcessError(d.process_error, d.process_state);
           ref.uptime.textContent = formatUptime(d.device_uptime);
-          ref.cycles.textContent = d.cycle_counter;
+          ref.cyclesPill.textContent = `${d.cycle_counter} ${Number(d.cycle_counter) === 1 ? 'cycle' : 'cycles'}`;
+          ref.cyclesPill.hidden = false;
           ref.rssiBox.style.display = d.wlan_rssi === -255 ? 'none' : ''; // hide the row when the device reports no WLAN
           renderRssi(d.wlan_rssi);
         } catch (e) {
@@ -6084,6 +6529,7 @@ const App = (() => {
         try {
           const key = await loadProcessData();
           if (key === null) return; // device not answering: skip the image
+          st.lastDataAt = performance.now();
           loadActivity();
 
           // Manual refresh always reloads the image; auto refresh only when cycle or step changed
@@ -6114,14 +6560,19 @@ const App = (() => {
       if (lastStatus) onCycleStatus({ detail: lastStatus });
 
       (async () => {
+        root.classList.add('is-syncing'); // first load: same "updating" look as after a stale tab
+        const loaded = () => { if (!st.dead && !st.syncing) root.classList.remove('is-syncing'); };
+        setTimeout(loaded, 15000); // safety: never stays dimmed when the device does not answer
         if (typeof loaderSpinner !== 'undefined') ref.img.src = loaderSpinner;
         st.lastImageKey = await loadProcessData();
         if (st.dead) return;
+        st.lastDataAt = performance.now();
         if (!st.capturing) {
-          applyReveal(await loadRecognition()); // the device picture (alg_roi.jpg) is only loaded if the animation view is not possible
+          await applyReveal(await loadRecognition()); // the device picture (alg_roi.jpg) is only loaded if the animation view is not possible
         } else {
-          loadRecognition();
+          await loadRecognition();
         }
+        loaded();
         loadActivity();
         st.plot = createReadingsPlot(ref.plotCard, ref.plotRange, ref.plotBody, st.abort.signal);
         st.plot.load();
@@ -6135,6 +6586,8 @@ const App = (() => {
       st.dead = true;
       clearTimeout(st.timer);
       st.offStatus?.();
+      st.offVis?.();
+      st.offTimer?.();
       st.offResize?.();
       st.reveal?.cancel();
       clearTimeout(st.holdTimer);
@@ -6598,7 +7051,7 @@ const App = (() => {
       <div class="container-content">
         <div class="editor-layout" data-ref="layout">
           <div class="setup-main">
-            <div class="card">
+            <div class="card setup-imgcard">
               <div class="card-header">
                 <span data-ref="canvasTitle">Reference image</span>
                 <div class="setup-header-actions" data-ref="optsImage" hidden>
@@ -6614,9 +7067,25 @@ const App = (() => {
                   </label>
                 </div>
               </div>
+              <div class="m-only setup-seqbar" data-ref="mSeqBar" hidden>
+                <select data-change="mSeq" data-ref="mSeq" aria-label="Number sequence"></select>
+                <button type="button" class="m-icon" data-click="newSequence" aria-label="New number sequence" title="New"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+                <button type="button" class="m-icon" data-click="renameSequence" aria-label="Rename number sequence" title="Rename"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg></button>
+                <button type="button" class="m-icon m-danger" data-click="deleteSequence" data-ref="mDeleteSeq" aria-label="Delete number sequence" title="Delete"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg></button>
+              </div>
               <div class="canvas-wrap">
                 <img data-ref="loading" alt="Loading..." />
                 <canvas data-ref="canvas" style="display: none"></canvas>
+              </div>
+            </div>
+
+            <div class="card setup-marker-rec" data-ref="panelRec" hidden>
+              <div class="card-header">
+                <span data-ref="recTitle">Last cycle</span>
+                <button type="button" class="button" data-click="recRefresh">Refresh</button>
+              </div>
+              <div class="side-body">
+                <div class="rec" data-ref="recBody"><span class="dash-log-empty">Loading ...</span></div>
               </div>
             </div>
 
@@ -6643,14 +7112,34 @@ const App = (() => {
 
           <div class="editor-side" data-ref="side" hidden>
             <div data-ref="panelMarkers" hidden>
-              <div class="card">
+              <div class="m-only setup-roibar"><div class="m-chips" data-ref="mMarkerChips" role="listbox" aria-label="Alignment markers"></div></div>
+              <div class="m-only setup-pair" data-ref="mPairMarker"></div>
+              <div class="card setup-proc">
+                <div class="card-header"><span>Processing</span></div>
+                <div class="setup-proc-row">
+                  <span class="setup-proc-label">Process digit ROIs</span>
+                  <span class="cfg-switch-wrap">
+                    <label class="cfg-switch"><input type="checkbox" data-change="digitProcessing" data-ref="digitProcessing" aria-label="Process digit ROIs" /><span></span></label>
+                    <span class="cfg-switch-text" data-ref="digitProcessingText">Off</span>
+                  </span>
+                </div>
+                <div class="setup-proc-row">
+                  <span class="setup-proc-label">Process analog ROIs</span>
+                  <span class="cfg-switch-wrap">
+                    <label class="cfg-switch"><input type="checkbox" data-change="analogProcessing" data-ref="analogProcessing" aria-label="Process analog ROIs" /><span></span></label>
+                    <span class="cfg-switch-text" data-ref="analogProcessingText">Off</span>
+                  </span>
+                </div>
+              </div>
+
+              <div class="card setup-markercard">
                 <div class="card-header"><span>Marker</span></div>
                 <div class="side-body">
-                  <label class="field">
+                  <label class="field m-hide">
                     <span class="field-label">Selected marker</span>
                     <select data-change="markerSelect" data-ref="markerSelect"></select>
                   </label>
-                  <div class="field-grid">
+                  <div class="field-grid m-hide">
                     <label class="field"><span class="field-label">X</span><input type="number" min="1" data-change="markerValue" data-ref="mx" /></label>
                     <label class="field"><span class="field-label">Y</span><input type="number" min="1" data-change="markerValue" data-ref="my" /></label>
                     <label class="field"><span class="field-label">Width</span><input type="number" min="1" data-change="markerValue" data-ref="mdx" /></label>
@@ -6677,29 +7166,19 @@ const App = (() => {
                 </div>
               </div>
 
-              <div class="card setup-marker-rec">
-                <div class="card-header">
-                  <span>Recognition</span>
-                  <button type="button" class="button" data-click="recRefresh">Refresh</button>
-                </div>
-                <div class="side-body">
-                  <div class="setup-rec-hint">Result of the last cycle: a good alignment shows in the recognition.</div>
-                  <div class="setup-rec-align" data-ref="recAlign" hidden></div>
-                  <div class="rec" data-ref="recBody"><span class="dash-log-empty">Loading ...</span></div>
-                </div>
-              </div>
             </div>
 
             <div class="setup-contents" data-ref="panelRoi" hidden>
-              <div class="card">
-                <div class="card-header"><span>Processing</span></div>
-                <div class="side-body">
-                  <label class="check"><input type="checkbox" data-change="digitProcessing" data-ref="digitProcessing" />Process digit ROIs</label>
-                  <label class="check"><input type="checkbox" data-change="analogProcessing" data-ref="analogProcessing" />Process analog ROIs</label>
+              <div class="m-only setup-roibar">
+                <div class="m-chips" data-ref="mChips" role="listbox" aria-label="Regions of interest"></div>
+                <div class="m-roiact">
+                  <button type="button" class="m-icon" data-click="newROI" aria-label="New region" title="New region"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+                  <button type="button" class="m-icon" data-click="copyROI" data-ref="mCopy" aria-label="Copy region to the right" title="Copy to the right"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg></button>
+                  <button type="button" class="m-icon m-danger" data-click="deleteROI" data-ref="mDelete" aria-label="Delete region" title="Delete region"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg></button>
                 </div>
               </div>
-
-              <div class="card">
+              <div class="m-only setup-pair" data-ref="mPairRoi"></div>
+              <div class="card m-hide">
                 <div class="card-header"><span>Number sequence</span></div>
                 <div class="side-body">
                   <label class="field">
@@ -6714,27 +7193,27 @@ const App = (() => {
                 </div>
               </div>
 
-              <div class="card">
+              <div class="card setup-roicard">
                 <div class="card-header"><span>Region of interest</span></div>
                 <div class="side-body">
                   <div class="setup-roi-inputs" data-ref="roiInputs" hidden>
-                    <div class="field-grid">
+                    <div class="field-grid m-hide">
                       <label class="field">
                         <span class="field-label">ROI</span>
                         <select data-change="roi" data-ref="roiSelect"></select>
                       </label>
                     </div>
-                    <div class="btn-row grid2">
+                    <div class="btn-row grid2 m-hide">
                       <button type="button" class="button" data-click="newROI" data-ref="newROI">New</button>
                       <button type="button" class="button btn-danger" data-click="deleteROI" data-ref="deleteROI">Delete</button>
                       <button type="button" class="button" data-click="moveHigher" data-ref="moveHigher">Move higher</button>
                       <button type="button" class="button" data-click="moveLower" data-ref="moveLower">Move lower</button>
                     </div>
-                    <div class="setup-multiplier">
+                    <div class="setup-multiplier m-hide">
                       <div>Multiplier by order: <output data-ref="multiplier"></output></div>
                       <div>With decimal scaling (<output data-ref="decimalShift"></output>): <output data-ref="multiplierDecshift"></output></div>
                     </div>
-                    <div class="field-grid">
+                    <div class="field-grid m-hide">
                       <label class="field"><span class="field-label">X</span><input type="number" min="1" data-change="roiValue" data-ref="refx" /></label>
                       <label class="field"><span class="field-label">Y</span><input type="number" min="1" data-change="roiValue" data-ref="refy" /></label>
                       <label class="field"><span class="field-label">Width</span><input type="number" min="1" data-change="roiValueDx" data-ref="refdx" /></label>
@@ -6817,6 +7296,7 @@ const App = (() => {
       } else {
         delta.digit.enabled = R.digitProcessing.checked;
       }
+      R.digitProcessingText.textContent = R.digitProcessing.checked ? 'On' : 'Off';
       setInputVisibility();
       if (delta.digit.enabled) {
         all('.setup-vis-digitanalog').forEach((el) => show(el, delta.analog.enabled));
@@ -6836,6 +7316,7 @@ const App = (() => {
       } else {
         delta.analog.enabled = R.analogProcessing.checked;
       }
+      R.analogProcessingText.textContent = R.analogProcessing.checked ? 'On' : 'Off';
       setInputVisibility();
       if (delta.analog.enabled) {
         all('.setup-vis-digitanalog').forEach((el) => show(el, delta.digit.enabled));
@@ -6882,6 +7363,7 @@ const App = (() => {
         }
       }
       R.deleteSeq.disabled = sel.options.length <= 1;
+      mFillSeq();
     }
 
     function createNumberSequence(sequenceName) {
@@ -7977,6 +8459,7 @@ const App = (() => {
     function refreshDraw() {
       redraw();
       updateCounts();
+      mSync();
       if (!drag) refreshSaveBar();
     }
 
@@ -8007,64 +8490,63 @@ const App = (() => {
       const c = r.confidence;
       return [label, c === null || c === undefined ? 'ok' : c >= 90 ? 'ok' : c >= 60 ? 'warn' : 'err'];
     };
+    // the recognition card shows only the regions of the open tab: digits or analog
+    let recData; // last answer of the device (undefined: not loaded, null: not available)
+    function renderMarkerRecognition() {
+      if (destroyed || !R.recBody) return;
+      const kind = mode === 'analog' ? 'analog' : 'digit';
+      R.recTitle.textContent = `Last cycle · ${kind === 'analog' ? 'analog' : 'digits'}`;
+      const body = R.recBody;
+      body.textContent = '';
+      const note = (text) => {
+        const msg = document.createElement('span');
+        msg.className = 'dash-log-empty';
+        msg.textContent = text;
+        body.append(msg);
+      };
+      if (!recData || !recData.ready) {
+        note(recData === undefined ? 'Loading ...' : recData ? 'No result yet' : 'Not available');
+        return;
+      }
+      const block = recData.sequences[0]?.[kind];
+      if (!block || !block.enabled || !block.rois.length) {
+        note('Switched off');
+        return;
+      }
+      const grid = document.createElement('div');
+      grid.className = `rec-roi-grid is-${kind}`;
+      for (const r of block.rois) {
+        const [label, status] = recTileValue(kind, r);
+        const tile = document.createElement('div');
+        tile.className = 'rec-roi-tile';
+        tile.dataset.status = status;
+        const v = document.createElement('div');
+        v.className = 'rec-roi-value';
+        v.textContent = label;
+        tile.append(v);
+        if (!r.na && r.image) {
+          const img = document.createElement('img');
+          img.className = 'rec-roi-img';
+          img.src = Api.process.imageUrl(r.image);
+          img.alt = `ROI ${label}`;
+          tile.append(img);
+        }
+        grid.append(tile);
+      }
+      body.append(grid);
+    }
     async function loadMarkerRecognition() {
       if (destroyed || !R.recBody) return;
       const data = await Api.process.recognition();
       if (destroyed) return;
-      const body = R.recBody;
-      body.textContent = '';
-      R.recAlign.hidden = true;
-      if (!data || !data.ready) {
-        const msg = document.createElement('span');
-        msg.className = 'dash-log-empty';
-        msg.textContent = data ? 'Waiting for the first completed cycle' : 'Recognition details not available';
-        body.append(msg);
-        return;
-      }
-      const al = data.alignment;
-      if (al) {
-        R.recAlign.hidden = false;
-        R.recAlign.textContent = al.ok === false ? 'Alignment failed in the last cycle' : `Last alignment: rotation ${(+al.rotation).toFixed(1)}°, shift ${al.dx} / ${al.dy} px`;
-        R.recAlign.classList.toggle('is-error', al.ok === false);
-      }
-      const seq = data.sequences[0];
-      for (const [kind, title] of [['digit', 'Digit ROIs'], ['analog', 'Analog ROIs']]) {
-        const block = seq[kind];
-        if (!block.enabled || !block.rois.length) continue;
-        const wrap = document.createElement('div');
-        wrap.className = 'rec-roi-block';
-        const h = document.createElement('div');
-        h.className = 'rec-roi-title';
-        h.textContent = title;
-        const grid = document.createElement('div');
-        grid.className = `rec-roi-grid is-${kind}`;
-        for (const r of block.rois) {
-          const [label, status] = recTileValue(kind, r);
-          const tile = document.createElement('div');
-          tile.className = 'rec-roi-tile';
-          tile.dataset.status = status;
-          const v = document.createElement('div');
-          v.className = 'rec-roi-value';
-          v.textContent = label;
-          tile.append(v);
-          if (!r.na && r.image) {
-            const img = document.createElement('img');
-            img.className = 'rec-roi-img';
-            img.src = Api.process.imageUrl(r.image);
-            img.alt = `ROI ${label}`;
-            tile.append(img);
-          }
-          grid.append(tile);
-        }
-        wrap.append(h, grid);
-        body.append(wrap);
-      }
+      recData = data;
+      renderMarkerRecognition();
     }
     // a finished cycle has new results
     let recWasRunning = false;
     const onCycleForRec = (e) => {
       const running = !!e.detail?.running;
-      if (recWasRunning && !running && mode === 'markers') loadMarkerRecognition();
+      if (recWasRunning && !running && isRoiMode()) loadMarkerRecognition();
       recWasRunning = running;
     };
     window.addEventListener('cycle-status', onCycleForRec);
@@ -8074,7 +8556,9 @@ const App = (() => {
       const isRoi = isRoiMode();
       R.panelImage.hidden = mode !== 'image';
       R.panelMarkers.hidden = mode !== 'markers';
-      if (mode === 'markers' && lastRecTab !== 'markers') loadMarkerRecognition();
+      R.panelRec.hidden = !isRoi; // recognition of the last cycle: only with the digit and analog regions
+      if (isRoi && !['digit', 'analog'].includes(lastRecTab)) loadMarkerRecognition();
+      else if (isRoi && lastRecTab !== mode) renderMarkerRecognition(); // digits <-> analog: same data, other regions
       lastRecTab = mode;
       R.panelRoi.hidden = !isRoi;
       R.side.hidden = mode === 'image';
@@ -8083,6 +8567,9 @@ const App = (() => {
       R.optsRoi.hidden = !isRoi;
       R.canvasTitle.textContent = TAB_TITLE[mode];
       R.canvas.classList.toggle('setup-canvas-draw', mode !== 'image'); // touch drawing must not scroll the page
+      R.mSeqBar.hidden = !isRoi;
+      root.dataset.mode = mode;
+      mSync(true);
       updateCounts();
     }
 
@@ -8254,6 +8741,485 @@ const App = (() => {
       else await saveAll();
     }
 
+    /* ================================================================== */
+    /* Compact layout (phones): chips, pad, jog and steppers drive the    */
+    /* same logic as the fields of the desktop layout                     */
+    /* ================================================================== */
+    const mq = window.matchMedia('(max-width: 860px)');
+    const compact = () => mq.matches;
+    let mStep = 10;
+    const clampN = (v, a, b) => Math.max(a, Math.min(b, v));
+    const mEl = (tag, cls, html) => {
+      const el = document.createElement(tag);
+      if (cls) el.className = cls;
+      if (html !== undefined) el.innerHTML = html;
+      return el;
+    };
+    const M_ICON = {
+      up: '<svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg>',
+      down: '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>',
+      left: '<svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>',
+      right: '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>',
+      jog: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>',
+    };
+
+    // the thing that is edited: a region of interest or an alignment marker
+    const mTargets = {
+      roi: {
+        ready: () => !!delta.digit && roiCount() > 0,
+        list: () => roisOf().map((r) => ({ x: toInt(r.x), y: toInt(r.y), w: toInt(r.dx), h: toInt(r.dy) })),
+        index: () => roiSelected,
+        select: (i) => {
+          R.roiSelect.value = String(i);
+          onROIChanged();
+        },
+        setPos: (x, y) => {
+          R.refx.value = x;
+          R.refy.value = y;
+          onValueManualChanged();
+        },
+        setW: (w) => {
+          R.refdx.value = w;
+          onValueManualChangedDx();
+        },
+        setH: (h) => {
+          R.refdy.value = h;
+          onValueManualChanged();
+        },
+      },
+      marker: {
+        ready: () => markerReady(),
+        list: () => (Array.isArray(markerRoi) ? markerRoi.map((r) => ({ x: toInt(r.x), y: toInt(r.y), w: toInt(r.dx), h: toInt(r.dy) })) : []),
+        index: () => markerSelected,
+        select: (i) => {
+          R.markerSelect.value = String(i);
+          markerSelectionChanged();
+        },
+        setPos: (x, y) => {
+          R.mx.value = x;
+          R.my.value = y;
+          markerValueChanged();
+        },
+        setW: (w) => {
+          R.mdx.value = w;
+          markerValueChanged();
+        },
+        setH: (h) => {
+          R.mdy.value = h;
+          markerValueChanged();
+        },
+      },
+    };
+    const mTarget = () => (mode === 'markers' ? mTargets.marker : isRoiMode() ? mTargets.roi : null);
+    const mCurrent = (t) => {
+      try {
+        return t.ready() ? t.list()[t.index()] || null : null;
+      } catch (e) {
+        return null;
+      }
+    };
+
+    // button that repeats while it is held (and gets faster)
+    function mHold(el, fn) {
+      let timer = null;
+      let delay = 380;
+      let pressed = false;
+      const stop = () => {
+        pressed = false;
+        clearTimeout(timer);
+      };
+      const loop = () => {
+        if (!pressed) return;
+        fn();
+        delay = Math.max(60, delay * 0.8);
+        timer = setTimeout(loop, delay);
+      };
+      el.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        pressed = true;
+        delay = 380;
+        fn();
+        timer = setTimeout(loop, delay);
+      });
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => el.addEventListener(ev, stop));
+    }
+
+    // Position (pad with jog) and Size (steppers) as two cards next to each other
+    function mBuildPair(host, which) {
+      const t = mTargets[which];
+      const pos = mEl('div', 'card m-card');
+      pos.append(mEl('div', 'm-title', 'Position'));
+      const pad = mEl('div', 'm-dpad');
+      const keys = { up: [0, -1], left: [-1, 0], right: [1, 0], down: [0, 1] };
+      for (const [name, [dx, dy]] of Object.entries(keys)) {
+        const b = mEl('button', `m-key ${name}`, M_ICON[name]);
+        b.type = 'button';
+        b.setAttribute('aria-label', name);
+        mHold(b, () => {
+          const c = mCurrent(t);
+          if (c) t.setPos(c.x + dx * mStep, c.y + dy * mStep);
+        });
+        pad.append(b);
+      }
+      const jog = mEl('div', 'm-key mid', M_ICON.jog);
+      jog.setAttribute('role', 'slider');
+      jog.setAttribute('aria-label', 'Jog: pull in any direction to move');
+      jog.tabIndex = 0;
+      pad.append(jog);
+      pos.append(pad);
+
+      const by = mEl('div', 'm-moveby');
+      by.append(mEl('small', '', 'Move by'));
+      const seg = mEl('div', 'm-seg');
+      [1, 5, 10].forEach((n) => {
+        const b = mEl('button', n === mStep ? 'active' : '', String(n));
+        b.type = 'button';
+        b.addEventListener('click', () => {
+          mStep = n;
+          document.querySelectorAll('.m-seg button').forEach((x) => x.classList.toggle('active', Number(x.textContent) === n));
+        });
+        seg.append(b);
+      });
+      by.append(seg);
+      pos.append(by);
+
+      // jog: the stick moves the region, the further it is pulled the faster; it springs back on release
+      (() => {
+        const MAXR = 34;
+        const DEAD = 0.1;
+        const SPEED = 90;
+        let st = null;
+        let timer = null;
+        const tick = () => {
+          if (!st) return;
+          const now = performance.now();
+          const dt = Math.min(0.05, (now - st.t) / 1000);
+          st.t = now;
+          const mag = Math.hypot(st.vx, st.vy);
+          const f = clampN(mag / MAXR, 0, 1);
+          const c = mCurrent(t);
+          if (f > DEAD && c) {
+            const k = (Math.pow((f - DEAD) / (1 - DEAD), 2) * SPEED * dt) / mag;
+            st.ax += st.vx * k;
+            st.ay += st.vy * k;
+            const mx = Math.trunc(st.ax);
+            const my = Math.trunc(st.ay);
+            if (mx || my) {
+              st.ax -= mx;
+              st.ay -= my;
+              t.setPos(c.x + mx, c.y + my);
+            }
+          }
+        };
+        jog.addEventListener('pointerdown', (e) => {
+          e.preventDefault();
+          try { jog.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ }
+          jog.classList.add('active');
+          st = { id: e.pointerId, x0: e.clientX, y0: e.clientY, vx: 0, vy: 0, ax: 0, ay: 0, t: performance.now() };
+          timer = setInterval(tick, 16);
+        });
+        jog.addEventListener('pointermove', (e) => {
+          if (!st || e.pointerId !== st.id) return;
+          let dx = e.clientX - st.x0;
+          let dy = e.clientY - st.y0;
+          const m = Math.hypot(dx, dy);
+          if (m > MAXR) {
+            dx *= MAXR / m;
+            dy *= MAXR / m;
+          }
+          st.vx = dx;
+          st.vy = dy;
+          jog.style.transform = `translate(${dx}px, ${dy}px)`;
+        });
+        const end = (e) => {
+          if (!st || e.pointerId !== st.id) return;
+          clearInterval(timer);
+          st = null;
+          jog.classList.remove('active');
+          jog.style.transform = '';
+        };
+        jog.addEventListener('pointerup', end);
+        jog.addEventListener('pointercancel', end);
+        jog.addEventListener('keydown', (e) => {
+          const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+          const c = mCurrent(t);
+          if (d && c) {
+            e.preventDefault();
+            t.setPos(c.x + d[0], c.y + d[1]);
+          }
+        });
+      })();
+
+      const size = mEl('div', 'card m-card');
+      size.append(mEl('div', 'm-title', 'Size'));
+      const steppers = mEl('div', 'm-steppers');
+      const inputs = {};
+      const stepper = (key, label, set) => {
+        const box = mEl('div', 'm-stepper');
+        const minus = mEl('button', '', '&minus;');
+        const plus = mEl('button', '', '+');
+        minus.type = 'button';
+        plus.type = 'button';
+        minus.setAttribute('aria-label', `${label} smaller`);
+        plus.setAttribute('aria-label', `${label} larger`);
+        const mid = mEl('div', 'm-stepval');
+        mid.append(mEl('small', '', label));
+        const inp = document.createElement('input');
+        inp.type = 'number';
+        inp.inputMode = 'numeric';
+        inp.setAttribute('aria-label', label);
+        mid.append(inp);
+        box.append(minus, mid, plus);
+        mHold(minus, () => { const c = mCurrent(t); if (c) set(Math.max(1, c[key] - 1)); });
+        mHold(plus, () => { const c = mCurrent(t); if (c) set(c[key] + 1); });
+        inp.addEventListener('change', () => {
+          const v = parseInt(inp.value, 10);
+          if (Number.isNaN(v) || v < 1) mSync();
+          else set(v);
+        });
+        inputs[key] = inp;
+        steppers.append(box);
+      };
+      stepper('w', 'Width', (v) => t.setW(v));
+      stepper('h', 'Height', (v) => t.setH(v));
+      size.append(steppers);
+      host.append(pos, size);
+      return {
+        update() {
+          const c = mCurrent(t);
+          for (const key of ['w', 'h']) {
+            if (document.activeElement !== inputs[key]) inputs[key].value = c ? c[key] : '';
+            inputs[key].disabled = !c;
+          }
+        },
+      };
+    }
+    const mPairs = {};
+
+    // chips: select a region, drag to change the order (touch: press and hold first)
+    function mRenderChips(box, count, selected, sortable, onSelect) {
+      box.textContent = '';
+      for (let i = 0; i < count; i++) {
+        const b = mEl('button', `m-chip${i === selected ? ' active' : ''}`, String(i + 1));
+        b.type = 'button';
+        b.setAttribute('role', 'option');
+        b.setAttribute('aria-selected', String(i === selected));
+        b.addEventListener('click', () => onSelect(i));
+        box.append(b);
+      }
+      box.dataset.sortable = sortable ? '1' : '';
+    }
+
+    function mAttachSort(box, onMove) {
+      const LONG = 260;
+      const GAP = 8;
+      let d = null;
+      let suppress = false;
+      let auto = null;
+      const chipOf = (el) => el.closest && el.closest('.m-chip');
+      const targetIndex = () => {
+        const c = d.rects[d.i];
+        const center = c.left + c.width / 2 + d.dx;
+        return clampN(d.rects.filter((r, k) => k !== d.i && r.left + r.width / 2 < center).length, 0, d.rects.length - 1);
+      };
+      const layout = () => {
+        const t = targetIndex();
+        const w = d.rects[d.i].width + GAP;
+        [...box.children].forEach((c, j) => {
+          if (j === d.i) {
+            c.style.transform = `translateX(${d.dx}px)`;
+            return;
+          }
+          let shift = 0;
+          if (d.i < t && j > d.i && j <= t) shift = -w;
+          else if (d.i > t && j < d.i && j >= t) shift = w;
+          c.style.transform = shift ? `translateX(${shift}px)` : '';
+        });
+      };
+      const activate = () => {
+        if (!d || d.active) return;
+        d.active = true;
+        d.rects = [...box.children].map((c) => ({ left: c.offsetLeft, width: c.offsetWidth }));
+        d.scroll0 = box.scrollLeft;
+        d.dx = 0;
+        d.chip.classList.add('dragging');
+        box.classList.add('sorting');
+        try { d.chip.setPointerCapture(d.id); } catch (e) { /* not capturable */ }
+        if (navigator.vibrate) navigator.vibrate(12);
+        auto = setInterval(() => {
+          if (!d || !d.active) return;
+          const b = box.getBoundingClientRect();
+          const v = d.x < b.left + 36 ? -9 : d.x > b.right - 36 ? 9 : 0;
+          if (v) {
+            box.scrollLeft += v;
+            d.dx = d.x - d.x0 + (box.scrollLeft - d.scroll0);
+            layout();
+          }
+        }, 16);
+      };
+      const cleanup = () => {
+        if (d) clearTimeout(d.timer);
+        clearInterval(auto);
+        [...box.children].forEach((c) => {
+          c.style.transform = '';
+          c.classList.remove('dragging');
+        });
+        box.classList.remove('sorting');
+        d = null;
+      };
+      box.addEventListener('pointerdown', (e) => {
+        const chip = chipOf(e.target);
+        if (!chip || box.dataset.sortable !== '1' || (e.pointerType === 'mouse' && e.button !== 0)) return;
+        d = { chip, i: [...box.children].indexOf(chip), id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, active: false, touch: e.pointerType !== 'mouse' };
+        if (d.touch) d.timer = setTimeout(activate, LONG);
+      });
+      box.addEventListener('pointermove', (e) => {
+        if (!d || e.pointerId !== d.id) return;
+        d.x = e.clientX;
+        if (!d.active) {
+          const dist = Math.hypot(e.clientX - d.x0, e.clientY - d.y0);
+          if (d.touch && dist > 8) {
+            cleanup();
+            return;
+          }
+          if (d.touch || dist <= 5) return;
+          activate();
+        }
+        d.dx = e.clientX - d.x0 + (box.scrollLeft - d.scroll0);
+        layout();
+      });
+      box.addEventListener('pointerup', (e) => {
+        if (!d || e.pointerId !== d.id) return;
+        if (!d.active) {
+          cleanup();
+          return;
+        }
+        const from = d.i;
+        const to = targetIndex();
+        cleanup();
+        suppress = true;
+        setTimeout(() => { suppress = false; }, 0);
+        if (to !== from) onMove(from, to);
+      });
+      box.addEventListener('pointercancel', (e) => { if (d && e.pointerId === d.id) cleanup(); });
+      box.addEventListener('click', (e) => { if (suppress) { e.stopPropagation(); e.preventDefault(); } }, true);
+      box.addEventListener('touchmove', (e) => { if (d && d.active) e.preventDefault(); }, { passive: false });
+      box.addEventListener('contextmenu', (e) => { if (d) e.preventDefault(); });
+    }
+
+    function mMoveROI(from, to) {
+      const rois = roisOf();
+      const [r] = rois.splice(from, 1);
+      rois.splice(to, 0, r);
+      roiSelected = to;
+      refreshROI();
+      onValueManualChanged(); // spacing and synchronized values follow the new order
+    }
+
+    // copy the selected region to the right of it
+    function onClickCopyROI() {
+      const rois = roisOf();
+      if (!rois.length) return;
+      const r = rois[roiSelected];
+      const gap = roiType === 'digit' ? toInt(space) : 0;
+      rois.splice(roiSelected + 1, 0, { ...r, x: toInt(r.x) + toInt(r.dx) + gap });
+      roiSelected += 1;
+      refreshROI();
+      onValueManualChanged();
+    }
+
+    // sequence selection of the flat bar mirrors the original selection
+    function mFillSeq() {
+      if (!R.mSeq) return;
+      R.mSeq.textContent = '';
+      Array.from(R.seqSelect.options).forEach((o) => R.mSeq.add(new Option(o.text, o.value)));
+      R.mSeq.selectedIndex = R.seqSelect.selectedIndex;
+      R.mDeleteSeq.disabled = R.deleteSeq.disabled;
+    }
+
+    // keeps chips and values in step with the editor state (cheap: called after every redraw)
+    let mChipKey = '';
+    function mSync(force) {
+      if (!R.mChips) return;
+      const t = mTarget();
+      if (!t) return;
+      let count = 0;
+      try {
+        count = t.ready() ? t.list().length : 0;
+      } catch (e) {
+        count = 0;
+      }
+      const which = mode === 'markers' ? 'marker' : 'roi';
+      const box = which === 'marker' ? R.mMarkerChips : R.mChips;
+      const sel = t.index();
+      const key = `${which}|${roiType}|${seqIdx()}|${count}`;
+      if (force || key !== mChipKey) {
+        mChipKey = key;
+        mRenderChips(box, count, sel, which === 'roi', (i) => t.select(i));
+      }
+      [...box.children].forEach((c, i) => {
+        c.classList.toggle('active', i === sel);
+        c.setAttribute('aria-selected', String(i === sel));
+      });
+      const cur = box.children[sel];
+      if (cur && !box.classList.contains('sorting')) box.scrollTo({ left: cur.offsetLeft - (box.clientWidth - cur.offsetWidth) / 2 });
+      if (which === 'roi') {
+        R.mCopy.disabled = count === 0;
+        R.mDelete.disabled = count === 0;
+      }
+      mPairs[which]?.update();
+      mFillSeqState();
+    }
+    function mFillSeqState() {
+      if (R.mSeq && R.mSeq.selectedIndex !== R.seqSelect.selectedIndex) R.mSeq.selectedIndex = R.seqSelect.selectedIndex;
+      if (R.mDeleteSeq) R.mDeleteSeq.disabled = R.deleteSeq.disabled;
+    }
+
+    // on a phone the region is moved by dragging it in the image (the size is changed with the steppers)
+    let mDragState = null;
+    function mPointerDown(e) {
+      const t = mTarget();
+      if (!t || !t.ready()) return false;
+      const p = pointerPos(e, R.canvas);
+      const list = t.list();
+      const cur = t.index();
+      const tol = 8;
+      const inside = (r) => !!r && p.x >= r.x - tol && p.x <= r.x + r.w + tol && p.y >= r.y - tol && p.y <= r.y + r.h + tol;
+      let hit = -1;
+      if (inside(list[cur])) {
+        hit = cur;
+      } else {
+        let best = Infinity;
+        list.forEach((r, i) => {
+          if (inside(r) && r.w * r.h < best) {
+            best = r.w * r.h;
+            hit = i;
+          }
+        });
+      }
+      if (hit < 0) return true; // nothing to grab
+      if (hit !== cur) t.select(hit);
+      const c = mCurrent(t);
+      if (!c) return true;
+      mDragState = { id: e.pointerId, x0: p.x, y0: p.y, ox: c.x, oy: c.y };
+      return true;
+    }
+    function mPointerMove(e) {
+      if (!mDragState || e.pointerId !== mDragState.id) return;
+      const p = pointerPos(e, R.canvas);
+      mTarget()?.setPos(mDragState.ox + p.x - mDragState.x0, mDragState.oy + p.y - mDragState.y0);
+    }
+
+    function mInit() {
+      mPairs.roi = mBuildPair(R.mPairRoi, 'roi');
+      mPairs.marker = mBuildPair(R.mPairMarker, 'marker');
+      mAttachSort(R.mChips, (from, to) => mMoveROI(from, to));
+      mAttachSort(R.mMarkerChips, () => {});
+      mq.addEventListener?.('change', () => mSync(true));
+    }
+
+    mInit();
+
     /* ---------------------------------------------------------- events */
     const CLICKS = {
       tab: (e, t) => {
@@ -8269,6 +9235,7 @@ const App = (() => {
       renameSequence: () => onClickRenameSequence(),
       deleteSequence: () => onClickDeleteSequence(),
       newROI: () => onClickNewROI(),
+      copyROI: () => onClickCopyROI(),
       deleteROI: () => onClickDeleteROI(),
       moveHigher: () => swapROI(-1),
       moveLower: () => swapROI(1),
@@ -8278,6 +9245,10 @@ const App = (() => {
     const CHANGES = {
       redraw: () => refreshDraw(),
       markerSelect: () => markerSelectionChanged(),
+      mSeq: () => {
+        R.seqSelect.selectedIndex = R.mSeq.selectedIndex;
+        onSequenceChanged();
+      },
       markerValue: (t) => {
         clampMin(t, 1);
         markerValueChanged();
@@ -8328,6 +9299,17 @@ const App = (() => {
 
     const onPointerDown = (e) => {
       if (!imageOk || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      if (compact() && (mode === 'markers' || isRoiMode())) {
+        // phone: the region is moved by dragging (its size is changed with the steppers)
+        if (!mPointerDown(e)) return;
+        try {
+          R.canvas.setPointerCapture(e.pointerId);
+        } catch (err) {
+          /* not capturable */
+        }
+        e.preventDefault();
+        return;
+      }
       if (mode === 'markers') markerPointerDown(e);
       else if (isRoiMode()) seqPointerDown(e);
       else return;
@@ -8339,11 +9321,19 @@ const App = (() => {
       e.preventDefault();
     };
     const onPointerUp = (e) => {
+      if (mDragState) {
+        mDragState = null;
+        return;
+      }
       if (!drag) return;
       if (mode === 'markers') markerPointerUp(e);
       else if (isRoiMode()) seqPointerUp(e);
     };
     const onPointerMove = (e) => {
+      if (compact() && (mode === 'markers' || isRoiMode())) {
+        mPointerMove(e);
+        return;
+      }
       if (mode === 'markers') {
         if (imageOk) markerPointerMove(e);
       } else if (isRoiMode()) {
@@ -9580,13 +10570,26 @@ const App = (() => {
     },
     digit_model: {
       title: 'Digit model',
-      text: 'The AI model that reads each digit. Models are files on the SD card. No model is best everywhere, test a few and keep the one with the fewest wrong readings.',
+      text: 'The AI model that reads each digit. Test a few and keep the one with the fewest wrong readings.',
+      options: {
+        class100: ['class100', 'Value 0.0 to 9.9. Also reads a wheel between two numbers.'],
+        class11: ['class11', 'Digits 0 to 9 or N (not recognized). Smallest model.'],
+        cont: ['cont', 'Calculated value. Uncertain readings are rejected.'],
+      },
+      current: (g) => (/class100/i.test(g('digit_model')) ? 'class100' : /class11/i.test(g('digit_model')) ? 'class11' : /cont/i.test(g('digit_model')) ? 'cont' : ''),
       now: (g) => describeModel(g('digit_model')),
+      tip: 'Name, e.g. dig-class100_0182_s2_q: type, version 1.82, size s2 (s0 is the largest), q = quantized (smaller, faster).',
     },
     analog_model: {
       title: 'Analog model',
-      text: 'The AI model that reads each dial. Models are files on the SD card. Test a few and keep the one with the fewest wrong readings.',
+      text: 'The AI model that reads each dial. Test a few and keep the one with the fewest wrong readings.',
+      options: {
+        class100: ['class100', 'One of 100 pointer positions (0.0 to 9.9).'],
+        cont: ['cont', 'Pointer angle as a continuous value.'],
+      },
+      current: (g) => (/class100/i.test(g('analog_model')) ? 'class100' : /cont/i.test(g('analog_model')) ? 'cont' : ''),
       now: (g) => describeModel(g('analog_model')),
+      tip: 'Name, e.g. ana-class100_0201_s1_q: type, version 2.01, size s1, q = quantized (smaller, faster).',
     },
     digit_debug_saveroiimages: {
       title: 'Save ROI images',
@@ -9675,14 +10678,58 @@ const App = (() => {
     },
   };
 
+  // ---- model info (combo entries and the text below the field) -----------------------------------------
+  // What a model type does (from the firmware: ClassFlowCNNGeneral) and facts about the models that ship with the firmware.
+  // Release dates: first publication in the official repositories (jomjol, model changelogs); input size, classes and file size
+  // are read from the .tflite files. Models that are not listed here (own models) are described by their file name only.
+  const MODEL_TYPES = {
+    'dig-class100': { chip: '100', kind: 'Digit', classes: 100, how: 'Picks one of 100 classes (0.0 to 9.9): a digit with a decimal place, for wheels that are between two numbers.' },
+    'dig-class11': { chip: '11', kind: 'Digit', classes: 11, how: 'Picks one of 11 classes: the digits 0 to 9 or N (no digit recognized). Whole digits only.' },
+    'dig-cont': { chip: 'cont', kind: 'Digit', classes: 10, how: 'Calculates a continuous value from 10 outputs. A fit check rejects uncertain readings (CNN good threshold).' },
+    'ana-class100': { chip: '100', kind: 'Analog', classes: 100, how: 'Picks one of 100 pointer positions (0.0 to 9.9).' },
+    'ana-cont': { chip: 'cont', kind: 'Analog', classes: 2, how: 'Calculates the pointer angle from two outputs (sine and cosine): a continuous value.' },
+  };
+  const MODEL_CATALOG = {
+    'dig-class100_0182_s2_q': { date: '2025-12-29', input: '32 x 20', kb: 221, latest: true },
+    'dig-class11_2000_s2_q': { date: '2025-04-23', input: '32 x 20', kb: 95, latest: true },
+    'dig-cont_0900_s3_q': { date: '2025-04-06', input: '32 x 20', kb: 308, latest: true },
+    'ana-class100_0201_s1_q': { date: '2025-08-30', input: '32 x 32', kb: 130, latest: true },
+    'ana-class100_0171_s1_q': { date: '2023-12-22', input: '32 x 32', kb: 131 },
+    'ana-cont_1901_s0_q': { date: '2025-08-30', input: '32 x 32', kb: 183, latest: true },
+  };
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  function modelInfo(file) {
+    const name = String(file || '').toLowerCase().replace(/\.tflite$/, '');
+    if (!name) return null;
+    const norm = name.replace(/-/g, '_');
+    const m = /^(dig|ana)_(class100|class11|cont)_(\d{4})(?:_s(\d))?(_q)?$/.exec(norm);
+    const type = m ? `${m[1]}-${m[2]}` : '';
+    const t = MODEL_TYPES[type] || null;
+    const cat = (m && MODEL_CATALOG[`${type}_${m[3]}${m[4] ? `_s${m[4]}` : ''}${m[5] || ''}`]) || null; // old files use dashes: dig-class100-0182-s2-q
+    const version = m ? (parseInt(m[3], 10) / 100).toFixed(2) : '';
+    let released = '';
+    let age = '';
+    if (cat?.date) {
+      const d = new Date(cat.date + 'T00:00:00');
+      released = `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+      const months = Math.max(0, (new Date().getFullYear() - d.getFullYear()) * 12 + new Date().getMonth() - d.getMonth());
+      age = months < 1 ? 'this month' : months < 24 ? `${months} month${months === 1 ? '' : 's'} ago` : `${Math.floor(months / 12)} years ago`;
+    }
+    const quantized = !!(m && m[5]);
+    const facts = [];
+    if (version) facts.push(`v${version}`);
+    if (released) facts.push(`${released} (${age})`);
+    if (cat?.kb) facts.push(`${cat.kb} KB`);
+    if (cat?.input) facts.push(`input ${cat.input}`);
+    return { name, type, t, cat, version, released, age, quantized, chip: t ? t.chip : '?', sub: facts.join(' · ') };
+  }
+
   function describeModel(file) {
-    const f = String(file || '').toLowerCase();
-    if (!f) return '';
-    const parts = [];
-    if (f.includes('class100')) parts.push('A classification model that picks one of 100 values (0.0 to 9.9), which allows a decimal place on the last wheel or dial.');
-    else if (f.includes('cont')) parts.push('A continuous model that returns a fractional value directly, so transitions between numbers are smoother.');
-    if (/_q(\.|$)/.test(f)) parts.push('The q in the name usually marks a quantized model: smaller and faster.');
-    return parts.length ? 'Selected: ' + f.replace('.tflite', '') + '. ' + parts.join(' ') : 'Selected: ' + f.replace('.tflite', '') + '.';
+    const i = modelInfo(file);
+    if (!i) return '';
+    const status = i.cat ? (i.cat.latest ? 'Newest of its type in the official repositories.' : 'Older than the newest of its type.') : i.t ? 'No release date known.' : '';
+    return [`Selected: ${i.name}.`, i.sub ? `${i.sub}.` : '', status].filter(Boolean).join(' ');
   }
 
   const paramValue = (key) => (S ? valueOfId(S, key) : '');
@@ -9765,6 +10812,7 @@ const App = (() => {
           idx = 0;
         }
         if (idx >= 0) fld.el.selectedIndex = idx;
+        fld.modelCombo?.sync();
         break;
       }
       case 'info':
@@ -10780,11 +11828,13 @@ const App = (() => {
     list.hidden = true;
     combo.append(btn, list);
 
-    const content = (it, suffix = '') => {
+    const content = (it, suffix = '', withSub = false) => {
       const wrap = App.el('span', 'theme-opt');
       const lead = App.el('span', 'theme-opt-lead');
       lead.innerHTML = it.lead;
-      wrap.append(lead, App.el('span', 'theme-opt-name', it.label + suffix));
+      const name = App.el('span', 'theme-opt-name', it.label + suffix);
+      if (withSub && it.sub) name.append(App.el('small', 'theme-opt-sub', it.sub)); // second line (e.g. model facts)
+      wrap.append(lead, name);
       return wrap;
     };
     let active = -1;
@@ -10804,8 +11854,9 @@ const App = (() => {
       suffix: '',
       markSelected: true,
       sync() {
-        const cur = items[indexOfCurrent()];
-        btn.replaceChildren(content(cur, api.suffix), App.el('span', 'theme-combo-chev', '\u25BE'));
+        const found = items.findIndex((it) => String(it.value) === String(get()));
+        const cur = found < 0 && api.placeholder ? { lead: '', label: api.placeholder } : items[indexOfCurrent()];
+        btn.replaceChildren(content(cur, api.suffix, !!api.subInButton), App.el('span', 'theme-combo-chev', '\u25BE'));
         list.replaceChildren();
         items.forEach((it, i) => {
           const li = App.el('li', 'theme-combo-item');
@@ -10813,7 +11864,7 @@ const App = (() => {
           const selected = api.markSelected && String(it.value) === String(get());
           li.setAttribute('aria-selected', String(selected));
           li.classList.toggle('selected', selected);
-          li.append(content(it));
+          li.append(content(it, '', true));
           li.addEventListener('click', () => {
             close();
             btn.focus();
@@ -10878,6 +11929,34 @@ const App = (() => {
     sel.hidden = true;
     sel.after(combo.el);
     fld.meterCombo = combo;
+  }
+
+  // Model selection (Digit / Analog ROI processing): custom combo with the model type in front and the facts of the model
+  // (version, release date and age, size, input) as a second line. The native select stays as the form field.
+  function addModelCombo(s, id) {
+    const fld = s.byId[id];
+    if (!fld || fld.modelCombo) return;
+    const sel = fld.el;
+    const items = Array.from(sel.options).filter((o) => o.value).map((o) => {
+      const info = modelInfo(o.value);
+      return {
+        value: o.value,
+        label: stripExt(o.textContent),
+        lead: `<span class="model-chip" data-kind="${info?.t?.kind === 'Analog' ? 'ana' : 'dig'}">${info?.chip ?? '?'}</span>`,
+        sub: info?.sub || '',
+      };
+    });
+    const combo = createCombo(items, () => sel.value, (value) => {
+      sel.value = value;
+      sel.dispatchEvent(new Event('change', { bubbles: true })); // the form takes the change over (delta, save bar)
+      combo.sync();
+    });
+    combo.placeholder = 'Select a model';
+    combo.el.classList.add('is-wide', 'is-models');
+    sel.hidden = true;
+    sel.after(combo.el);
+    combo.sync();
+    fld.modelCombo = combo;
   }
 
   // Theme row (Setup > General > Meter Type & Theme): the main color of the interface follows the meter type (blue for generic).
@@ -11049,6 +12128,8 @@ const App = (() => {
     for (const def of SCHEMA.cards) cardEls[def.id] = buildCard(s, def);
     addThemeRow(cardEls.metertheme.querySelector('.cfg-body'));
     addMeterTypeCombo(s);
+    addModelCombo(s, 'digit_model');
+    addModelCombo(s, 'analog_model');
 
     for (const g of SCHEMA.groups) {
       const label = App.el('div', 'cfg-nav-group', g.label);
@@ -11103,6 +12184,8 @@ const App = (() => {
       setValue(fld, v !== undefined ? v : f.def);
     }
     s.byId.mqtt_homeassistant_metertype?.meterCombo?.sync();
+    s.byId.digit_model?.modelCombo?.sync();
+    s.byId.analog_model?.modelCombo?.sync();
     updatePinUsage(s);
     updateFlashMapping(s);
     attachHelpEvents(s);
@@ -11186,7 +12269,7 @@ const App = (() => {
     const optsHost = h.pop.querySelector('.cfg-hp-opts');
     optsHost.textContent = '';
     if (info.options) {
-      const cur = paramValue(h.key);
+      const cur = info.current ? info.current(paramValue) : paramValue(h.key); // `current`: help keys that are not the field value
       for (const [value, [name, desc]] of Object.entries(info.options)) {
         const row = App.el('div', 'cfg-hp-opt' + (value === cur ? ' cfg-current' : ''));
         row.append(App.el('b', '', name), App.el('span', '', desc));
@@ -11594,6 +12677,31 @@ const CycleMonitor = (() => {
     return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
   };
 
+  // Countdown / elapsed text of the current state (sidebar and dashboard use the same text); '' without a status
+  function timerText() {
+    if (!status) return '';
+    const drift = (performance.now() - fetchedAt) / 1000;
+    const paused = !!status.paused && status.autoStart;
+    const waiting = status.autoStart && !status.running && status.nextRunSeconds >= 0;
+    let timer;
+    if (status.running && status.cycleSeconds !== undefined) {
+      // Countdown: the duration of the last cycle (processTime) is the best estimate for this one
+      const elapsed = status.cycleSeconds + drift;
+      const left = status.processTime - elapsed;
+      timer = `running for ${formatSeconds(elapsed)}`;
+      if (status.processTime > 0) timer += left > 0 ? ` · about ${formatSeconds(Math.ceil(left))} left` : ' · finishing ...';
+    } else if (waiting) {
+      // Automatic mode: countdown to the next run instead of the idle time
+      timer = paused
+        ? `no automatic cycles · ${formatCountdown(status.nextRunSeconds)} left`
+        : `next run in ${formatCountdown(status.nextRunSeconds - drift)}`;
+    } else {
+      timer = `${status.running ? 'running for' : 'in this state for'} ${formatSeconds(status.stateSeconds + drift)}`;
+    }
+    if (status.running && paused) timer += ' · paused afterwards';
+    return timer;
+  }
+
   function render() {
     const panel = $('cycle-panel');
     if (!panel) return;
@@ -11636,22 +12744,7 @@ const CycleMonitor = (() => {
     if (stale && status.running) panel.dataset.kind = 'running';
 
     const drift = (performance.now() - fetchedAt) / 1000;
-    let timer;
-    if (status.running && status.cycleSeconds !== undefined) {
-      // Countdown: the duration of the last cycle (processTime) is the best estimate for this one
-      const elapsed = status.cycleSeconds + drift;
-      const left = status.processTime - elapsed;
-      timer = `running for ${formatSeconds(elapsed)}`;
-      if (status.processTime > 0) timer += left > 0 ? ` · about ${formatSeconds(Math.ceil(left))} left` : ' · finishing ...';
-    } else if (waiting) {
-      // Automatic mode: countdown to the next run instead of the idle time
-      timer = paused
-        ? `no automatic cycles · ${formatCountdown(status.nextRunSeconds)} left`
-        : `next run in ${formatCountdown(status.nextRunSeconds - drift)}`;
-    } else {
-      timer = `${status.running ? 'running for' : 'in this state for'} ${formatSeconds(status.stateSeconds + drift)}`;
-    }
-    if (status.running && paused) timer += ' · paused afterwards';
+    const timer = timerText();
     $('cycle-timer').textContent = stale ? `${timer} · device is busy` : timer;
 
     pauseBtn.hidden = !status.autoStart;
@@ -11720,6 +12813,7 @@ const CycleMonitor = (() => {
 
   return {
     last: () => status,
+    timerText: () => (stale && status ? `${timerText()} · device is busy` : timerText()),
     start() {
       $('cycle-start')?.addEventListener('click', start);
       $('cycle-pause')?.addEventListener('click', togglePause);

@@ -54,7 +54,7 @@ platformio run -e esp32cam            # RELEASE_VERSION=v2.4.0 builds .builds/AI
 
 WebUI without a device - the mock server (no dependencies except Python 3):
 ```
-python tools/webui/mock/mock_server.py            # serves sd-card/html on http://127.0.0.1:8099/
+python tools/webui/mock/mock_server.py            # serves sd-card/html on http://127.0.0.1:8099/ and in the LAN (prints the addresses)
 ```
 It answers the JSON endpoints with the data of a gas meter (blurred images), simulates a cycle of about 12 s for "Start cycle" including
 `/api/live` and a data log for the readings plot. **When you add or change an endpoint, update the mock too** (`api_status`, `api_live`,
@@ -76,6 +76,9 @@ Single page app, hash routes, no framework. Read `docs/WebUI/README.md`. Key par
   `GET /api/live`, falls back to a replay when the firmware has no `/api/live`).
 - Setup (schema driven, `SCHEMA`), Configuration editor (image, markers, digits, analog), wizard, file explorer, backup/restore, v16 import
   (`LegacyImport`).
+Configuration editor on phones (max-width 860 px): an extra control layer (`.m-only`: sequence bar, region chips, pad with jog, steppers) drives the same
+functions as the desktop fields (`onValueManualChanged`, `markerValueChanged`, ...); the desktop cards are hidden by `.m-hide`. On a phone the canvas moves the
+selected region by dragging instead of drawing it. Desktop is untouched. Design proof: `tools/webui/mock/poc/config-digits-mobile.html`.
 Conventions: no emojis, no inline handlers, ids/classes carry the view prefix (`dash-`, `rec-`, `setup-`, `cfg-`, `sys-`), tokens in
 `:root` (light/dark) in `style.css`, mobile breakpoint 860 px (menu) / 1156 px (dashboard layout).
 
@@ -91,10 +94,17 @@ Conventions: no emojis, no inline handlers, ids/classes carry the view prefix (`
   shift by `dx`, `dy`. Raw image `/img_tmp/raw.jpg` lives in RAM (about 190 KB PSRAM).
 - The ESP32 is busy while it processes: HTTP answers can take seconds. The WebUI therefore keeps the last state and treats a missing answer
   as "busy" (never as "not supported"); do not poll faster than every 1 to 2 s and keep one request in flight.
-- `max_uri_handlers` is 44 (`webserver.cpp`); a new endpoint may need a higher value.
+- `max_uri_handlers` is 50 (`webserver.cpp`); a new endpoint may need a higher value.
+- Optional MCP server (`code/components/mcp_ctrl`, docs `docs/API/REST/mcp.md`): `POST /mcp` JSON-RPC with a bearer token (device-generated,
+  only the SHA-256 hash lives in NVS namespace `mcp`, survives reboot), switched on under System > MCP. The tools call the device's own
+  REST endpoints over loopback from a worker task (the request is detached with `httpd_req_async_handler_begin`, otherwise the single web server
+  task would deadlock). When a REST endpoint changes, check the tool of the same name. The mock simulates it (`/mcp`, `/api/mcp`).
+  mbedTLS 4: hashing goes through PSA (`psa_hash_compute`), `mbedtls/sha256.h` is not public any more.
 - Secrets (WLAN, MQTT passwords) live in NVS (`parseSecretParameter`); the v16 migration (`configLegacyIni.cpp`) copies them.
-- Open questions: the confidence values are derived from the model outputs and saturate at 100 % on a well-read meter (calibration not
-  verified); analog ROIs of the live view are only tested with the mock.
+- Confidence: the class100 models (`dig-class100*`, `ana-class100*`) end with a fully connected layer **without softmax** (checked in the
+  .tflite files), their outputs are raw logits. The confidence therefore applies a softmax first (`ClassFlowCNNGeneral.cpp`); the earlier
+  sum of the raw outputs gave 0 % for digits and 100 % for analog. `dig-class11` and `dig-cont` have a softmax. Not yet verified on a device.
+- Open questions: analog ROIs of the live view are only tested with the mock.
 
 ## Releasing (only when the owner asks)
 

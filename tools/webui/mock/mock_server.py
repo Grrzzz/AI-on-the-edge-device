@@ -1,7 +1,7 @@
 """Mock of the device HTTP API to try the WebUI without a device (data of a gas meter, blurred images).
 
-Usage: python tools/webui/mock/mock_server.py [html_dir] [port]   (default: sd-card/html, port 8099)
-Open http://127.0.0.1:8099/ - "Start cycle" simulates a cycle of about 12 s incl. /api/live.
+Usage: python tools/webui/mock/mock_server.py [html_dir] [port] [host]   (default: sd-card/html, port 8099, host 0.0.0.0 = also reachable in the LAN)
+Open http://127.0.0.1:8099/ (or http://<IPv4 of this computer>:8099/ from a phone in the same network) - "Start cycle" simulates a cycle of about 12 s incl. /api/live.
 """
 import json, sys, os, time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -11,6 +11,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, '..', '..', '..'))
 ROOT = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1] else os.path.join(REPO, 'sd-card', 'html')
 PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 8099
+HOST = sys.argv[3] if len(sys.argv) > 3 else os.environ.get('MOCK_HOST', '0.0.0.0')  # 127.0.0.1: this computer only
 START = time.time()
 STATE = {"fallback": "46107.499"}
 import json as _json
@@ -58,6 +59,7 @@ IMG = b"""<svg xmlns='http://www.w3.org/2000/svg' width='800' height='560' viewB
 
 INFO = {
     "hostname": "gasmeter", "board_type": "esp32cam", "firmware_version": "v2.3.0-Grrzzz Mock", "html_version": "v2.3.0-Grrzzz Mock",
+    "mqtt_status": "Connected",  # dashboard badge (the full /info list below has the same service states)
 }
 CONFIG = {"webui": {"autorefresh": {"dashboard": {"enabled": True, "refreshtime": 5}}}, "mqtt": {"enabled": True, "homeassistant": {"discoveryenabled": True}}}
 
@@ -142,6 +144,8 @@ def api_status():
     now = time.time()
     running = CYCLE["t0"] and now - CYCLE["t0"] < 12.5
     if CYCLE["t0"] and not running:  # cycle finished
+        global LAST_OK
+        LAST_OK = now
         CYCLE["t0"] = 0.0
         CYCLE["idle_since"] = now
         if CYCLE["queued"]:
@@ -163,6 +167,10 @@ def api_status():
     if not CYCLE["paused"]:
         CYCLE["frozen"] = 0
     left = 300 - (CYCLE["frozen"] if CYCLE["paused"] else waited)
+    if left <= 0 and not CYCLE["paused"]:  # the countdown is over: the device starts the next cycle by itself
+        CYCLE["n"] += 1
+        CYCLE["t0"] = now
+        return api_status()
     return {"api_name": "status:v1", "state": "Idle - Waiting For Autostart", "stateCode": 7, "stateSeconds": waited,
             "cycle": CYCLE["n"], "autoStart": True, "running": False, "cycleStart": "ready", "processInterval": 5.0, "processTime": 12, "cycleSeconds": 0,
             "uptime": int(now - START) + 35, "error": 0, "nextRunSeconds": max(0, left), "paused": CYCLE["paused"],
@@ -266,7 +274,10 @@ FS = {
     "/": [("config", True, 0), ("html", True, 0), ("log", True, 0)],
     "/config": [("models", True, 0), ("certs", True, 0), ("config.json", False, 9800), ("reference.jpg", False, 54200),
                 ("marker1.jpg", False, 1100), ("marker2.jpg", False, 1000)],
-    "/config/models": [("dig-class100_0182_s2_q.tflite", False, 412000), ("ana-class100_0201_s1_q.tflite", False, 398000)],
+    "/config/models": [("ana-class100_0171_s1_q.tflite", False, 133784), ("ana-class100_0201_s1_q.tflite", False, 133504),
+                       ("ana-cont_1901_s0_q.tflite", False, 187792), ("dig-class100_0182_s2_q.tflite", False, 226656),
+                       ("dig-class11_2000_s2_q.tflite", False, 97192), ("dig-cont_0900_s3_q.tflite", False, 315544),
+                       ("dig-own-meter_q.tflite", False, 120000)],
     "/config/certs": [],
     "/html": [("index.html", False, 14500), ("style-iframe.css", False, 31000), ("global.js", False, 30500)],
     "/log": [("message", True, 0), ("data", True, 0)],
@@ -314,6 +325,146 @@ def fs_page(dirpath):
     marker = '      <!-- The the remaining part of body is injected by firmware (server_file.cpp) -->'
     return tpl.replace(marker, marker + body, 1)
 
+
+# ---- MCP (optional server on the device): token handling like the firmware, a subset of the tools ---------
+import hashlib as _hashlib, secrets as _secrets, base64 as _b64
+MCP = {"enabled": False, "allowSystem": False, "hash": ""}
+
+
+def mcp_state(token=None):
+    d = {"ok": True, "enabled": MCP["enabled"], "allowSystem": MCP["allowSystem"], "tokenSet": bool(MCP["hash"]), "endpoint": "/mcp"}
+    if token:
+        d["token"] = token
+    return d
+
+
+def mcp_api(method, body):
+    """GET/POST /api/mcp: state, on/off, system actions, new token (returned once, only its hash is kept)"""
+    if method == "GET":
+        return 200, mcp_state()
+    try:
+        data = json.loads(body.decode() or "{}")
+    except Exception:
+        return 400, {"ok": False, "message": "Body must be a JSON object"}
+    token = None
+    if isinstance(data.get("enabled"), bool):
+        MCP["enabled"] = data["enabled"]
+    if isinstance(data.get("allowSystem"), bool):
+        MCP["allowSystem"] = data["allowSystem"]
+    if data.get("regenerate") is True or (MCP["enabled"] and not MCP["hash"]):
+        token = _secrets.token_hex(32)
+        MCP["hash"] = _hashlib.sha256(token.encode()).hexdigest()
+    return 200, mcp_state(token)
+
+
+MCP_TOOLS = [
+    ("get_status", "State of the device and the process.", {}, []),
+    ("get_live", "Progress of the running cycle.", {}, []),
+    ("get_recognition", "Result of the last cycle: regions with value, confidence and rectangle, plus the alignment.", {}, []),
+    ("get_config", "The configuration as JSON, optionally one section.", {"section": {"type": "string"}}, []),
+    ("get_fallback", "Fallback value of a number sequence.", {"sequence": {"type": "string"}}, []),
+    ("get_log", "The last lines of the device log.", {"lines": {"type": "integer"}}, []),
+    ("list_files", "Lists a folder of the SD card.", {"path": {"type": "string"}}, []),
+    ("get_image", "Returns an image: reference, alg, alg_roi, raw or markerN.", {"name": {"type": "string"}}, ["name"]),
+    ("save_config", "Changes configuration parameters (partial configuration).", {"config": {"type": "object"}, "apply": {"type": "boolean"}}, ["config"]),
+    ("start_cycle", "Starts a cycle now.", {}, []),
+    ("set_paused", "Pauses or resumes the countdown.", {"paused": {"type": "boolean"}}, ["paused"]),
+    ("set_fallback", "Sets the fallback value.", {"sequence": {"type": "string"}, "value": {"type": "number"}}, ["value"]),
+    ("cut_marker", "Cuts an area out of an image (alignment marker).", {"out": {"type": "string"}, "x": {"type": "integer"}, "y": {"type": "integer"}, "dx": {"type": "integer"}, "dy": {"type": "integer"}}, ["out", "x", "y", "dx", "dy"]),
+    ("copy_file", "Copies a file on the SD card.", {"in": {"type": "string"}, "out": {"type": "string"}}, ["in", "out"]),
+    ("delete_file", "Deletes a file. System action.", {"path": {"type": "string"}}, ["path"]),
+    ("reboot", "Restarts the device. System action.", {}, []),
+]
+MCP_SYSTEM = {"delete_file", "reboot"}
+
+
+def mcp_text(t, err=False):
+    return {"content": [{"type": "text", "text": t}], "isError": err}
+
+
+def mcp_call(name, args):
+    if name in MCP_SYSTEM and not MCP["allowSystem"]:
+        return mcp_text("System actions are disabled. Switch on 'System actions' on the MCP page (System > MCP).", True)
+    if name == "get_status":
+        return mcp_text(json.dumps(api_status()))
+    if name == "get_live":
+        return mcp_text(json.dumps(api_live()))
+    if name == "get_recognition":
+        return mcp_text(json.dumps(api_recognition()))
+    if name == "get_config":
+        cfg = build_config()
+        sec = args.get("section")
+        return mcp_text(json.dumps(cfg.get(sec) if sec else cfg)) if not sec or sec in cfg else mcp_text("Section '%s' not found" % sec, True)
+    if name == "get_fallback":
+        return mcp_text(json.dumps({"ok": True, "sequence": args.get("sequence", "main"), "value": STATE["fallback"]}))
+    if name == "get_log":
+        return mcp_text("[00:00:12] 2026-11-09 10:00:00 <INF> [MAIN] Mock log line")
+    if name == "list_files":
+        return mcp_text(json.dumps({"path": args.get("path", "/"), "entries": []}))
+    if name == "get_image":
+        files = {"reference": "reference.jpg", "alg": "alg.jpg", "alg_roi": "alg_roi.jpg", "raw": "raw.jpg", "marker1": "marker1.jpg", "marker2": "marker2.jpg"}
+        f = files.get(args.get("name", ""))
+        path = os.path.join(HERE, "assets", f) if f else None
+        if not path or not os.path.exists(path):
+            return mcp_text("Unknown image. Use reference, alg, alg_roi, raw or marker1, marker2, ...", True)
+        data = open(path, "rb").read()
+        return {"content": [{"type": "image", "mimeType": "image/jpeg", "data": _b64.b64encode(data).decode()},
+                            {"type": "text", "text": "JPEG image, %d bytes" % len(data)}], "isError": False}
+    if name == "start_cycle":
+        c, d = api_post("/api/cycle", b"{}")
+        return mcp_text(json.dumps(d), c >= 400)
+    if name == "set_paused":
+        c, d = api_post("/api/cycle", json.dumps({"paused": bool(args.get("paused", True))}).encode())
+        return mcp_text(json.dumps(d), c >= 400)
+    if name == "set_fallback":
+        c, d = api_post("/api/fallback", json.dumps({"sequence": args.get("sequence", "main"), "value": args.get("value")}).encode())
+        return mcp_text(json.dumps(d), c >= 400)
+    if name == "save_config":
+        if api_status()["running"]:
+            return mcp_text("A cycle is running. Wait until it has finished (get_status: running=false) and try again.", True)
+        STATE.setdefault("posts", []).append(json.dumps(args.get("config"))[:4000])
+        return mcp_text("Configuration saved (mock: not applied to the shown configuration).")
+    if name in ("cut_marker", "copy_file"):
+        return mcp_text(json.dumps({"ok": True, "code": "001", "message": "Done (mock)"}))
+    if name in ("delete_file", "reboot"):
+        return mcp_text("Done (mock: nothing happened).")
+    return mcp_text("Unknown tool", True)
+
+
+def mcp_rpc(body, headers):
+    """POST /mcp (JSON-RPC). returns (http code, payload or None)"""
+    if not MCP["enabled"]:
+        return 404, "Not found"
+    auth = headers.get("Authorization", "")
+    ok = auth.startswith("Bearer ") and MCP["hash"] and _secrets.compare_digest(_hashlib.sha256(auth[7:].encode()).hexdigest(), MCP["hash"])
+    if not ok:
+        return 401, {"error": "Access token missing or wrong"}
+    try:
+        msg = json.loads(body.decode())
+    except Exception:
+        return 400, {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}}
+    if "id" not in msg or "method" not in msg:
+        return 202, None
+    mid, method, params = msg["id"], msg["method"], msg.get("params") or {}
+
+    def result(r):
+        return 200, {"jsonrpc": "2.0", "id": mid, "result": r}
+    if method == "initialize":
+        pv = params.get("protocolVersion")
+        return result({"protocolVersion": pv if pv in ("2025-03-26", "2024-11-05", "2025-06-18") else "2025-06-18",
+                       "capabilities": {"tools": {"listChanged": False}}, "serverInfo": {"name": "ai-on-the-edge", "version": "1.0 (mock)"}})
+    if method == "ping":
+        return result({})
+    if method == "tools/list":
+        return result({"tools": [{"name": n, "description": d + (" (disabled: 'System actions' is off on the MCP page)" if n in MCP_SYSTEM and not MCP["allowSystem"] else ""),
+                                  "inputSchema": {"type": "object", "properties": p, "required": r}} for n, d, p, r in MCP_TOOLS]})
+    if method == "tools/call":
+        if params.get("name") not in [t[0] for t in MCP_TOOLS]:
+            return 200, {"jsonrpc": "2.0", "id": mid, "error": {"code": -32602, "message": "Unknown tool"}}
+        return result(mcp_call(params["name"], params.get("arguments") or {}))
+    return 200, {"jsonrpc": "2.0", "id": mid, "error": {"code": -32601, "message": "Method not found"}}
+
+
 class H(SimpleHTTPRequestHandler):
     def __init__(self, *a, **k):
         super().__init__(*a, directory=ROOT, **k)
@@ -340,6 +491,17 @@ class H(SimpleHTTPRequestHandler):
         if u.path.startswith("/ota/"):
             time.sleep(1.5)
             return self._send("success: package staged", "text/plain")
+        if u.path == "/mcp":
+            code, payload = mcp_rpc(body, self.headers)
+            if payload is None:
+                self.send_response(202)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            return self._send(payload, code=code)
+        if u.path == "/api/mcp":
+            code, payload = mcp_api("POST", body)
+            return self._send(payload, code=code)
         if u.path.startswith("/api/"):
             code, payload = api_post(u.path, body)
             return self._send(payload, code=code)
@@ -368,6 +530,16 @@ class H(SimpleHTTPRequestHandler):
         u = urlparse(self.path)
         q = parse_qs(u.query)
         p = u.path
+        if p.startswith("/poc/") and ".." not in p:  # design proofs of concept (not part of the firmware package)
+            f = os.path.join(HERE, "poc", p[len("/poc/"):])
+            if os.path.isfile(f):
+                return self._send(open(f, "rb").read(), "text/html; charset=utf-8" if f.endswith(".html") else "application/octet-stream")
+            return self._send("Not found", "text/plain", 404)
+        if p == "/api/mcp":
+            code, payload = mcp_api("GET", b"")
+            return self._send(payload, code=code)
+        if p == "/mcp":
+            return self._send({"error": "POST only"}, code=405 if MCP["enabled"] else 404)
         if p == "/info" and "type" in q:
             return self._send(INFO.get(q["type"][0], "?"), "text/plain")
         if p == "/info":
@@ -416,9 +588,13 @@ class H(SimpleHTTPRequestHandler):
                 STATE["fallback"] = q["value"][0]
             return self._send(STATE["fallback"], "text/plain")
         if p == "/process_data":
+            # the reading advances with every cycle that was started here (shows the rolling counter in the dashboard)
+            # while a cycle runs, the new value only appears after it has finished
+            done = CYCLE["n"] - 842 - (1 if CYCLE["t0"] else 0)
+            val = "%.3f" % (46107.499 + 0.017 * max(0, done))
             return self._send({
-                "actual_value": {"main": "46107.499"}, "fallback_value": {"main": STATE["fallback"]},
-                "raw_value": {"main": "46107.499"}, "value_status": {"main": "000 Valid"},
+                "actual_value": {"main": val}, "fallback_value": {"main": STATE["fallback"]},
+                "raw_value": {"main": val}, "value_status": {"main": "000 Valid"},
                 "timestamp_fallbackvalue": {"main": "2026-11-05T12:21:57"},
                 "process_state": "[" + time.strftime("%H:%M:%S") + "] " + api_status()["state"], "process_error": 0,
                 "device_uptime": int(time.time() - START) + 35, "cycle_counter": 2, "wlan_rssi": -36})
@@ -427,7 +603,9 @@ class H(SimpleHTTPRequestHandler):
         if False:
             return self._send(MARKER_SVG, "image/svg+xml")
         if p.startswith("/fileserver/config/models/") and "list_dir" in u.query:
-            return self._send({"files": ["dig-class100_0182_s2_q.tflite", "dig-cont_0570_s3.tflite", "ana-class100_0201_s1_q.tflite", "ana-cont_1300_s2.tflite"], "folders": []})
+            return self._send({"files": ["ana-class100_0171_s1_q.tflite", "ana-class100_0201_s1_q.tflite", "ana-cont_1901_s0_q.tflite",
+                                         "dig-class100_0182_s2_q.tflite", "dig-class11_2000_s2_q.tflite", "dig-cont_0900_s3_q.tflite",
+                                         "dig-own-meter_q.tflite"], "folders": []})
         if p.startswith("/fileserver/config/certs/") and "list_dir" in u.query:
             return self._send({"files": ["ca.pem", "client.crt", "client.key"], "folders": []})
         if p == "/ota" and q.get("task") == ["selfupdate"]:
@@ -524,4 +702,27 @@ class H(SimpleHTTPRequestHandler):
         super().end_headers()
 
 
-ThreadingHTTPServer(("127.0.0.1", PORT), H).serve_forever()
+def _lan_addresses():
+    """IPv4 addresses of this computer (for the start message)"""
+    import socket
+    found = set()
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            if not info[4][0].startswith("127."):
+                found.add(info[4][0])
+    except OSError:
+        pass
+    try:  # the address that would be used to reach the LAN
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sck:
+            sck.connect(("192.0.2.1", 9))
+            found.add(sck.getsockname()[0])
+    except OSError:
+        pass
+    return sorted(found)
+
+
+print("Mock server: http://127.0.0.1:%d/" % PORT, flush=True)
+if HOST in ("0.0.0.0", ""):
+    for a in _lan_addresses():
+        print("             http://%s:%d/   (LAN)" % (a, PORT), flush=True)
+ThreadingHTTPServer((HOST, PORT), H).serve_forever()

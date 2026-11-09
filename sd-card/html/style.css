@@ -1570,6 +1570,67 @@ dialog.dlg::backdrop {
   margin-top: 14px;
 }
 
+/* copy button: green with a check mark right after copying */
+.button.is-copied {
+  background: color-mix(in srgb, var(--success) 16%, transparent);
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.btn-states {
+  display: inline-grid;
+  justify-items: center;
+}
+
+.btn-states > span {
+  grid-area: 1 / 1;
+  visibility: hidden;
+  white-space: nowrap;
+}
+
+.btn-states[data-state='label'] > [data-s='label'],
+.btn-states[data-state='ok'] > [data-s='ok'],
+.btn-states[data-state='fail'] > [data-s='fail'] {
+  visibility: visible;
+}
+
+.button .copy-check {
+  width: 14px;
+  height: 14px;
+  margin-right: 5px;
+  vertical-align: -2px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* token dialog: the secret value with copy buttons */
+.dlg-code {
+  display: block;
+  margin: 4px 0 12px;
+  padding: 9px 11px;
+  border-radius: 0.5rem;
+  background: var(--surface);
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.dlg-copies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dlg-copies .button {
+  width: auto;
+  padding: 6px 12px;
+}
+
 .dlg-actions {
   display: flex;
   justify-content: flex-end;
@@ -3222,6 +3283,155 @@ a .rst-content .admonition-title {
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+}
+
+/* a changed wheel rolls forward from the old to the new digit */
+.dash .dash-wheel.is-rolling {
+  align-items: flex-start;
+  overflow: hidden;
+}
+
+.dash .dash-wheel-strip {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  animation: dash-wheel-roll 1s cubic-bezier(0.45, 0, 0.2, 1) both;
+}
+
+.dash .dash-wheel-strip > span {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  height: 1.28em;
+}
+
+@keyframes dash-wheel-roll {
+  from { transform: translateY(0); }
+  to { transform: translateY(calc(-100% * var(--steps) / (var(--steps) + 1))); }
+}
+
+/* the dashboard is out of date (tab was in the background) and loads again */
+/* countdown pill in the process state card (same text as the sidebar) */
+.dash .dash-state-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.dash .dash-pill {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.dash .dash-pill[hidden] {
+  display: none;
+}
+
+.dash .dash-pill[data-kind='running'] {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.dash .dash-pill[data-kind='paused'] {
+  background: color-mix(in srgb, var(--warning) 18%, transparent);
+  color: var(--warning);
+}
+
+.dash-sync {
+  display: none;
+  flex: none;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  animation: dash-updating 1.2s ease-in-out infinite;
+}
+
+.dash.is-syncing .dash-sync {
+  display: inline-block;
+}
+
+.dash-syncbar {
+  position: relative;
+  height: 3px;
+  margin: 0 0 8px;
+  overflow: hidden;
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+
+.dash.is-syncing .dash-syncbar {
+  opacity: 1;
+}
+
+.dash-syncbar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 35%;
+  border-radius: 2px;
+  background: var(--primary);
+  animation: dash-syncbar 1.1s ease-in-out infinite;
+}
+
+@keyframes dash-syncbar {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
+}
+
+.dash .dash-side,
+.dash .dash-image,
+.dash .dash-row,
+.dash .dash-activity {
+  transition: opacity 0.3s, filter 0.3s;
+}
+
+.dash.is-syncing .dash-side,
+.dash.is-syncing .dash-image,
+.dash.is-syncing .dash-row,
+.dash.is-syncing .dash-activity {
+  opacity: 0.5;
+  filter: blur(1.5px);
+}
+
+/* image card while loading: no spinner icon in the corner, a shimmer instead */
+.dash.is-syncing .dash-img.is-loading {
+  visibility: hidden;
+}
+
+.dash.is-syncing .dash-image::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.14) 50%, transparent 70%);
+  background-size: 250% 100%;
+  animation: dash-shimmer 1.3s linear infinite;
+}
+
+@keyframes dash-shimmer {
+  from { background-position: 150% 0; }
+  to { background-position: -50% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash .dash-wheel-strip { animation: none; transform: translateY(calc(-100% * var(--steps) / (var(--steps) + 1))); }
 }
 
 .dash .dash-wheel-red {
@@ -5510,13 +5720,176 @@ a .rst-content .admonition-title {
 
 /* the list opens over the following cards */
 [data-card="metertheme"],
-[data-card="metertheme"] .card-body {
+[data-card="metertheme"] .card-body,
+[data-card="digit"],
+[data-card="digit"] .card-body,
+[data-card="analog"],
+[data-card="analog"] .card-body {
   overflow: visible;
 }
 
-[data-card="metertheme"] {
+[data-card="metertheme"],
+[data-card="digit"],
+[data-card="analog"] {
   position: relative;
   z-index: 5;
+}
+
+/* MCP page (System > MCP): uses the cards and rows of the Setup */
+.sys-mcp .mcp-note,
+.sys-mcp .mcp-hint {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.sys-mcp .mcp-note,
+.sys-mcp .mcp-step,
+.sys-mcp .mcp-tools,
+.sys-mcp .cfg-body > .mcp-hint {
+  padding-inline: 14px;
+}
+
+.sys-mcp .mcp-note {
+  padding-block: 4px 10px;
+}
+
+.sys-mcp .cfg-body > .mcp-hint {
+  padding-block: 4px;
+}
+
+.sys-mcp .cfg-ctl {
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+/* a switch that is not available (system actions while the server is off) is greyed out, also when it is on */
+.sys-mcp .cfg-switch-wrap:has(input:disabled),
+.sys-mcp .cfg-switch-wrap:has(input:disabled) + .mcp-hint {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sys-mcp .cfg-switch input:disabled,
+.sys-mcp .cfg-switch input:disabled + span {
+  cursor: not-allowed;
+}
+
+.sys-mcp .mcp-step {
+  padding-block: 8px;
+}
+
+.sys-mcp .mcp-step + .mcp-step {
+  border-top: 1px solid var(--border);
+}
+
+.sys-mcp .mcp-step-title {
+  margin-bottom: 6px;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.sys-mcp .mcp-snippet {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.sys-mcp .mcp-snippet .button {
+  flex: none;
+  width: auto;
+  padding: 6px 12px;
+  white-space: nowrap;
+}
+
+.sys-mcp .mcp-code {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: 0.5rem;
+  background: var(--surface);
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.sys-mcp .mcp-pre {
+  white-space: pre-wrap;
+}
+
+.sys-mcp .mcp-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-block: 4px 8px;
+}
+
+.sys-mcp .mcp-tools > div {
+  display: grid;
+  grid-template-columns: 70px 1fr;
+  gap: 10px;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.sys-mcp .mcp-tools span {
+  color: var(--text-secondary);
+}
+
+/* the card with the open list is above the cards after it */
+[data-card]:has(.theme-combo-btn[aria-expanded='true']) {
+  z-index: 30;
+}
+
+/* model combo: type chip in front, facts of the model as a second line */
+.theme-combo.is-models {
+  max-width: 560px;
+}
+
+.theme-combo.is-models .theme-combo-list {
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.theme-opt-name {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow-wrap: anywhere;
+}
+
+.theme-opt-sub {
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  line-height: 1.3;
+}
+
+.model-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.model-chip[data-kind='ana'] {
+  background: color-mix(in srgb, var(--warning) 18%, transparent);
+  color: var(--warning);
+}
+
+.theme-opt-lead:has(.model-chip) {
+  width: auto;
+  min-width: 36px;
+  height: auto;
 }
 
 .theme-override {
@@ -5619,19 +5992,35 @@ a .rst-content .admonition-title {
   }
 }
 
-/* MQTT connection badge in the Wi-Fi card */
-.dash .stat-value .dash-mqtt {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
+/* Services card: one row per service with its state */
+.dash .dash-services {
+  display: flex;
+  flex-direction: column;
   gap: 6px;
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: var(--text-secondary);
+  margin-top: 4px;
 }
 
-.dash .stat-value .dash-mqtt[hidden] {
+.dash .dash-service {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.dash .dash-service[hidden],
+.dash .dash-service-none[hidden] {
   display: none;
+}
+
+.dash .dash-service .badge {
+  font-size: 0.72rem;
+}
+
+.dash .dash-service-none {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
 }
 
 /* hint for a newer release: info icon at the version, dot at the Update menu item (and at the closed System group) */
@@ -5845,31 +6234,96 @@ a .rst-content .admonition-title {
 }
 
 /* Configuration > Markers: recognition of the last cycle */
+/* Processing card (Configuration > Markers): rows with switches like in the Setup */
+.setup-proc {
+  margin-bottom: var(--card-gap);
+}
+
+.setup-proc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 16px;
+}
+
+.setup-proc-row + .setup-proc-row {
+  border-top: 1px solid var(--border);
+}
+
+.setup-proc-label {
+  color: var(--text-secondary);
+}
+
+.setup-proc .cfg-switch {
+  position: relative;
+  display: inline-block;
+  width: 42px;
+  height: 24px;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.setup-proc .cfg-switch input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.setup-proc .cfg-switch span {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--surface-hover);
+  transition: background var(--transition-speed);
+}
+
+.setup-proc .cfg-switch span::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform var(--transition-speed);
+}
+
+.setup-proc .cfg-switch input:checked + span {
+  background: var(--primary);
+}
+
+.setup-proc .cfg-switch input:checked + span::after {
+  transform: translateX(18px);
+}
+
+.setup-proc .cfg-switch input:focus-visible + span {
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.setup-proc .cfg-switch-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.setup-proc .cfg-switch-text {
+  min-width: 24px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
 .setup-marker-rec .card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-}
-
-.setup-rec-hint {
-  margin-bottom: 8px;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-}
-
-.setup-rec-align {
-  margin-bottom: 10px;
-  padding: 6px 10px;
-  border-radius: 0.5rem;
-  background: var(--surface);
-  font-size: 0.8rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.setup-rec-align.is-error {
-  background: color-mix(in srgb, var(--error) 14%, transparent);
-  color: var(--error);
 }
 
 .setup-marker-rec .rec-roi-grid.is-digit {
@@ -5901,4 +6355,568 @@ a.nav-item,
 a.nav-sub-item {
   text-decoration: none;
   box-sizing: border-box;
+}
+
+/* ========================================================================== */
+/* Configuration on a phone: one flat page. The image stays in view while the */
+/* controls below it are used. Desktop is untouched (.m-only is hidden).      */
+/* ========================================================================== */
+.m-only {
+  display: none;
+}
+
+@media screen and (max-width: 860px) {
+  .setup [hidden] {
+    display: none !important;
+  }
+
+  .setup .m-only {
+    display: block;
+  }
+
+  /* the title, the description and the help text make room for the work area */
+  .setup .setup-header .container-title,
+  .setup .setup-header .page-sub,
+  .setup .setup-header .setup-desc {
+    display: none;
+  }
+
+  .setup .setup-header {
+    padding-bottom: 0;
+  }
+
+  .setup .setup-tabs {
+    margin-top: 0;
+  }
+
+  .setup .m-hide {
+    display: none !important;
+  }
+
+  /* tabs: four equal columns, always one row */
+  .setup .setup-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    width: 100%;
+    margin-top: 10px;
+    box-sizing: border-box;
+  }
+
+  .setup .setup-tab {
+    justify-content: center;
+    gap: 4px;
+    padding: 9px 2px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  .setup .setup-tab-count {
+    min-width: 16px;
+    padding: 0 5px;
+    font-size: 0.66rem;
+  }
+
+  /* the page is one column of cards in a fixed order */
+  .setup .editor-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .setup .setup-main,
+  .setup .editor-side,
+  .setup [data-ref='panelRoi'],
+  .setup [data-ref='panelMarkers'] {
+    display: contents;
+  }
+
+  .setup .setup-imgcard { order: 1; }
+  .setup [data-ref='panelImage'] { order: 2; }
+  .setup .setup-roibar { order: 3; }
+  .setup .setup-pair { order: 4; }
+  .setup .setup-roicard,
+  .setup .setup-markercard { order: 5; }
+  .setup .setup-proc { order: 6; margin-bottom: 0; }
+  .setup .setup-marker-rec { order: 7; }
+
+  /* the image (with the sequence bar) stays at the top while the controls are used */
+  .setup:not([data-mode='image']) .setup-imgcard {
+    position: sticky;
+    top: 6px;
+    z-index: 6;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
+  }
+
+  .setup:not([data-mode='image']) .setup-imgcard > .card-header {
+    display: none;
+  }
+
+  .setup .canvas-wrap {
+    min-height: 0;
+    padding: 0 6px 6px;
+  }
+
+  .setup .setup-seqbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .setup .setup-seqbar select {
+    flex: 1;
+    min-width: 0;
+    height: 38px;
+    font-weight: 600;
+  }
+
+  .setup .m-icon {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 0;
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text-main);
+    cursor: pointer;
+  }
+
+  .setup .m-icon svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .setup .m-icon:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  .setup .m-icon.m-danger {
+    color: var(--error);
+  }
+
+  /* region bar: chips | new, copy, delete */
+  .setup .setup-roibar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .setup .m-chips {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    gap: 8px;
+    padding: 2px 0 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .setup .m-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .setup .m-roiact {
+    display: flex;
+    flex: none;
+    gap: 6px;
+  }
+
+  .setup .m-chip {
+    position: relative;
+    flex: none;
+    min-width: 50px;
+    height: 40px;
+    padding: 0 14px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg-card);
+    color: var(--text-main);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    transition: transform 0.16s, box-shadow 0.16s;
+  }
+
+  .setup .m-chip.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+  }
+
+  .setup .m-chip.dragging {
+    z-index: 3;
+    transition: box-shadow 0.16s;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+    cursor: grabbing;
+  }
+
+  /* Position | Size */
+  .setup .setup-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .setup .m-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    padding: 10px;
+  }
+
+  .setup .m-title {
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .setup .m-dpad {
+    position: relative;
+    width: 132px;
+    height: 132px;
+    margin: 0 auto;
+    border-radius: 50%;
+    background: var(--surface);
+  }
+
+  .setup .m-key {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-main);
+    cursor: pointer;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: background 0.12s, color 0.12s;
+  }
+
+  .setup .m-key:active {
+    background: var(--primary-soft);
+    color: var(--primary);
+  }
+
+  .setup .m-key svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    pointer-events: none;
+  }
+
+  .setup .m-key.up { top: 3px; left: 45px; }
+  .setup .m-key.down { bottom: 3px; left: 45px; }
+  .setup .m-key.left { left: 3px; top: 45px; }
+  .setup .m-key.right { right: 3px; top: 45px; }
+
+  .setup .m-key.mid {
+    inset: 40px;
+    width: auto;
+    height: auto;
+    background: var(--bg-card);
+    cursor: grab;
+    touch-action: none;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+    transition: transform 0.18s cubic-bezier(0.3, 1.4, 0.5, 1), box-shadow 0.15s, background 0.15s;
+  }
+
+  .setup .m-key.mid svg {
+    width: 22px;
+    height: 22px;
+    stroke-width: 2.2;
+  }
+
+  .setup .m-key.mid.active {
+    cursor: grabbing;
+    transition: box-shadow 0.15s, background 0.15s;
+    background: var(--primary-soft);
+    color: var(--primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  }
+
+  .setup .m-moveby {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .setup .m-moveby small {
+    color: var(--text-secondary);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-align: center;
+    text-transform: uppercase;
+  }
+
+  .setup .m-seg {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    padding: 3px;
+    border-radius: 10px;
+    background: var(--surface);
+  }
+
+  .setup .m-seg button {
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .setup .m-seg button.active {
+    background: var(--primary);
+    color: #fff;
+  }
+
+  .setup .m-steppers {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .setup .m-stepper {
+    display: grid;
+    grid-template-columns: 38px 1fr 38px;
+    align-items: center;
+    border-radius: 12px;
+    background: var(--surface);
+  }
+
+  .setup .m-stepper button {
+    height: 56px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-main);
+    font-size: 1.3rem;
+    font-weight: 600;
+    cursor: pointer;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .setup .m-stepper button:active {
+    color: var(--primary);
+  }
+
+  .setup .m-stepval {
+    text-align: center;
+    line-height: 1.1;
+  }
+
+  .setup .m-stepval small {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .setup .m-stepval input {
+    width: 100%;
+    height: auto;
+    box-sizing: border-box;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+    color: var(--text-main);
+    font: inherit;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    -moz-appearance: textfield;
+  }
+
+  .setup .m-stepval input::-webkit-outer-spin-button,
+  .setup .m-stepval input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .setup .m-stepval input:focus {
+    outline: none;
+    box-shadow: none;
+    color: var(--primary);
+  }
+
+  /* options: the lock list of the region card as a flat card with switches */
+  .setup .setup-roicard > .card-header {
+    display: none;
+  }
+
+  .setup .setup-roicard .side-body {
+    gap: 8px;
+    padding: 10px 12px 12px;
+  }
+
+  .setup .setup-roicard .side-body::before {
+    content: 'Options';
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .setup .setup-lock-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 12px;
+  }
+
+  .setup .setup-lock-list .check {
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  .setup .setup-lock-list .check:has(.setup-space-input) {
+    grid-column: 1 / -1;
+  }
+
+  .setup .setup-lock-list .check input[type='checkbox'] {
+    -webkit-appearance: none;
+    appearance: none;
+    position: relative;
+    flex: none;
+    width: 44px;
+    height: 26px;
+    margin: 0;
+    border-radius: 999px;
+    background: var(--surface-hover);
+    cursor: pointer;
+    transition: background var(--transition-speed);
+  }
+
+  .setup .setup-lock-list .check input[type='checkbox']::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    transition: transform var(--transition-speed);
+  }
+
+  .setup .setup-lock-list .check input[type='checkbox']:checked {
+    background: var(--primary);
+  }
+
+  .setup .setup-lock-list .check input[type='checkbox']:checked::after {
+    transform: translateX(18px);
+  }
+
+  .setup .setup-lock-list .check input[type='checkbox']:disabled {
+    opacity: 0.45;
+  }
+
+  /* marker card: the image and the histogram stay, the fields are replaced by the pad and steppers */
+  .setup .setup-markercard .side-body {
+    gap: 10px;
+    padding: 10px 12px 12px;
+  }
+
+  /* Image tab: the parameter table as stacked rows */
+  .setup .setup-param-scroll {
+    overflow-x: visible;
+    padding: 0 8px 8px;
+  }
+
+  .setup .setup-cam-table,
+  .setup .setup-cam-table tbody {
+    display: block;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .setup .setup-cam-table colgroup {
+    display: none;
+  }
+
+  .setup .setup-cam-table tr {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 36%) minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .setup .setup-cam-table td {
+    height: auto;
+    min-height: 44px;
+    border-top: 1px solid var(--border);
+  }
+
+  .setup .setup-cam-table tr:first-child td:nth-child(-n + 3) {
+    border-top: 0;
+  }
+
+  .setup .setup-cam-table tr + tr td {
+    border-top: 1px solid var(--border);
+  }
+
+  .setup .setup-cam-table td > span {
+    font-size: 0.84rem;
+  }
+
+  .setup[data-mode='image'] .setup-imgcard > .card-header,
+  .setup [data-ref='panelImage'] .card-header {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .setup[data-mode='image'] .setup-imgcard > .card-header > span {
+    flex: 1 1 100%;
+  }
+
+  .setup .setup-header-actions {
+    width: 100%;
+  }
+
+  .setup .setup-header-actions .button {
+    flex: 1;
+  }
 }

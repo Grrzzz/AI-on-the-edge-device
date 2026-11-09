@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Configuration - mobile PoC</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  /* PoC: the Digits tab of the Configuration, built for a phone. Only the design tokens of the real UI (style.css) are reused. */
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--text-main); font-family: var(--font); overflow: hidden; }
+  .poc { height: 100dvh; display: flex; flex-direction: column; max-width: 640px; margin: 0 auto; background: var(--bg); }
+
+  /* top bar */
+  .p-top { flex: none; display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--bg-card); border-bottom: 1px solid var(--border); }
+  .p-top h1 { flex: 1; margin: 0; font-size: 1.05rem; font-weight: 700; }
+  .p-icon { width: 40px; height: 40px; border: 0; border-radius: 10px; background: var(--surface); color: var(--text-main); display: grid; place-items: center; cursor: pointer; flex: none; }
+  .p-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .p-icon:disabled { opacity: 0.4; cursor: default; }
+  .p-icon.sm { width: 36px; height: 36px; border-radius: 9px; }
+  .p-icon.sm svg { width: 18px; height: 18px; }
+  .p-icon.danger { color: var(--error); }
+  .p-save { height: 40px; padding: 0 16px; border: 0; border-radius: 10px; background: var(--primary); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+  .p-save:disabled { background: var(--surface); color: var(--text-secondary); cursor: default; }
+
+  /* tabs: four equal columns, always one row */
+  .p-tabs { flex: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 8px 12px; background: var(--bg-card); }
+  .p-tab { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 7px 2px 6px; border: 0; border-radius: 10px; background: transparent; color: var(--text-secondary); font: inherit; font-size: 0.74rem; font-weight: 600; cursor: pointer; }
+  .p-tab svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .p-tab.active { background: var(--primary-soft); color: var(--primary); }
+  .p-tab .p-count { position: absolute; top: 3px; right: calc(50% - 26px); min-width: 16px; padding: 0 4px; border-radius: 999px; background: var(--primary); color: #fff; font-size: 0.64rem; line-height: 16px; text-align: center; }
+  .p-tab .p-count.off { background: var(--surface); color: var(--text-secondary); }
+
+  /* image: always visible while editing */
+  .p-stage { flex: 1 1 0; min-height: 150px; position: relative; background: #111; }
+  .p-stage #cv { touch-action: none; cursor: pointer; display: block; width: 100%; height: 100%; object-fit: contain; }
+  .p-stage-tools { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; }
+  .p-pill { height: 32px; padding: 0 12px; border: 0; border-radius: 999px; background: rgba(255,255,255,0.92); color: #111827; font: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
+  .p-pill.on { background: var(--primary); color: #fff; }
+  .p-stage-label { position: absolute; left: 8px; bottom: 8px; padding: 3px 10px; border-radius: 999px; background: rgba(0,0,0,0.6); color: #fff; font-size: 0.76rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* editor: scrolls on its own, the image stays */
+  .p-sheet { flex: none; padding: 10px 12px calc(12px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 10px; }
+  .p-sheet > * { flex: none; }
+  .p-chips { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x proximity; padding: 2px 0 4px; margin: 0 -12px; padding-inline: 12px; scrollbar-width: none; }
+  .p-chips::-webkit-scrollbar { display: none; }
+  .p-chip { flex: none; scroll-snap-align: center; min-width: 52px; height: 40px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-card); color: var(--text-main); font: inherit; font-weight: 600; cursor: pointer; }
+  .p-chip { position: relative; transition: transform 0.16s, box-shadow 0.16s; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  .p-chip.dragging { z-index: 3; transition: box-shadow 0.16s; box-shadow: 0 8px 18px rgba(0,0,0,0.28); cursor: grabbing; }
+  .p-chips.sorting { scroll-snap-type: none; }
+  .p-chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .p-chip.add { color: var(--primary); border-style: dashed; }
+  .p-chip.changed::after { content: ''; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--warning); vertical-align: middle; }
+
+  .p-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--card-radius); padding: 12px; }
+  .p-card h2 { margin: 0 0 10px; font-size: 0.74rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; }
+  .p-move { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; }
+
+  /* direction pad: one round control with a target in the middle */
+  .p-dpad { position: relative; width: 132px; height: 132px; border-radius: 50%; background: var(--surface); }
+  .p-key { position: absolute; width: 42px; height: 42px; border: 0; border-radius: 50%; background: transparent; color: var(--text-main); display: grid; place-items: center; cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; transition: background 0.12s, color 0.12s; }
+  .p-key:active { background: var(--primary-soft); color: var(--primary); }
+  .p-key svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; }
+  .p-key.up { top: 3px; left: 45px; } .p-key.down { bottom: 3px; left: 45px; } .p-key.left { left: 3px; top: 45px; } .p-key.right { right: 3px; top: 45px; }
+  .p-key.mid { inset: 40px; width: auto; height: auto; background: var(--bg-card); cursor: grab; touch-action: none; box-shadow: 0 2px 6px rgba(0,0,0,0.18); transition: transform 0.18s cubic-bezier(0.3, 1.4, 0.5, 1), box-shadow 0.15s, background 0.15s; will-change: transform; }
+  .p-key.mid.active { cursor: grabbing; transition: box-shadow 0.15s, background 0.15s; background: var(--primary-soft); color: var(--primary); box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
+  .p-key.mid svg { width: 22px; height: 22px; stroke-width: 2.2; pointer-events: none; }
+  .p-key.mid:active { background: var(--bg-card); }
+  .p-key.mid.active:active { background: var(--primary-soft); }
+
+  .p-seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 3px; border-radius: 10px; background: var(--surface); }
+  .p-seg button { height: 32px; border: 0; border-radius: 8px; background: transparent; color: var(--text-secondary); font: inherit; font-weight: 600; cursor: pointer; }
+  .p-seg button.active { background: var(--primary); color: #fff; }
+
+  .p-swwrap { display: inline-flex; align-items: center; gap: 8px; }
+  /* number sequence: one flat bar above the image */
+  .p-seqbar { flex: none; display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--bg-card); border-bottom: 1px solid var(--border); }
+  .p-seqbar select { flex: 1; min-width: 0; height: 36px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--input-radius); background: var(--bg-card); color: var(--text-main); font: inherit; font-weight: 600; }
+
+  /* position: pad with move by | region preview | toggles, in one row */
+  .p-pos h2 { margin-bottom: 8px; }
+  .p-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: stretch; }
+  .p-pair .p-card { padding: 10px; display: flex; flex-direction: column; min-width: 0; }
+  .p-size .p-sizecol { flex: 1; justify-content: center; }
+  .p-size .p-stepper { grid-template-columns: 38px 1fr 38px; }
+  .p-size .p-stepper button { height: 56px; }
+  .p-size .p-stepper small { font-size: 0.62rem; }
+  .p-sizecol { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .p-opt.wide { grid-column: 1 / -1; flex-wrap: wrap; }
+  .p-optcard h2 { margin-bottom: 8px; }
+  .p-roibar { display: flex; align-items: center; gap: 8px; }
+  .p-roibar .p-chips { flex: 1; min-width: 0; margin: 0; padding-inline: 0; }
+  .p-roiact { display: flex; gap: 6px; flex: none; }
+  .p-padcol { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 132px; margin: 0 auto; }
+  .p-moveby { display: flex; flex-direction: column; gap: 3px; }
+  .p-moveby small { color: var(--text-secondary); font-size: 0.62rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; text-align: center; }
+  .p-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .p-opt { display: flex; align-items: center; gap: 8px; font-size: 0.74rem; font-weight: 600; line-height: 1.25; cursor: pointer; }
+  .p-togs { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; width: 104px; }
+  .p-tog { display: flex; flex-direction: column; gap: 4px; font-size: 0.7rem; font-weight: 600; line-height: 1.25; cursor: pointer; }
+  .p-num { width: 46px; height: 30px; box-sizing: border-box; padding: 0 4px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text-main); font: inherit; font-size: 0.85rem; text-align: center; }
+  .p-num:focus { outline: none; border-color: var(--primary); }
+  .p-swtext { min-width: 26px; color: var(--text-secondary); font-size: 0.82rem; font-weight: 600; }
+
+  /* size */
+  .p-size { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .p-stepper { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; border-radius: 12px; background: var(--surface); }
+  .p-stepper button { height: 44px; border: 0; background: transparent; color: var(--text-main); font-size: 1.3rem; font-weight: 600; cursor: pointer; touch-action: manipulation; user-select: none; }
+  .p-stepper button:active { color: var(--primary); }
+  .p-stepper div { text-align: center; line-height: 1.1; }
+  .p-stepper small { display: block; color: var(--text-secondary); font-size: 0.66rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .p-stepper b { font-variant-numeric: tabular-nums; font-size: 1rem; }
+
+  .p-stepper input.p-stepval { width: 100%; height: auto; box-sizing: border-box; padding: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; color: var(--text-main); font: inherit; font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; -moz-appearance: textfield; }
+  .p-stepval::-webkit-outer-spin-button, .p-stepval::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .p-stepper input.p-stepval:focus { outline: none; box-shadow: none; color: var(--primary); }
+
+  .p-btn { height: 44px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); color: var(--text-main); font: inherit; font-weight: 600; cursor: pointer; }
+  .p-btn.danger { color: var(--error); }
+  .p-btn:disabled { opacity: 0.45; cursor: default; }
+
+  /* collapsible sections */
+  .p-acc summary { list-style: none; display: flex; align-items: center; justify-content: space-between; min-height: 44px; cursor: pointer; font-weight: 600; }
+  .p-acc summary::-webkit-details-marker { display: none; }
+  .p-acc summary svg { width: 18px; height: 18px; fill: none; stroke: var(--text-secondary); stroke-width: 2.2; transition: transform 0.2s; }
+  .p-acc[open] summary svg { transform: rotate(180deg); }
+  .p-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; border-top: 1px solid var(--border); }
+  .p-row select { height: 44px; max-width: 60%; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--input-radius); background: var(--bg-card); color: var(--text-main); font: inherit; }
+  .p-sw { position: relative; display: block; width: 44px; height: 26px; flex: none; }
+  .p-sw input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  .p-sw span { position: absolute; inset: 0; border-radius: 999px; background: var(--border); transition: background 0.2s; pointer-events: none; }
+  .p-sw span::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform 0.2s; }
+  .p-sw input:checked + span { background: var(--primary); }
+  .p-sw input:checked + span::after { transform: translateX(18px); }
+
+  .p-dlg { width: min(86vw, 340px); padding: 18px; border: 0; border-radius: 16px; background: var(--bg-card); color: var(--text-main); box-shadow: 0 12px 40px rgba(0,0,0,0.3); }
+  .p-dlg::backdrop { background: rgba(15,23,42,0.45); }
+  .p-dlg h3 { margin: 0 0 6px; font-size: 1.05rem; }
+  .p-dlg p { margin: 0 0 12px; color: var(--text-secondary); font-size: 0.86rem; line-height: 1.4; }
+  .p-dlg p:empty { display: none; }
+  .p-dlg input { width: 100%; box-sizing: border-box; height: 44px; margin-bottom: 14px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--input-radius); background: var(--bg-card); color: var(--text-main); font: inherit; }
+  .p-dlg input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+  .p-dlg-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .p-btn.p-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .p-btn.p-primary.danger { background: var(--error); border-color: var(--error); color: #fff; }
+  .p-toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translate(-50%, 20px); padding: 10px 16px; border-radius: 999px; background: #111827; color: #fff; font-size: 0.84rem; opacity: 0; pointer-events: none; transition: 0.25s; z-index: 10; }
+  .p-toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .p-note { color: var(--text-secondary); font-size: 0.76rem; line-height: 1.4; text-align: center; padding: 2px 8px; }
+</style>
+</head>
+<body>
+<div class="poc">
+  <header class="p-top">
+    <button class="p-icon" id="menu" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <h1>Configuration</h1>
+    <button class="p-icon" id="undo" aria-label="Undo" disabled><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
+    <button class="p-save" id="save" disabled>Save</button>
+  </header>
+
+  <nav class="p-tabs" role="tablist" aria-label="Configuration sections">
+    <button class="p-tab" role="tab" data-tab="image"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg>Image</button>
+    <button class="p-tab" role="tab" data-tab="markers"><svg viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><circle cx="12" cy="12" r="3"/></svg>Markers<span class="p-count">2</span></button>
+    <button class="p-tab active" role="tab" aria-selected="true" data-tab="digit"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="16" rx="1.5"/><rect x="14" y="4" width="6" height="16" rx="1.5"/></svg>Digits<span class="p-count" id="digitCount">8</span></button>
+    <button class="p-tab" role="tab" data-tab="analog"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 12l4-4"/></svg>Analog<span class="p-count off">off</span></button>
+  </nav>
+
+  <div class="p-seqbar">
+    <select id="seq" aria-label="Number sequence"></select>
+    <button class="p-icon sm" id="seqNew" aria-label="New sequence" title="New"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button class="p-icon sm" id="seqRename" aria-label="Rename sequence" title="Rename"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg></button>
+    <button class="p-icon sm danger" id="seqDelete" aria-label="Delete sequence" title="Delete"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg></button>
+  </div>
+
+  <div class="p-stage" id="stage">
+    <canvas id="cv" width="800" height="600"></canvas>
+    <div class="p-stage-tools">
+      <button class="p-pill" id="zoom">Zoom to digit</button>
+    </div>
+    <div class="p-stage-label" id="label">-</div>
+  </div>
+
+  <main class="p-sheet" id="sheet">
+    <div class="p-roibar">
+      <div class="p-chips" id="chips" role="listbox" aria-label="Digit regions"></div>
+      <div class="p-roiact">
+        <button class="p-icon sm" id="roiNew" aria-label="New region" title="New region"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button class="p-icon sm" id="dup" aria-label="Copy region to the right" title="Copy to the right"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg></button>
+        <button class="p-icon sm danger" id="del" aria-label="Delete region" title="Delete region"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg></button>
+      </div>
+    </div>
+
+    <div class="p-pair">
+      <section class="p-card p-pos">
+        <h2><span>Position</span></h2>
+      <div class="p-padcol">
+        <div class="p-dpad">
+          <button class="p-key up" data-dx="0" data-dy="-1" aria-label="Up"><svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></button>
+          <button class="p-key left" data-dx="-1" data-dy="0" aria-label="Left"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+          <div class="p-key mid" id="jog" role="slider" aria-label="Jog: drag in any direction to move the region" tabindex="0"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg></div>
+          <button class="p-key right" data-dx="1" data-dy="0" aria-label="Right"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+          <button class="p-key down" data-dx="0" data-dy="1" aria-label="Down"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+        </div>
+        <div class="p-moveby">
+          <small>Move by</small>
+          <div class="p-seg" id="steps" role="group" aria-label="Step size"><button data-step="1">1</button><button data-step="5">5</button><button data-step="10" class="active">10</button></div>
+        </div>
+      </div>
+      </section>
+
+      <section class="p-card p-size">
+        <h2><span>Size</span></h2>
+      <div class="p-sizecol">
+        <div class="p-stepper"><button data-dw="-1" aria-label="Narrower">−</button><div><small>Width</small><input class="p-stepval" id="wv" type="number" inputmode="numeric" aria-label="Width"></div><button data-dw="1" aria-label="Wider">+</button></div>
+        <div class="p-stepper"><button data-dh="-1" aria-label="Lower">−</button><div><small>Height</small><input class="p-stepval" id="hv" type="number" inputmode="numeric" aria-label="Height"></div><button data-dh="1" aria-label="Taller">+</button></div>
+      </div>
+      </section>
+    </div>
+
+    <section class="p-card p-optcard">
+      <h2><span>Options</span></h2>
+      <div class="p-opts">
+        <label class="p-opt" title="Lock aspect ratio"><span class="p-sw"><input type="checkbox" id="optLock"><span></span></span><span>Lock aspect ratio</span></label>
+        <label class="p-opt" title="Synchronize Y, width and height"><span class="p-sw"><input type="checkbox" id="optSync"><span></span></span><span>Sync Y, width and height</span></label>
+        <div class="p-opt wide" title="Keep spacing between all ROIs"><label class="p-sw"><input type="checkbox" id="optSpace" aria-label="Keep spacing between all ROIs"><span></span></label><span>Keep spacing of</span><input class="p-num" id="spaceVal" type="number" min="0" max="200" value="14" inputmode="numeric" aria-label="Spacing in pixels"><span>between all ROIs</span></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+<dialog class="p-dlg" id="dlg">
+  <form method="dialog">
+    <h3 id="dlgTitle"></h3>
+    <p id="dlgText"></p>
+    <input id="dlgInput" type="text" autocomplete="off" maxlength="30">
+    <div class="p-dlg-actions">
+      <button class="p-btn" value="cancel" id="dlgCancel">Cancel</button>
+      <button class="p-btn p-primary" value="ok" id="dlgOk">OK</button>
+    </div>
+  </form>
+</dialog>
+<div class="p-toast" id="toast"></div>
+
+<script>
+(() => {
+  // follow the theme of the real UI
+  try {
+    const mode = localStorage.getItem('theme');
+    const dark = mode === 'dark' || (mode !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.classList.toggle('dark', dark);
+    document.documentElement.classList.toggle('light', !dark);
+  } catch (e) { }
+
+  const $ = (id) => document.getElementById(id);
+  const W = 640, H = 480; // reference image
+  const cv = $('cv'), ctx = cv.getContext('2d');
+  let img = null, rois = [], orig = [], sel = 0, step = 10;
+  let view = { x: 0, y: 0, w: W, h: H }, target = null, zoomed = false;
+  const history = [];
+  const seqs = []; let cur = 0; // number sequences: every sequence has its own regions
+
+  const clone = (a) => a.map((r) => ({ ...r }));
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const toast = (t) => { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('show'), 1800); };
+
+  /* ---------------- data ---------------- */
+  async function load() {
+    const cfg = await (await fetch('/config')).json();
+    const list = cfg.digit?.sequence?.[0]?.roi || [];
+    rois = list.map((r, i) => ({ x: r.x, y: r.y, w: r.dx, h: r.dy, name: `dig${i + 1}` }));
+    orig = clone(rois);
+    seqs.push({ name: cfg.numbersequences?.sequence?.[0]?.sequencename || 'main', rois, orig });
+    syncSeq();
+    img = new Image();
+    img.onload = () => { draw(); };
+    img.src = '/fileserver/config/reference.jpg';
+    renderChips(); fill(); draw();
+  }
+
+  const changedCount = () => {
+    let n = Math.abs(rois.length - orig.length);
+    rois.forEach((r, i) => { const o = orig[i]; if (!o || o.x !== r.x || o.y !== r.y || o.w !== r.w || o.h !== r.h) n++; });
+    return n;
+  };
+  const isChanged = (i) => { const o = orig[i], r = rois[i]; return !o || o.x !== r.x || o.y !== r.y || o.w !== r.w || o.h !== r.h; };
+
+  function commit(fn) {
+    history.push(JSON.stringify(rois));
+    fn();
+    after();
+  }
+  function after() {
+    const n = changedCount();
+    $('save').disabled = n === 0;
+    $('save').textContent = n ? `Save (${n})` : 'Save';
+    $('undo').disabled = history.length === 0;
+    $('digitCount').textContent = rois.length;
+    renderChips(); fill(); draw();
+  }
+
+  /* ---------------- drawing ---------------- */
+  function fit() {
+    const k = Math.min(cv.width / view.w, cv.height / view.h);
+    return { k, ox: (cv.width - view.w * k) / 2, oy: (cv.height - view.h * k) / 2 };
+  }
+  const toScreen = (x, y) => { const f = fit(); return [f.ox + (x - view.x) * f.k, f.oy + (y - view.y) * f.k]; };
+  const toImage = (sx, sy) => { const f = fit(); return [view.x + (sx - f.ox) / f.k, view.y + (sy - f.oy) / f.k]; };
+
+  function draw() {
+    ctx.fillStyle = '#111'; ctx.fillRect(0, 0, cv.width, cv.height);
+    if (img && img.complete && img.naturalWidth) {
+      const f = fit();
+      ctx.drawImage(img, view.x * img.naturalWidth / W, view.y * img.naturalHeight / H, view.w * img.naturalWidth / W, view.h * img.naturalHeight / H,
+        f.ox, f.oy, view.w * f.k, view.h * f.k);
+    }
+    const f = fit();
+    const primary = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#2563eb';
+    rois.forEach((r, i) => {
+      const [sx, sy] = toScreen(r.x, r.y);
+      const w = r.w * f.k, h = r.h * f.k;
+      const on = i === sel;
+      ctx.lineWidth = on ? 3 : 1.5;
+      ctx.strokeStyle = on ? primary : 'rgba(255,255,255,0.75)';
+      ctx.fillStyle = on ? 'rgba(37,99,235,0.18)' : 'rgba(255,255,255,0.05)';
+      ctx.fillRect(sx, sy, w, h);
+      ctx.strokeRect(sx, sy, w, h);
+      if (!zoomed || on) {
+        ctx.font = `600 ${Math.max(11, Math.min(15, w * 0.45))}px system-ui, sans-serif`;
+        ctx.fillStyle = on ? primary : '#fff';
+        ctx.textAlign = 'center';
+        ctx.fillText(String(i + 1), sx + w / 2, sy - 5);
+      }
+    });
+    $('label').textContent = rois[sel] ? `${rois[sel].name}  ${rois[sel].x}, ${rois[sel].y}  ${rois[sel].w} x ${rois[sel].h}` : 'No region';
+  }
+
+
+  function animateTo(v) {
+    target = v;
+    cancelAnimationFrame(animateTo.raf);
+    const from = { ...view }, t0 = performance.now();
+    const tick = (now) => {
+      const t = clamp((now - t0) / 220, 0, 1), e = 1 - Math.pow(1 - t, 3);
+      for (const k of ['x', 'y', 'w', 'h']) view[k] = from[k] + (target[k] - from[k]) * e;
+      draw();
+      if (t < 1) animateTo.raf = requestAnimationFrame(tick);
+    };
+    animateTo.raf = requestAnimationFrame(tick);
+  }
+  function focusView() {
+    if (!zoomed || !rois[sel]) { animateTo({ x: 0, y: 0, w: W, h: H }); return; }
+    const r = rois[sel];
+    const w = clamp(Math.max(r.w * 5, 120), 120, W), h = w * 3 / 4;
+    animateTo({ x: clamp(r.x + r.w / 2 - w / 2, 0, W - w), y: clamp(r.y + r.h / 2 - h / 2, 0, H - h), w, h });
+  }
+
+  /* ---------------- UI ---------------- */
+  function renderChips() {
+    const box = $('chips');
+    box.textContent = '';
+    rois.forEach((r, i) => {
+      const b = document.createElement('button');
+      b.className = 'p-chip' + (i === sel ? ' active' : '') + (isChanged(i) ? ' changed' : '');
+      b.textContent = String(i + 1);
+      b.setAttribute('role', 'option');
+      b.setAttribute('aria-selected', String(i === sel));
+      b.onclick = () => select(i);
+      box.append(b);
+    });
+    const cur = box.children[sel]; // only the chip row scrolls: scrollIntoView would move the whole editor
+    if (cur) box.scrollTo({ left: cur.offsetLeft - (box.clientWidth - cur.offsetWidth) / 2, behavior: 'smooth' });
+  }
+  function fill() {
+    const r = rois[sel];
+    for (const [id, v] of [['wv', r?.w], ['hv', r?.h]]) $(id).value = r ? v : '';
+    $('del').disabled = $('dup').disabled = !r;
+  }
+  function select(i) { sel = clamp(i, 0, rois.length - 1); renderChips(); fill(); focusView(); draw(); }
+
+  function addRoi() {
+    commit(() => {
+      const last = rois[rois.length - 1] || { x: 100, y: 200, w: 24, h: 40 };
+      rois.push({ x: clamp(last.x + last.w + 6, 0, W - last.w), y: last.y, w: last.w, h: last.h, name: `dig${rois.length + 1}` });
+      sel = rois.length - 1;
+    });
+    focusView();
+  }
+
+  // Region options: lock the aspect ratio, change Y / width / height of all regions together, keep a fixed gap between regions
+  const opt = { lock: false, sync: false, space: false, gap: 14 };
+  let lockRatio = 1, ratioFor = -1;
+  function applyRules(i, b) { // b: the region before the change
+    const r = rois[i];
+    if (opt.lock) {
+      if (ratioFor !== i) { lockRatio = b.w / b.h; ratioFor = i; }
+      if (r.w !== b.w && r.h === b.h) r.h = clamp(Math.round(r.w / lockRatio), 4, H - r.y);
+      else if (r.h !== b.h && r.w === b.w) r.w = clamp(Math.round(r.h * lockRatio), 4, W - r.x);
+    }
+    if (opt.sync && (r.y !== b.y || r.w !== b.w || r.h !== b.h)) {
+      rois.forEach((q, j) => {
+        if (j === i) return;
+        q.w = clamp(q.w + (r.w - b.w), 4, W); q.h = clamp(q.h + (r.h - b.h), 4, H);
+        q.x = clamp(q.x, 0, W - q.w); q.y = clamp(q.y + (r.y - b.y), 0, H - q.h);
+      });
+    }
+    if (opt.space) respace(i + 1);
+  }
+  function respace(from) {
+    for (let j = Math.max(1, from); j < rois.length; j++) rois[j].x = clamp(rois[j - 1].x + rois[j - 1].w + opt.gap, 0, W - rois[j].w);
+  }
+  $('optLock').onchange = () => { opt.lock = $('optLock').checked; ratioFor = -1; };
+  $('optSync').onchange = () => { opt.sync = $('optSync').checked; };
+  $('optSpace').onchange = () => { opt.space = $('optSpace').checked; if (opt.space) { commit(() => respace(1)); } };
+  $('spaceVal').onchange = () => {
+    opt.gap = clamp(parseInt($('spaceVal').value, 10) || 0, 0, 200); $('spaceVal').value = opt.gap;
+    if (opt.space) commit(() => respace(1));
+  };
+
+  function move(dx, dy, dw, dh) {
+    const r = rois[sel];
+    if (!r) return;
+    commit(() => {
+      const b = { ...r };
+      r.w = clamp(r.w + dw, 4, W);
+      r.h = clamp(r.h + dh, 4, H);
+      r.x = clamp(r.x + dx, 0, W - r.w);
+      r.y = clamp(r.y + dy, 0, H - r.h);
+      applyRules(sel, b);
+    });
+    if (zoomed) focusView();
+  }
+
+  // buttons repeat while they are held (accelerating), one history entry per press
+  function holdRepeat(el, fn) {
+    let timer = null, delay = 380, pressed = false;
+    const stop = () => { pressed = false; clearTimeout(timer); };
+    const loop = () => { if (!pressed) return; fn(true); delay = Math.max(60, delay * 0.8); timer = setTimeout(loop, delay); };
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      pressed = true; delay = 380;
+      fn(false);
+      timer = setTimeout(loop, delay);
+    });
+    for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) el.addEventListener(ev, stop);
+  }
+  document.querySelectorAll('.p-key[data-dx]').forEach((b) => {
+    holdRepeat(b, (repeat) => {
+      if (repeat) history.pop(); // keep one undo step for a held key
+      move(Number(b.dataset.dx) * step, Number(b.dataset.dy) * step, 0, 0);
+    });
+  });
+  document.querySelectorAll('.p-stepper button').forEach((b) => {
+    holdRepeat(b, (repeat) => {
+      if (repeat) history.pop();
+      move(0, 0, Number(b.dataset.dw || 0), Number(b.dataset.dh || 0));
+    });
+  });
+  $('steps').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    step = Number(b.dataset.step);
+    $('steps').querySelectorAll('button').forEach((x) => x.classList.toggle('active', x === b));
+  });
+  for (const [id, key] of [['wv', 'w'], ['hv', 'h']]) {
+    $(id).addEventListener('change', () => {
+      const v = parseInt($(id).value, 10);
+      if (Number.isNaN(v)) { fill(); return; }
+      commit(() => { const b = { ...rois[sel] }; rois[sel][key] = v; rois[sel].w = clamp(rois[sel].w, 4, W); rois[sel].h = clamp(rois[sel].h, 4, H); rois[sel].x = clamp(rois[sel].x, 0, W - rois[sel].w); rois[sel].y = clamp(rois[sel].y, 0, H - rois[sel].h); applyRules(sel, b); });
+      if (zoomed) focusView();
+    });
+  }
+  $('roiNew').onclick = addRoi;
+  $('dup').onclick = () => {
+    commit(() => {
+      const r = rois[sel];
+      rois.splice(sel + 1, 0, { ...r, x: clamp(r.x + r.w + 6, 0, W - r.w), name: '' });
+      rois.forEach((q, i) => { q.name = `dig${i + 1}`; });
+      sel += 1;
+    });
+    focusView();
+  };
+  $('del').onclick = () => {
+    commit(() => { rois.splice(sel, 1); rois.forEach((q, i) => { q.name = `dig${i + 1}`; }); sel = clamp(sel, 0, rois.length - 1); });
+    focusView();
+  };
+  $('undo').onclick = () => {
+    const prev = history.pop();
+    if (prev) { rois = JSON.parse(prev); sel = clamp(sel, 0, Math.max(0, rois.length - 1)); after(); focusView(); }
+  };
+  $('save').onclick = () => {
+    orig = clone(rois); history.length = 0; after();
+    toast('Saved (PoC: nothing is sent to the device)');
+  };
+  $('zoom').onclick = () => {
+    zoomed = !zoomed;
+    $('zoom').classList.toggle('on', zoomed);
+    $('zoom').textContent = zoomed ? 'Show all' : 'Zoom to digit';
+    focusView();
+  };
+  document.querySelectorAll('.p-tab').forEach((t) => t.addEventListener('click', () => { if (t.dataset.tab !== 'digit') toast('Not part of this PoC: only the Digits tab'); }));
+  $('menu').onclick = () => toast('Opens the menu like in the app');
+
+  // Jog: the middle of the pad is a stick. Pull it in any direction: the region moves, the further the faster; it springs back on release.
+  (() => {
+    const jog = $('jog');
+    const MAXR = 34, DEAD = 0.1, SPEED = 90; // px of travel, dead zone (fraction), image px per second at full deflection
+    let st = null, timer = null;
+    const follow = () => {
+      if (!zoomed || !rois[sel]) return;
+      const r = rois[sel], w = view.w, h = view.h;
+      view = { x: clamp(r.x + r.w / 2 - w / 2, 0, W - w), y: clamp(r.y + r.h / 2 - h / 2, 0, H - h), w, h };
+    };
+    const tick = () => {
+      if (!st) return;
+      const now = performance.now();
+      const dt = Math.min(0.05, (now - st.t) / 1000); st.t = now;
+      const mag = Math.hypot(st.vx, st.vy), f = clamp(mag / MAXR, 0, 1);
+      if (f > DEAD && rois[sel]) {
+        const k = Math.pow((f - DEAD) / (1 - DEAD), 2) * SPEED * dt / mag;
+        st.ax += st.vx * k; st.ay += st.vy * k;
+        const mx = Math.trunc(st.ax), my = Math.trunc(st.ay);
+        if (mx || my) {
+          if (!st.moved) { st.moved = true; history.push(JSON.stringify(rois)); }
+          st.ax -= mx; st.ay -= my;
+          const r = rois[sel];
+          const b = { ...r };
+          r.x = clamp(r.x + mx, 0, W - r.w); r.y = clamp(r.y + my, 0, H - r.h);
+          applyRules(sel, b);
+          follow(); fill(); draw(); updateSave();
+        }
+      }
+    };
+    jog.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      try { jog.setPointerCapture(e.pointerId); } catch (err) { }
+      jog.classList.add('active');
+      st = { id: e.pointerId, x0: e.clientX, y0: e.clientY, vx: 0, vy: 0, ax: 0, ay: 0, t: performance.now(), moved: false };
+      timer = setInterval(tick, 16); // a timer instead of requestAnimationFrame: steady also while the page is not painted
+    });
+    jog.addEventListener('pointermove', (e) => {
+      if (!st || e.pointerId !== st.id) return;
+      let dx = e.clientX - st.x0, dy = e.clientY - st.y0;
+      const m = Math.hypot(dx, dy);
+      if (m > MAXR) { dx *= MAXR / m; dy *= MAXR / m; }
+      st.vx = dx; st.vy = dy;
+      jog.style.transform = `translate(${dx}px, ${dy}px)`;
+    });
+    const end = (e) => {
+      if (!st || e.pointerId !== st.id) return;
+      clearInterval(timer);
+      const moved = st.moved;
+      st = null;
+      jog.classList.remove('active');
+      jog.style.transform = '';
+      if (moved) { after(); if (zoomed) focusView(); }
+    };
+    jog.addEventListener('pointerup', end);
+    jog.addEventListener('pointercancel', end);
+    // keyboard: arrow keys nudge by one pixel
+    jog.addEventListener('keydown', (e) => {
+      const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+      if (d) { e.preventDefault(); move(d[0], d[1], 0, 0); }
+    });
+  })();
+
+  // The frame can be dragged in the image (finger or mouse). The size is changed only with the steppers and fields below.
+  let drag = null;
+  const canvasPoint = (e) => {
+    const b = cv.getBoundingClientRect();
+    // the canvas is shown with object-fit: contain: the picture may be smaller than the element and centered (bars at the sides)
+    const k = Math.min(b.width / cv.width, b.height / cv.height);
+    const ox = b.left + (b.width - cv.width * k) / 2, oy = b.top + (b.height - cv.height * k) / 2;
+    const sx = (e.clientX - ox) / k, sy = (e.clientY - oy) / k;
+    return { sx, sy, img: toImage(sx, sy) };
+  };
+  function hitTest(ix, iy) {
+    const tol = 8 * view.w / W; // generous touch tolerance
+    const inside = (r) => ix >= r.x - tol && ix <= r.x + r.w + tol && iy >= r.y - tol && iy <= r.y + r.h + tol;
+    if (rois[sel] && inside(rois[sel])) return sel; // the selected one wins where frames overlap
+    let best = -1, bestArea = Infinity;
+    rois.forEach((r, i) => { if (inside(r) && r.w * r.h < bestArea) { best = i; bestArea = r.w * r.h; } });
+    return best;
+  }
+  function updateSave() {
+    const n = changedCount();
+    $('save').disabled = n === 0;
+    $('save').textContent = n ? `Save (${n})` : 'Save';
+    $('undo').disabled = history.length === 0;
+  }
+  cv.addEventListener('pointerdown', (e) => {
+    const pt = canvasPoint(e);
+    const hit = hitTest(pt.img[0], pt.img[1]);
+    if (hit < 0) return;
+    if (hit !== sel) { sel = hit; renderChips(); fill(); draw(); }
+    const r = rois[sel];
+    drag = { id: e.pointerId, x0: pt.sx, y0: pt.sy, ox: r.x, oy: r.y, moved: false, k: fit().k };
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { }
+    cv.style.cursor = 'grabbing';
+  });
+  cv.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) {
+      if (!drag) { // hover: show that the frame can be moved
+        const pt = canvasPoint(e);
+        cv.style.cursor = hitTest(pt.img[0], pt.img[1]) >= 0 ? 'grab' : 'default';
+      }
+      return;
+    }
+    const pt = canvasPoint(e);
+    const dxp = (pt.sx - drag.x0) / drag.k, dyp = (pt.sy - drag.y0) / drag.k;
+    if (!drag.moved && Math.hypot(pt.sx - drag.x0, pt.sy - drag.y0) < 4) return; // a tap is not a move
+    if (!drag.moved) { drag.moved = true; history.push(JSON.stringify(rois)); } // one undo step per drag
+    const r = rois[sel];
+    const b = { ...r };
+    r.x = clamp(Math.round(drag.ox + dxp), 0, W - r.w);
+    r.y = clamp(Math.round(drag.oy + dyp), 0, H - r.h);
+    applyRules(sel, b);
+    fill(); draw(); updateSave();
+  });
+  const endDrag = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const moved = drag.moved;
+    drag = null;
+    cv.style.cursor = 'pointer';
+    if (moved) { after(); if (zoomed) focusView(); }
+  };
+  cv.addEventListener('pointerup', endDrag);
+  cv.addEventListener('pointercancel', endDrag);
+
+  /* ---------------- reorder the digits: drag a chip (touch: press and hold first) ---------------- */
+  (() => {
+    const box = $('chips');
+    const LONG = 260, GAP = 8;
+    let d = null, suppress = false, auto = null;
+    const chipOf = (t) => t.closest && t.closest('.p-chip');
+    // the new place: how many of the other chips have their middle left of the dragged chip's middle
+    const targetIndex = () => {
+      const c = d.rects[d.i], center = c.left + c.width / 2 + d.dx;
+      return clamp(d.rects.filter((r, k) => k !== d.i && r.left + r.width / 2 < center).length, 0, d.rects.length - 1);
+    };
+    const layout = () => {
+      const t = targetIndex(), w = d.rects[d.i].width + GAP;
+      [...box.children].forEach((c, j) => {
+        if (j === d.i) { c.style.transform = `translateX(${d.dx}px)`; return; }
+        let shift = 0;
+        if (d.i < t && j > d.i && j <= t) shift = -w;
+        else if (d.i > t && j < d.i && j >= t) shift = w;
+        c.style.transform = shift ? `translateX(${shift}px)` : '';
+      });
+    };
+    const activate = () => {
+      if (!d || d.active) return;
+      d.active = true;
+      d.rects = [...box.children].map((c) => ({ left: c.offsetLeft, width: c.offsetWidth }));
+      d.scroll0 = box.scrollLeft;
+      d.dx = 0;
+      d.chip.classList.add('dragging');
+      box.classList.add('sorting');
+      try { d.chip.setPointerCapture(d.id); } catch (e) { }
+      if (navigator.vibrate) navigator.vibrate(12);
+      auto = setInterval(() => { // near the edges the row scrolls on its own
+        if (!d || !d.active) return;
+        const b = box.getBoundingClientRect();
+        const v = d.x < b.left + 36 ? -9 : d.x > b.right - 36 ? 9 : 0;
+        if (v) { box.scrollLeft += v; d.dx = d.x - d.x0 + (box.scrollLeft - d.scroll0); layout(); }
+      }, 16);
+    };
+    const cleanup = () => {
+      if (d) clearTimeout(d.timer);
+      clearInterval(auto);
+      [...box.children].forEach((c) => { c.style.transform = ''; c.classList.remove('dragging'); });
+      box.classList.remove('sorting');
+      d = null;
+    };
+    box.addEventListener('pointerdown', (e) => {
+      const chip = chipOf(e.target);
+      if (!chip || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      d = { chip, i: [...box.children].indexOf(chip), id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, active: false, touch: e.pointerType !== 'mouse' };
+      if (d.touch) d.timer = setTimeout(activate, LONG); // touch: press and hold, otherwise the row scrolls
+    });
+    box.addEventListener('pointermove', (e) => {
+      if (!d || e.pointerId !== d.id) return;
+      d.x = e.clientX;
+      if (!d.active) {
+        const dist = Math.hypot(e.clientX - d.x0, e.clientY - d.y0);
+        if (d.touch && dist > 8) { cleanup(); return; } // the finger moved before the hold: it was a scroll
+        if (d.touch || dist <= 5) return;
+        activate();                                      // mouse: a small move is enough, and this move counts already
+      }
+      d.dx = e.clientX - d.x0 + (box.scrollLeft - d.scroll0);
+      layout();
+    });
+    const finish = (e) => {
+      if (!d || e.pointerId !== d.id) return;
+      if (!d.active) { cleanup(); return; }
+      const from = d.i, to = targetIndex();
+      cleanup();
+      suppress = true; setTimeout(() => { suppress = false; }, 0); // the click after a drag must not select
+      if (to !== from) {
+        commit(() => {
+          const [r] = rois.splice(from, 1);
+          rois.splice(to, 0, r);
+          rois.forEach((q, k) => { q.name = `dig${k + 1}`; });
+          sel = to;
+        });
+        if (zoomed) focusView();
+      }
+    };
+    box.addEventListener('pointerup', finish);
+    box.addEventListener('pointercancel', (e) => { if (d && e.pointerId === d.id) cleanup(); });
+    box.addEventListener('click', (e) => { if (suppress) { e.stopPropagation(); e.preventDefault(); } }, true);
+    // once the drag runs, the finger must not scroll the page or the row
+    box.addEventListener('touchmove', (e) => { if (d && d.active) e.preventDefault(); }, { passive: false });
+    box.addEventListener('contextmenu', (e) => { if (d) e.preventDefault(); }); // long press on touch screens
+  })();
+
+  /* ---------------- number sequences ---------------- */
+  function ask({ title, text = '', input = null, ok = 'OK', danger = false }) {
+    return new Promise((resolve) => {
+      const dlg = $('dlg');
+      $('dlgTitle').textContent = title;
+      $('dlgText').textContent = text;
+      $('dlgInput').hidden = input === null;
+      $('dlgInput').value = input ?? '';
+      $('dlgOk').textContent = ok;
+      $('dlgOk').classList.toggle('danger', danger);
+      // decide right when the button is pressed: the 'close' event alone can come late (or not at all in a page that is not painted)
+      let done = false;
+      const finish = (ok) => {
+        if (done) return;
+        done = true;
+        if (dlg.open) dlg.close();
+        resolve(ok ? (input === null ? true : $('dlgInput').value.trim()) : null);
+      };
+      $('dlgOk').onclick = (e) => { e.preventDefault(); finish(true); };
+      $('dlgCancel').onclick = (e) => { e.preventDefault(); finish(false); };
+      dlg.onclose = () => finish(false); // Esc
+      $('dlgInput').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); finish(true); } };
+      dlg.showModal();
+      if (input !== null) { $('dlgInput').focus(); $('dlgInput').select(); }
+    });
+  }
+  function syncSeq() {
+    const sel_ = $('seq');
+    sel_.textContent = '';
+    seqs.forEach((q, i) => sel_.append(new Option(q.name, String(i), false, i === cur)));
+    $('seqDelete').disabled = seqs.length <= 1;
+    $('seqDelete').style.opacity = seqs.length <= 1 ? '0.4' : '';
+  }
+  function switchSeq(i) {
+    seqs[cur].rois = rois; seqs[cur].orig = orig;
+    cur = i; rois = seqs[i].rois; orig = seqs[i].orig;
+    history.length = 0; sel = 0;
+    syncSeq(); after(); focusView();
+  }
+  const nameTaken = (n, except = -1) => seqs.some((q, i) => i !== except && q.name.toLowerCase() === n.toLowerCase());
+  $('seq').addEventListener('change', () => switchSeq(Number($('seq').value)));
+  $('seqNew').onclick = async () => {
+    const n = await ask({ title: 'New number sequence', text: 'A sequence reads one counter. It has its own digit and analog regions.', input: '', ok: 'Create' });
+    if (n === null) return;
+    if (!n || nameTaken(n)) { toast(n ? 'That name is already used' : 'Enter a name'); return; }
+    seqs[cur].rois = rois; seqs[cur].orig = orig;
+    seqs.push({ name: n, rois: [], orig: [] });
+    switchSeq(seqs.length - 1);
+    toast('Sequence created (PoC)');
+  };
+  $('seqRename').onclick = async () => {
+    const n = await ask({ title: 'Rename sequence', input: seqs[cur].name, ok: 'Rename' });
+    if (n === null || n === seqs[cur].name) return;
+    if (!n || nameTaken(n, cur)) { toast(n ? 'That name is already used' : 'Enter a name'); return; }
+    seqs[cur].name = n; syncSeq();
+  };
+  $('seqDelete').onclick = async () => {
+    if (seqs.length <= 1) return;
+    const ok = await ask({ title: `Delete "${seqs[cur].name}"?`, text: 'Its regions are deleted with it.', ok: 'Delete', danger: true });
+    if (!ok) return;
+    seqs.splice(cur, 1);
+    cur = Math.min(cur, seqs.length - 1);
+    rois = seqs[cur].rois; orig = seqs[cur].orig; history.length = 0; sel = 0;
+    syncSeq(); after(); focusView();
+  };
+
+  load();
+})();
+</script>
+</body>
+</html>
