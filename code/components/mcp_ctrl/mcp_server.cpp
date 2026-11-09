@@ -987,7 +987,12 @@ esp_err_t handlerMcp(httpd_req_t *req)
         return sendJsonStatus(req, "503 Service Unavailable", "{\"error\":\"Request could not be handled\"}");
     }
     auto *job = static_cast<McpJob *>(malloc(sizeof(McpJob)));
-    mcpBusy = true;
+    if (job) {
+        // the job must be complete before the task exists: the task may run on the other core at once
+        job->req = copy;
+        job->body = body;
+        mcpBusy = true;
+    }
     if (!job || xTaskCreate(mcpTask, "mcp", MCP_TASK_STACK, job, 5, nullptr) != pdPASS) {
         mcpBusy = false;
         free(body);
@@ -997,8 +1002,6 @@ esp_err_t handlerMcp(httpd_req_t *req)
         free(job);
         return ESP_OK;
     }
-    job->req = copy;
-    job->body = body;
     return ESP_OK;
 }
 
