@@ -854,7 +854,7 @@ void processRpc(const char *body, std::string &answer, int &status)
             version = pv->valuestring;
         }
         answer = rpcResult(id, "{\"protocolVersion\":\"" + version +
-                                   "\",\"capabilities\":{\"tools\":{\"listChanged\":false}},\"serverInfo\":{\"name\":\"ai-on-the-edge\",\"version\":\"1.0\"},"
+                                   "\",\"capabilities\":{\"tools\":{\"listChanged\":false}},\"serverInfo\":{\"name\":\"ai-on-the-edge\",\"version\":\"1.0-beta\"},"
                                    "\"instructions\":\"Tools of an AI-on-the-Edge meter reading device. Start with get_status and get_recognition. Alignment markers and "
                                    "regions of interest are in the configuration (get_config section imagealignment / numbersequences); get_image returns the pictures. "
                                    "The device is busy while a cycle runs: write tools are refused then.\"}");
