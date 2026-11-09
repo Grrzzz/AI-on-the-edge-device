@@ -50,7 +50,7 @@ Result of the last fully completed image recognition cycle as JSON (replaces the
 ```
 
 * `alignment` (last cycle, only if the raw image is available): the aligned image (`/img_tmp/alg.jpg`) is the raw image (`rawImage`) **rotated by `rotation` degrees around the image center (positive is clockwise) and then shifted by `dx`, `dy` pixels**. `rotation` is the initial rotation plus the correction of the alignment, `markers` are the reference markers in the aligned image. `ok: false`: the alignment failed
-* per ROI: `confidence` (0 to 100; 90 or more is `ok`, 60 or more `uncertain`, below that `low`; missing for models without a confidence) and `rect` (position and size in the aligned image, analog ROIs included)
+* per ROI: `confidence` (0 to 100; 90 or more is `ok`, 60 or more `uncertain`, below that `low`; missing for models without a confidence; for the class100 models, which end without softmax, the device applies a softmax to the outputs: probability of the winning class and its two neighbors on each side) and `rect` (position and size in the aligned image, analog ROIs included)
 * `/img_tmp/raw.jpg` is the raw camera image of the last cycle (kept in RAM, about 190 KB of PSRAM)
 
 See also [live](live.md) for the same data while the cycle is running.

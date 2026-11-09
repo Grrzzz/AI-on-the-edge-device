@@ -267,12 +267,23 @@ bool ClassFlowCNNGeneral::doInvokeCnn(const std::string time)
 
                     int num = tflite->getOutClassification();
                     {
-                        // Confidence: probability of the winning class and its direct neighbors (the 100 classes are fine steps)
+                        // Confidence: probability of the winning class and its direct neighbors (the 100 classes are fine steps).
+                        // The class100 models end without softmax: the outputs are raw logits, not probabilities (a sum over
+                        // the logits gave 0 % for the digits and 100 % for the analog models). Softmax is applied here.
+                        const int numClasses = 100;
+                        float maxLogit = tflite->getOutputValue(num);
+                        float total = 0.0f;
                         float mass = 0.0f;
-                        for (int k = -2; k <= 2; k++) {
-                            mass += tflite->getOutputValue((num + k + 100) % 100);
+                        for (int i = 0; i < numClasses; i++) {
+                            const float e = expf(tflite->getOutputValue(i) - maxLogit);
+                            total += e;
+                            for (int k = -2; k <= 2; k++) {
+                                if (i == (num + k + numClasses) % numClasses) {
+                                    mass += e;
+                                }
+                            }
                         }
-                        roi->confidencePct = std::clamp((int)lroundf(mass * 100.0f), 0, 100);
+                        roi->confidencePct = total > 0.0f ? std::clamp((int)lroundf(mass / total * 100.0f), 0, 100) : 0;
                     }
                     roi->CNNResult = roi->param->ccw ? (100 - num) % 100 : num;
                     roi->CNNResult = std::clamp(roi->CNNResult, 0, 99);
