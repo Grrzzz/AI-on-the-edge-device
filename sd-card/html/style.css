@@ -4314,58 +4314,6 @@ a .rst-content .admonition-title {
 }
 
 /* camera / flashlight parameter table */
-.setup-param-scroll {
-  overflow-x: auto;
-  padding: 0 12px 12px;
-}
-
-.setup-cam-table {
-  width: 100%;
-  min-width: 640px;
-  table-layout: fixed;
-  border-collapse: collapse;
-}
-
-.setup-cam-table td {
-  height: 46px;
-  padding: 4px 6px;
-}
-
-.setup-cam-table tr + tr td {
-  border-top: 1px solid var(--border);
-}
-
-.setup-cam-table td > span {
-  color: var(--text-secondary);
-}
-
-.setup-cam-table td:has(.tooltip-trigger) {
-  text-align: right;
-  padding-right: 5px;
-}
-
-.setup-cam-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.setup-cam-field output {
-  min-width: 36px;
-  text-align: right;
-  flex-shrink: 0;
-  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
-  font-size: 0.85rem;
-}
-
-.setup-cam-field input[type='range'],
-.setup-cam-field select {
-  flex-grow: 1;
-  width: 100%;
-  min-width: 0;
-  margin: 0;
-}
-
 .setup-cam-cell.is-off {
   opacity: 0.55;
 }
@@ -6358,23 +6306,473 @@ a.nav-sub-item {
 }
 
 /* ========================================================================== */
-/* Configuration on a phone: one flat page. The image stays in view while the */
-/* controls below it are used. Desktop is untouched (.m-only is hidden).      */
+/* Configuration editor: sequence bar, region chips, pad with jog, steppers   */
+/* and options (all widths). The layout below 1256 px keeps the image in view. */
 /* ========================================================================== */
 .m-only {
   display: none;
 }
 
-@media screen and (max-width: 860px) {
+.setup .m-only {
+  display: block;
+}
+
+.setup .m-hide {
+  display: none !important;
+}
+
+.setup .setup-seqbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+}
+
+.setup .setup-seqbar select {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  font-weight: 600;
+}
+
+.setup .m-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.setup .m-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.setup .m-icon:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.setup .m-icon.m-danger {
+  color: var(--error);
+}
+
+.setup .setup-roibar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setup .setup-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.setup .m-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.setup .m-title {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.setup .m-dpad {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.setup .m-key {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-main);
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background 0.12s, color 0.12s;
+}
+
+.setup .m-key:active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.setup .m-key svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.setup .m-key.up {
+  top: 3px;
+  left: 45px;
+}
+
+.setup .m-key.down {
+  bottom: 3px;
+  left: 45px;
+}
+
+.setup .m-key.left {
+  left: 3px;
+  top: 45px;
+}
+
+.setup .m-key.right {
+  right: 3px;
+  top: 45px;
+}
+
+.setup .m-key.mid {
+  inset: 40px;
+  width: auto;
+  height: auto;
+  background: var(--bg-card);
+  cursor: grab;
+  touch-action: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  transition: transform 0.18s cubic-bezier(0.3, 1.4, 0.5, 1), box-shadow 0.15s, background 0.15s;
+}
+
+.setup .m-key.mid svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2.2;
+}
+
+.setup .m-key.mid.active {
+  cursor: grabbing;
+  transition: box-shadow 0.15s, background 0.15s;
+  background: var(--primary-soft);
+  color: var(--primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.setup .m-moveby {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.setup .m-moveby small {
+  color: var(--text-secondary);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.setup .m-seg {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.setup .m-seg button {
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.setup .m-seg button.active {
+  background: var(--primary);
+  color: #fff;
+}
+
+.setup .m-steppers {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+}
+
+.setup .m-stepper {
+  display: grid;
+  grid-template-columns: 38px 1fr 38px;
+  align-items: center;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.setup .m-stepper button {
+  height: 56px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 1.3rem;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.setup .m-stepper button:active {
+  color: var(--primary);
+}
+
+.setup .m-stepval {
+  text-align: center;
+  line-height: 1.1;
+}
+
+.setup .m-stepval small {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.setup .m-stepval input {
+  width: 100%;
+  height: auto;
+  box-sizing: border-box;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  color: var(--text-main);
+  font: inherit;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.setup .m-stepval input::-webkit-outer-spin-button,
+.setup .m-stepval input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.setup .m-stepval input:focus {
+  outline: none;
+  box-shadow: none;
+  color: var(--primary);
+}
+
+.setup .setup-roicard > .card-header {
+  display: none;
+}
+
+.setup .setup-roicard .side-body {
+  gap: 8px;
+  padding: 10px 12px 12px;
+}
+
+.setup .setup-roicard .side-body::before {
+  content: 'Options';
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.setup .setup-lock-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+}
+
+.setup .setup-lock-list .check {
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.setup .setup-lock-list .check:has(.setup-space-input) {
+  grid-column: 1 / -1;
+}
+
+.setup .setup-lock-list .check input[type='checkbox'] {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 26px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--surface-hover);
+  cursor: pointer;
+  transition: background var(--transition-speed);
+}
+
+.setup .setup-lock-list .check input[type='checkbox']::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform var(--transition-speed);
+}
+
+.setup .setup-lock-list .check input[type='checkbox']:checked {
+  background: var(--primary);
+}
+
+.setup .setup-lock-list .check input[type='checkbox']:checked::after {
+  transform: translateX(18px);
+}
+
+.setup .setup-lock-list .check input[type='checkbox']:disabled {
+  opacity: 0.45;
+}
+
+.setup .setup-markercard .side-body {
+  gap: 10px;
+  padding: 10px 12px 12px;
+}
+
+.setup .m-only[hidden] {
+  display: none !important;
+}
+
+.setup:not([data-mode='image']) .canvas-wrap canvas {
+  cursor: grab;
+}
+
+/* wide screens: a wider column for the controls */
+@media screen and (min-width: 1257px) {
+  .setup .editor-layout:not(.single) {
+    grid-template-columns: minmax(0, 1fr) 390px;
+  }
+}
+
+/* narrow screens and phones: one column in a fixed order, the image stays in view */
+@media screen and (max-width: 1256px) {
   .setup [hidden] {
     display: none !important;
   }
 
-  .setup .m-only {
-    display: block;
+  .setup .editor-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
   }
 
-  /* the title, the description and the help text make room for the work area */
+  .setup .setup-main,
+  .setup .editor-side,
+  .setup [data-ref='panelRoi'],
+  .setup [data-ref='panelMarkers'] {
+    display: contents;
+  }
+
+  .setup .setup-imgcard {
+    order: 1;
+  }
+
+  .setup [data-ref='panelImage'] {
+    order: 2;
+  }
+
+  .setup .setup-pair {
+    order: 4;
+  }
+
+  .setup .setup-roicard,
+  .setup .setup-markercard {
+    order: 5;
+  }
+
+  .setup .setup-proc {
+    order: 6;
+    margin-bottom: 0;
+  }
+
+  .setup .setup-marker-rec {
+    order: 7;
+  }
+
+  .setup:not([data-mode='image']) .setup-imgcard {
+    position: sticky;
+    top: 6px;
+    z-index: 6;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
+  }
+
+  .setup:not([data-mode='image']) .setup-imgcard > .card-header {
+    display: none;
+  }
+
+  .setup .canvas-wrap {
+    min-height: 0;
+    padding: 0 6px 6px;
+  }
+
+  .setup[data-mode='image'] .setup-imgcard > .card-header,
+  .setup [data-ref='panelImage'] .card-header {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .setup[data-mode='image'] .setup-imgcard > .card-header > span {
+    flex: 1 1 100%;
+  }
+}
+
+/* phones: tabs, header and the image tab */
+@media screen and (max-width: 860px) {
   .setup .setup-header .container-title,
   .setup .setup-header .page-sub,
   .setup .setup-header .setup-desc {
@@ -6389,11 +6787,6 @@ a.nav-sub-item {
     margin-top: 0;
   }
 
-  .setup .m-hide {
-    display: none !important;
-  }
-
-  /* tabs: four equal columns, always one row */
   .setup .setup-tabs {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -6417,501 +6810,6 @@ a.nav-sub-item {
     font-size: 0.66rem;
   }
 
-  /* the page is one column of cards in a fixed order */
-  .setup .editor-layout {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-
-  .setup .setup-main,
-  .setup .editor-side,
-  .setup [data-ref='panelRoi'],
-  .setup [data-ref='panelMarkers'] {
-    display: contents;
-  }
-
-  .setup .setup-imgcard { order: 1; }
-  .setup [data-ref='panelImage'] { order: 2; }
-  .setup .setup-roibar { order: 3; }
-  .setup .setup-pair { order: 4; }
-  .setup .setup-roicard,
-  .setup .setup-markercard { order: 5; }
-  .setup .setup-proc { order: 6; margin-bottom: 0; }
-  .setup .setup-marker-rec { order: 7; }
-
-  /* the image (with the sequence bar) stays at the top while the controls are used */
-  .setup:not([data-mode='image']) .setup-imgcard {
-    position: sticky;
-    top: 6px;
-    z-index: 6;
-    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
-  }
-
-  .setup:not([data-mode='image']) .setup-imgcard > .card-header {
-    display: none;
-  }
-
-  .setup .canvas-wrap {
-    min-height: 0;
-    padding: 0 6px 6px;
-  }
-
-  .setup .setup-seqbar {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px;
-  }
-
-  .setup .setup-seqbar select {
-    flex: 1;
-    min-width: 0;
-    height: 38px;
-    font-weight: 600;
-  }
-
-  .setup .m-icon {
-    display: inline-grid;
-    place-items: center;
-    flex: none;
-    width: 38px;
-    height: 38px;
-    padding: 0;
-    border: 0;
-    border-radius: 10px;
-    background: var(--surface);
-    color: var(--text-main);
-    cursor: pointer;
-  }
-
-  .setup .m-icon svg {
-    width: 18px;
-    height: 18px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-
-  .setup .m-icon:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
-
-  .setup .m-icon.m-danger {
-    color: var(--error);
-  }
-
-  /* region bar: chips | new, copy, delete */
-  .setup .setup-roibar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .setup .m-chips {
-    display: flex;
-    flex: 1;
-    min-width: 0;
-    gap: 8px;
-    padding: 2px 0 4px;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .setup .m-chips::-webkit-scrollbar {
-    display: none;
-  }
-
-  .setup .m-roiact {
-    display: flex;
-    flex: none;
-    gap: 6px;
-  }
-
-  .setup .m-chip {
-    position: relative;
-    flex: none;
-    min-width: 50px;
-    height: 40px;
-    padding: 0 14px;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--bg-card);
-    color: var(--text-main);
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
-    user-select: none;
-    -webkit-user-select: none;
-    -webkit-touch-callout: none;
-    transition: transform 0.16s, box-shadow 0.16s;
-  }
-
-  .setup .m-chip.active {
-    background: var(--primary);
-    border-color: var(--primary);
-    color: #fff;
-  }
-
-  .setup .m-chip.dragging {
-    z-index: 3;
-    transition: box-shadow 0.16s;
-    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
-    cursor: grabbing;
-  }
-
-  /* Position | Size */
-  .setup .setup-pair {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    align-items: stretch;
-  }
-
-  .setup .m-card {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    min-width: 0;
-    padding: 10px;
-  }
-
-  .setup .m-title {
-    color: var(--text-secondary);
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-
-  .setup .m-dpad {
-    position: relative;
-    width: 132px;
-    height: 132px;
-    margin: 0 auto;
-    border-radius: 50%;
-    background: var(--surface);
-  }
-
-  .setup .m-key {
-    position: absolute;
-    display: grid;
-    place-items: center;
-    width: 42px;
-    height: 42px;
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    background: transparent;
-    color: var(--text-main);
-    cursor: pointer;
-    touch-action: manipulation;
-    user-select: none;
-    -webkit-user-select: none;
-    transition: background 0.12s, color 0.12s;
-  }
-
-  .setup .m-key:active {
-    background: var(--primary-soft);
-    color: var(--primary);
-  }
-
-  .setup .m-key svg {
-    width: 20px;
-    height: 20px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2.6;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    pointer-events: none;
-  }
-
-  .setup .m-key.up { top: 3px; left: 45px; }
-  .setup .m-key.down { bottom: 3px; left: 45px; }
-  .setup .m-key.left { left: 3px; top: 45px; }
-  .setup .m-key.right { right: 3px; top: 45px; }
-
-  .setup .m-key.mid {
-    inset: 40px;
-    width: auto;
-    height: auto;
-    background: var(--bg-card);
-    cursor: grab;
-    touch-action: none;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
-    transition: transform 0.18s cubic-bezier(0.3, 1.4, 0.5, 1), box-shadow 0.15s, background 0.15s;
-  }
-
-  .setup .m-key.mid svg {
-    width: 22px;
-    height: 22px;
-    stroke-width: 2.2;
-  }
-
-  .setup .m-key.mid.active {
-    cursor: grabbing;
-    transition: box-shadow 0.15s, background 0.15s;
-    background: var(--primary-soft);
-    color: var(--primary);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-  }
-
-  .setup .m-moveby {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-  }
-
-  .setup .m-moveby small {
-    color: var(--text-secondary);
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-align: center;
-    text-transform: uppercase;
-  }
-
-  .setup .m-seg {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 2px;
-    padding: 3px;
-    border-radius: 10px;
-    background: var(--surface);
-  }
-
-  .setup .m-seg button {
-    height: 32px;
-    padding: 0;
-    border: 0;
-    border-radius: 8px;
-    background: transparent;
-    color: var(--text-secondary);
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .setup .m-seg button.active {
-    background: var(--primary);
-    color: #fff;
-  }
-
-  .setup .m-steppers {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    justify-content: center;
-    gap: 10px;
-  }
-
-  .setup .m-stepper {
-    display: grid;
-    grid-template-columns: 38px 1fr 38px;
-    align-items: center;
-    border-radius: 12px;
-    background: var(--surface);
-  }
-
-  .setup .m-stepper button {
-    height: 56px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--text-main);
-    font-size: 1.3rem;
-    font-weight: 600;
-    cursor: pointer;
-    touch-action: manipulation;
-    user-select: none;
-    -webkit-user-select: none;
-  }
-
-  .setup .m-stepper button:active {
-    color: var(--primary);
-  }
-
-  .setup .m-stepval {
-    text-align: center;
-    line-height: 1.1;
-  }
-
-  .setup .m-stepval small {
-    display: block;
-    color: var(--text-secondary);
-    font-size: 0.62rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-
-  .setup .m-stepval input {
-    width: 100%;
-    height: auto;
-    box-sizing: border-box;
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-    background: transparent;
-    color: var(--text-main);
-    font: inherit;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    text-align: center;
-    -moz-appearance: textfield;
-  }
-
-  .setup .m-stepval input::-webkit-outer-spin-button,
-  .setup .m-stepval input::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
-
-  .setup .m-stepval input:focus {
-    outline: none;
-    box-shadow: none;
-    color: var(--primary);
-  }
-
-  /* options: the lock list of the region card as a flat card with switches */
-  .setup .setup-roicard > .card-header {
-    display: none;
-  }
-
-  .setup .setup-roicard .side-body {
-    gap: 8px;
-    padding: 10px 12px 12px;
-  }
-
-  .setup .setup-roicard .side-body::before {
-    content: 'Options';
-    color: var(--text-secondary);
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-
-  .setup .setup-lock-list {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px 12px;
-  }
-
-  .setup .setup-lock-list .check {
-    align-items: center;
-    gap: 8px;
-    font-size: 0.78rem;
-    font-weight: 600;
-    line-height: 1.25;
-  }
-
-  .setup .setup-lock-list .check:has(.setup-space-input) {
-    grid-column: 1 / -1;
-  }
-
-  .setup .setup-lock-list .check input[type='checkbox'] {
-    -webkit-appearance: none;
-    appearance: none;
-    position: relative;
-    flex: none;
-    width: 44px;
-    height: 26px;
-    margin: 0;
-    border-radius: 999px;
-    background: var(--surface-hover);
-    cursor: pointer;
-    transition: background var(--transition-speed);
-  }
-
-  .setup .setup-lock-list .check input[type='checkbox']::after {
-    content: '';
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: #fff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-    transition: transform var(--transition-speed);
-  }
-
-  .setup .setup-lock-list .check input[type='checkbox']:checked {
-    background: var(--primary);
-  }
-
-  .setup .setup-lock-list .check input[type='checkbox']:checked::after {
-    transform: translateX(18px);
-  }
-
-  .setup .setup-lock-list .check input[type='checkbox']:disabled {
-    opacity: 0.45;
-  }
-
-  /* marker card: the image and the histogram stay, the fields are replaced by the pad and steppers */
-  .setup .setup-markercard .side-body {
-    gap: 10px;
-    padding: 10px 12px 12px;
-  }
-
-  /* Image tab: the parameter table as stacked rows */
-  .setup .setup-param-scroll {
-    overflow-x: visible;
-    padding: 0 8px 8px;
-  }
-
-  .setup .setup-cam-table,
-  .setup .setup-cam-table tbody {
-    display: block;
-    min-width: 0;
-    width: 100%;
-  }
-
-  .setup .setup-cam-table colgroup {
-    display: none;
-  }
-
-  .setup .setup-cam-table tr {
-    display: grid;
-    grid-template-columns: 24px minmax(0, 36%) minmax(0, 1fr);
-    align-items: center;
-  }
-
-  .setup .setup-cam-table td {
-    height: auto;
-    min-height: 44px;
-    border-top: 1px solid var(--border);
-  }
-
-  .setup .setup-cam-table tr:first-child td:nth-child(-n + 3) {
-    border-top: 0;
-  }
-
-  .setup .setup-cam-table tr + tr td {
-    border-top: 1px solid var(--border);
-  }
-
-  .setup .setup-cam-table td > span {
-    font-size: 0.84rem;
-  }
-
-  .setup[data-mode='image'] .setup-imgcard > .card-header,
-  .setup [data-ref='panelImage'] .card-header {
-    flex-wrap: wrap;
-    row-gap: 8px;
-  }
-
-  .setup[data-mode='image'] .setup-imgcard > .card-header > span {
-    flex: 1 1 100%;
-  }
-
   .setup .setup-header-actions {
     width: 100%;
   }
@@ -6919,4 +6817,1006 @@ a.nav-sub-item {
   .setup .setup-header-actions .button {
     flex: 1;
   }
+}
+
+/* the image that stays in view must not take more than about half of the screen (aspect ratio is kept) */
+@media screen and (max-width: 1256px) {
+  .setup:not([data-mode='image']) .canvas-wrap canvas {
+    width: auto;
+    max-width: 100%;
+    max-height: 34vh;
+  }
+}
+
+/* markers: combo box whose entries show the marker */
+.setup .m-combo {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.setup .m-combo-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 46px;
+  padding: 4px 12px 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--input-radius);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.setup .m-combo-btn[aria-expanded='true'] {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.setup .m-combo-entry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.setup .m-combo-entry canvas {
+  flex: none;
+  height: 28px;
+  width: auto;
+  border-radius: 5px;
+  background: #111;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.18);
+}
+
+.setup .m-combo-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.setup .m-combo-text small {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.setup .m-combo-chev {
+  color: var(--text-secondary);
+}
+
+.setup .m-combo-list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--input-radius);
+  background: var(--bg-card);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+  /* the combo sits in the sticky image card: a long list scrolls itself, the page could not bring its end into view */
+  max-height: min(55vh, 420px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.setup .m-combo-list[hidden] {
+  display: none;
+}
+
+.setup .m-combo-item {
+  padding: 6px 8px;
+  border-radius: 0.45rem;
+  cursor: pointer;
+}
+
+.setup .m-combo-item:hover {
+  background: var(--surface);
+}
+
+.setup .m-combo-item.selected {
+  background: var(--primary-soft);
+}
+
+/* processing switch of a tab (first row of the Options card) */
+.setup .m-proc {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.setup .m-procrow {
+  justify-content: space-between;
+  min-height: 34px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.setup .m-proc input[type='checkbox'] {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 26px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--surface-hover);
+  cursor: pointer;
+  transition: background var(--transition-speed);
+}
+
+.setup .m-proc input[type='checkbox']::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform var(--transition-speed);
+}
+
+.setup .m-proc input[type='checkbox']:checked {
+  background: var(--primary);
+}
+
+.setup .m-proc input[type='checkbox']:checked::after {
+  transform: translateX(18px);
+}
+
+/* marker combo: the main control of the markers tab, so it is large and in the accent color; no heading above the image there */
+.setup[data-mode='markers'] .setup-imgcard > .card-header {
+  display: none;
+}
+
+.setup .setup-seqbar:has(.m-combo) {
+  padding: 8px;
+}
+
+.setup .m-combo-btn {
+  min-height: 60px;
+  padding: 6px 14px 6px 8px;
+  border: 1.5px solid var(--primary);
+  background: var(--primary-soft);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+}
+
+.setup .m-combo-btn .m-combo-text b {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.setup .m-combo-btn .m-combo-text small {
+  font-size: 0.78rem;
+  color: var(--text-main);
+  opacity: 0.7;
+}
+
+.setup .m-combo-btn .m-combo-chev {
+  color: var(--primary);
+  font-size: 1.1rem;
+}
+
+.setup .m-combo-entry canvas {
+  height: 36px;
+}
+
+/* number sequence: one prominent combo above the tabs (it applies to digits and analog) */
+.setup .setup-seqglobal {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.setup .setup-seqglobal .m-combo-btn {
+  min-height: 56px;
+}
+
+.setup .setup-seqglobal .m-icon {
+  width: 44px;
+  height: auto;
+  min-height: 56px;
+}
+
+.setup .m-combo-caption {
+  display: block;
+  color: var(--primary);
+  font-size: 0.62rem;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.setup .setup-seqglobal + .setup-tabs {
+  margin-top: 10px;
+}
+
+/* rename and delete of the number sequence: one modern button group at the height of the combo */
+.setup .m-iconpair {
+  display: flex;
+  flex: none;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--input-radius);
+  background: var(--bg-card);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+}
+
+.setup .m-iconpair .m-icon {
+  width: 48px;
+  height: auto;
+  min-height: 56px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  transition: background 0.15s, color 0.15s;
+}
+
+.setup .m-iconpair .m-icon + .m-icon {
+  border-left: 1px solid var(--border);
+}
+
+.setup .m-iconpair .m-icon:hover:not(:disabled) {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.setup .m-iconpair .m-icon.m-danger {
+  color: var(--error);
+}
+
+.setup .m-iconpair .m-icon.m-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--error) 14%, transparent);
+  color: var(--error);
+}
+
+.setup .m-iconpair .m-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* the entry that adds a sequence inside the list */
+.setup .m-combo-add {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 6px 4px 2px;
+  border-top: 1px solid var(--border);
+}
+
+.setup .m-combo-addbtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.setup .m-combo-addbtn span {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.setup .m-combo-addbtn:hover {
+  background: var(--primary-soft);
+}
+
+.setup .m-combo-add input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 10px;
+}
+
+.setup .m-combo-add input.invalid {
+  border-color: var(--error);
+}
+
+.setup .m-combo-addok {
+  flex: none;
+  height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--input-radius);
+  background: var(--primary);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* number sequence card: the combo with its buttons, below it the switches for digits and analog */
+.setup .setup-seqglobal {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.setup .m-seqrow {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.setup .m-procs {
+  display: flex;
+  gap: 8px;
+}
+
+.setup .m-procs .m-proc {
+  flex: 1;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--input-radius);
+  background: var(--bg-card);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+}
+
+/* the number sequence card; the tabs follow below it as their own bar */
+.setup .setup-seqcard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px;
+  overflow: visible;
+}
+
+.setup .setup-seqcard .setup-seqglobal {
+  margin: 0;
+}
+
+.setup .setup-seqcard + .setup-tabs {
+  margin-top: 12px;
+}
+
+/* the switches sit inline in the row of the number sequence, small and plain */
+.setup .setup-seqcard .m-procs {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+.setup .setup-seqcard .m-procs .m-proc {
+  flex: none;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.setup .setup-seqcard .m-procs .m-proc input[type='checkbox'] {
+  width: 34px;
+  height: 20px;
+}
+
+.setup .setup-seqcard .m-procs .m-proc input[type='checkbox']::after {
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+}
+
+.setup .setup-seqcard .m-procs .m-proc input[type='checkbox']:checked::after {
+  transform: translateX(14px);
+}
+
+/* a narrow combo shortens its texts */
+.setup .setup-seqglobal .m-combo-btn,
+.setup .setup-seqglobal .m-combo-entry,
+.setup .setup-seqglobal .m-combo-text {
+  min-width: 0;
+}
+
+.setup .setup-seqglobal .m-combo-btn .m-combo-text b,
+.setup .setup-seqglobal .m-combo-btn .m-combo-text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* entries of the number sequence list: the entry selects, the two small buttons rename and delete it */
+.setup .m-combo-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.setup .m-combo-item .m-combo-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.setup .m-combo-item.editing {
+  gap: 6px;
+}
+
+.setup .m-combo-item.editing input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 10px;
+}
+
+.setup .m-combo-item.editing input.invalid {
+  border-color: var(--error);
+}
+
+.setup .m-combo-acts {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+.setup .m-combo-act {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.setup .m-combo-act svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.setup .m-combo-act:hover:not(:disabled) {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.setup .m-combo-act.m-danger {
+  color: var(--error);
+}
+
+.setup .m-combo-act.m-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--error) 14%, transparent);
+}
+
+.setup .m-combo-act:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* zoom in: the canvas is scaled by a transform and clipped to its own place */
+.setup .canvas-wrap.zoomed {
+  position: relative;
+}
+
+.setup .canvas-wrap.zoomed canvas {
+  transform-origin: 0 0;
+  transition: transform 0.22s ease-out;
+  cursor: grab;
+}
+
+/* the zoom switch floats over the lower right corner of the image (the card header is hidden on narrow screens) */
+.setup .setup-imgcard {
+  position: relative;
+}
+
+.setup .setup-imgtools {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 3;
+  display: flex;
+  gap: 8px;
+}
+
+.setup .setup-imgtools[hidden] {
+  display: none;
+}
+
+.setup .setup-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-card) 88%, transparent);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
+  color: var(--text-main);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.setup .setup-zoom[hidden] {
+  display: none;
+}
+
+/* region combo: the entry buttons stay small so that the preview and the numbers keep their room */
+.setup .setup-roibar .m-combo {
+  flex: 1;
+  min-width: 0;
+}
+
+/* the pills over the image use the small switch */
+.setup .setup-zoom input[type='checkbox'],
+.setup .setup-switch input[type='checkbox'],
+.setup .cam-sw input[type='checkbox'] {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  flex: none;
+  order: 2;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--surface-hover);
+  cursor: pointer;
+  transition: background var(--transition-speed);
+}
+
+.setup .setup-zoom input[type='checkbox']::after,
+.setup .setup-switch input[type='checkbox']::after,
+.setup .cam-sw input[type='checkbox']::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform var(--transition-speed);
+}
+
+.setup .setup-zoom input[type='checkbox']:checked,
+.setup .setup-switch input[type='checkbox']:checked,
+.setup .cam-sw input[type='checkbox']:checked {
+  background: var(--primary);
+}
+
+.setup .setup-zoom input[type='checkbox']:checked::after,
+.setup .setup-switch input[type='checkbox']:checked::after,
+.setup .cam-sw input[type='checkbox']:checked::after {
+  transform: translateX(14px);
+}
+
+/* a kind of region that is switched off: its controls are greyed out and cannot be used, the note says why */
+.setup .m-offnote {
+  padding: 10px 12px;
+  border-radius: var(--input-radius);
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  color: var(--text-main);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.setup[data-proc-off='1'] .setup-imgcard .setup-roibar,
+.setup[data-proc-off='1'] [data-ref='panelRoi'] .setup-pair,
+.setup[data-proc-off='1'] [data-ref='panelRoi'] .setup-roicard {
+  opacity: 0.4;
+  filter: grayscale(0.6);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* digits and analog tabs: no card title above the image (like the markers tab); the header only stays for the "digits + analog" switch */
+.setup[data-mode='digit'] .setup-imgcard > .card-header > [data-ref='canvasTitle'],
+.setup[data-mode='analog'] .setup-imgcard > .card-header > [data-ref='canvasTitle'] {
+  display: none;
+}
+
+.setup[data-mode='digit'] .setup-imgcard > .card-header,
+.setup[data-mode='analog'] .setup-imgcard > .card-header {
+  justify-content: flex-end;
+}
+
+.setup[data-mode='digit'] .setup-imgcard > .card-header:not(:has(.setup-vis-digitanalog:not(.hidden))),
+.setup[data-mode='analog'] .setup-imgcard > .card-header:not(:has(.setup-vis-digitanalog:not(.hidden))) {
+  display: none;
+}
+
+/* phones: the top bar hides while scrolling down, the sticky image then moves up into its place (the content has 60px of padding for the bar) */
+@media screen and (max-width: 860px) {
+  .setup:not([data-mode='image']) .setup-imgcard {
+    transition: top 0.2s ease;
+  }
+
+  .app:has(.topbar.is-hidden) .setup:not([data-mode='image']) .setup-imgcard {
+    top: -54px;
+  }
+}
+
+/* image tab: the basics are always there, the rest sits behind the "Advanced" switch (remembered in the browser) */
+.setup[data-cam-adv='0'] .setup-cam-adv {
+  display: none;
+}
+
+.setup .setup-cam-head {
+  gap: 12px;
+}
+
+.setup .setup-cam-head .setup-header-actions {
+  flex: 1;
+  width: auto;
+  justify-content: flex-end;
+}
+
+.setup .setup-cam-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* image tab: no card title (like the other tabs), the two buttons form one row */
+.setup[data-mode='image'] .setup-imgcard > .card-header > [data-ref='canvasTitle'] {
+  display: none;
+}
+
+.setup[data-mode='image'] .setup-imgcard > .card-header {
+  justify-content: flex-end;
+}
+
+@media screen and (max-width: 1256px) {
+  .setup[data-mode='image'] .setup-imgcard > .card-header > .setup-header-actions {
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
+  }
+
+  .setup[data-mode='image'] .setup-imgcard {
+    position: sticky;
+    top: 6px;
+    z-index: 6;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
+  }
+
+  .setup[data-mode='image'] .canvas-wrap canvas {
+    width: auto;
+    max-width: 100%;
+    max-height: 34vh;
+  }
+}
+
+@media screen and (max-width: 860px) {
+  .setup[data-mode='image'] .setup-imgcard > .card-header .button {
+    padding-inline: 8px;
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+
+  .app:has(.topbar.is-hidden) .setup[data-mode='image'] .setup-imgcard {
+    top: -54px;
+  }
+}
+
+/* camera controls: tiles in the style of the size steppers, a slider with -/+ buttons, switches and segmented buttons */
+.setup .cam-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.setup .cam-ctl {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.setup .cam-ctl.is-off {
+  opacity: 0.45;
+}
+
+.setup .cam-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+}
+
+.setup .cam-label {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.setup .cam-head output {
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.setup .cam-toggles {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.setup .cam-slide,
+.setup .cam-numrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setup .cam-step {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text-main);
+  font: inherit;
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.setup .cam-step:active:not(:disabled) {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.setup .cam-step:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.setup .cam-slide input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.setup .cam-slide input[type='range']::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--border) var(--from, 0%), var(--primary) var(--from, 0%), var(--primary) var(--to, 0%), var(--border) var(--to, 0%));
+}
+
+.setup .cam-slide input[type='range']::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--border) var(--from, 0%), var(--primary) var(--from, 0%), var(--primary) var(--to, 0%), var(--border) var(--to, 0%));
+}
+
+.setup .cam-slide input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: -8px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.setup .cam-slide input[type='range']::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.setup .cam-slide input[type='range']:disabled {
+  cursor: default;
+}
+
+.setup .cam-numrow input[type='number'] {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text-main);
+  font: inherit;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.setup .cam-unit {
+  min-width: 14px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.setup .cam-toggle .cam-head {
+  min-height: 26px;
+}
+
+.setup .cam-sw {
+  display: inline-flex;
+  flex: none;
+}
+
+.setup .cam-segbtns[data-cols='2'] {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.setup .cam-segbtns[data-cols='3'] {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.setup .cam-segbtns[data-cols='1'],
+.setup .cam-segbtns[data-cols='4'] {
+  grid-template-columns: 1fr;
+}
+
+.setup .cam-segbtns button {
+  min-width: 0;
+  padding: 0 4px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.setup .cam-segbtns button:disabled {
+  cursor: default;
+}
+
+/* wide screens: the reference image floats while the long column of controls scrolls */
+@media screen and (min-width: 1257px) {
+  .setup .setup-main {
+    align-self: stretch; /* the floating card needs the full height of the row to move in */
+  }
+
+  .setup .setup-imgcard {
+    position: sticky;
+    top: 6px;
+    z-index: 6;
+    align-self: start;
+  }
+}
+
+/* image tab: the one button that takes a new picture */
+.setup .setup-takebtn {
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+}
+
+.setup .setup-takebtn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary) 88%, #000);
+}
+
+.setup .setup-takebtn:disabled {
+  opacity: 0.6;
+}
+
+.setup[data-mode='image'] .setup-imgcard > .card-header > .setup-header-actions {
+  flex: 1 1 100%;
+}
+
+.setup[data-mode='image'] .setup-imgcard > .card-header > .setup-header-actions .button {
+  flex: 1;
+}
+
+/* settings of the image tab: blurred with a hint until a new picture was taken */
+.setup .cam-wrap {
+  position: relative;
+}
+
+.setup .cam-lock {
+  position: absolute;
+  inset: 0 6px 6px;
+  z-index: 3;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 36px 24px 0;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg-card) 45%, transparent);
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+  color: var(--text-main);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.setup .cam-lock[hidden] {
+  display: none;
+}
+
+.setup .cam-lock span {
+  position: sticky;
+  top: 120px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--bg-card);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.18);
+}
+
+/* "Beta" marker (menu entry, MCP page) */
+.beta-pill {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  text-transform: uppercase;
+  vertical-align: middle;
 }

@@ -4368,13 +4368,13 @@ const App = (() => {
         </div>`;
       root.innerHTML = `
         <div class="container">
-          ${viewHeader('MCP', 'Let an AI assistant such as Claude work with this device.')}
+          ${viewHeader('MCP', 'Let an AI assistant such as Claude work with this device (beta).')}
           <div class="container-content">
 
             <div class="card cfg-card">
-              <div class="card-header"><span class="cfg-card-title">MCP server</span></div>
+              <div class="card-header"><span class="cfg-card-title">MCP server</span><span class="beta-pill">Beta</span></div>
               <div class="card-body cfg-body">
-                <div class="mcp-note">The assistant can read the device, move alignment markers and regions, change settings and start cycles.
+                <div class="mcp-note"><b>Beta:</b> new and so far tested only in the web interface mock, not yet over a longer time on a device. The assistant can read the device, move alignment markers and regions, change settings and start cycles.
                   It is off by default. Everyone with the token has this access, so use it only in a network you trust.</div>
                 ${switchRow('Server', 'on', 'onText')}
                 ${switchRow('System actions', 'sys', 'sysText', 'delete files, reboot, update')}
@@ -6802,74 +6802,110 @@ const App = (() => {
   const CAM_ROWS = [
     [
       { name: KEY_CAM + 'zoomfactor', label: 'Zoom Factor', type: 'range', min: 1000, max: 4000, value: 1000, int: true, init: true, fmt: 'zoom' },
-      { name: KEY_CAM + 'brightness', label: 'Brightness', type: 'range', min: -2, max: 2, value: 0, int: true, init: true },
-    ],
-    [
       { name: KEY_CAM + 'zoomoffsetx', label: 'Zoom Offset X', type: 'range', min: -960, max: 960, value: 0, int: true, init: true, gate: 'zoom' },
-      { name: KEY_CAM + 'contrast', label: 'Contrast', type: 'range', min: -2, max: 2, value: 0, int: true, init: true },
     ],
     [
       { name: KEY_CAM + 'zoomoffsety', label: 'Zoom Offset Y', type: 'range', min: -720, max: 720, value: 0, int: true, init: true, gate: 'zoom' },
-      { name: KEY_CAM + 'saturation', label: 'Saturation', type: 'range', min: -2, max: 2, value: 0, int: true, init: true },
+      { name: 'imagealignment.imagerotation', label: 'Image Rotation', type: 'range', min: -180, max: 180, step: 0.1, value: 0, fmt: 'deg' },
     ],
     [
-      {
-        name: KEY_CAM + 'mirrorimage',
-        label: 'Mirror Image',
-        type: 'select',
-        options: [['false', 'Disabled'], ['true', 'Enabled']],
-      },
+      { name: 'takeimage.flashlight.flashtime', label: 'Flash Time', type: 'range', min: 100, max: 10000, step: 100, value: 2000, int: true, fmt: 'ms' },
+      { name: 'takeimage.flashlight.flashintensity', label: 'Flash Intensity', type: 'range', min: 0, max: 100, value: 50, int: true, fmt: 'pct' },
+    ],
+    [
+      { name: KEY_CAM + 'brightness', label: 'Brightness', type: 'range', min: -2, max: 2, value: 0, int: true, init: true },
+      { name: KEY_CAM + 'contrast', label: 'Contrast', type: 'range', min: -2, max: 2, value: 0, int: true, init: true },
+    ],
+    [
+      { name: KEY_CAM + 'saturation', label: 'Saturation', type: 'range', min: -2, max: 2, value: 0, int: true, init: true },
       { name: KEY_CAM + 'sharpness', label: 'Sharpness', type: 'range', min: -3, max: 3, value: 0, int: true, init: true },
     ],
     [
       {
-        name: KEY_CAM + 'flipimage',
-        label: 'Flip Image',
-        type: 'select',
-        options: [['false', 'Disabled'], ['true', 'Enabled']],
-      },
+            name: KEY_CAM + 'mirrorimage',
+            label: 'Mirror Image',
+            type: 'select',
+            options: [['false', 'Disabled'], ['true', 'Enabled']],
+          },
       {
-        name: KEY_CAM + 'specialeffect',
-        label: 'Special Effect',
-        type: 'select',
-        int: true,
-        options: [['0', 'None'], ['1', 'Negative'], ['2', 'Grayscale'], ['7', 'Gray+Negative']],
-      },
+            name: KEY_CAM + 'flipimage',
+            label: 'Flip Image',
+            type: 'select',
+            options: [['false', 'Disabled'], ['true', 'Enabled']],
+          },
     ],
     [
       {
-        name: KEY_CAM + 'gaincontrolmode',
-        label: 'Gain Control',
-        type: 'select',
-        int: true,
-        init: true,
-        value: '1',
-        options: [['0', 'Manual'], ['1', 'Auto']],
-      },
+            name: KEY_CAM + 'gaincontrolmode',
+            label: 'Gain Control',
+            type: 'select',
+            int: true,
+            init: true,
+            value: '1',
+            options: [['0', 'Manual'], ['1', 'Auto']],
+          },
       {
-        name: KEY_CAM + 'exposurecontrolmode',
-        label: 'Exposure Control',
-        type: 'select',
-        int: true,
-        init: true,
-        value: '1',
-        options: [['0', 'Manual'], ['1', 'Auto'], ['2', 'Auto (AEC2)']],
-      },
+            name: KEY_CAM + 'exposurecontrolmode',
+            label: 'Exposure Control',
+            type: 'select',
+            int: true,
+            init: true,
+            value: '1',
+            options: [['0', 'Manual'], ['1', 'Auto'], ['2', 'Auto (AEC2)']],
+          },
     ],
     [
       { name: KEY_CAM + 'manualgainvalue', label: 'Manual Gain Value', type: 'range', min: 0, max: 30, value: 0, int: true, init: true, gate: 'gainManual' },
       { name: KEY_CAM + 'autoexposurelevel', label: 'Auto Exposure Level', type: 'range', min: -2, max: 2, value: 0, int: true, init: true, gate: 'expAuto' },
     ],
     [
-      { name: 'takeimage.flashlight.flashtime', label: 'Flash Time', type: 'number', min: 100, step: 100, value: 2000, int: true, unit: 'ms' },
+      {
+            name: KEY_CAM + 'specialeffect',
+            label: 'Special Effect',
+            type: 'select',
+            int: true,
+            options: [['0', 'None'], ['1', 'Negative'], ['2', 'Grayscale'], ['7', 'Gray+Negative']],
+          },
       { name: KEY_CAM + 'manualexposurevalue', label: 'Manual Exposure Value', type: 'range', min: 0, max: 1920, value: 0, int: true, init: true, gate: 'expManual' },
     ],
-    [
-      { name: 'takeimage.flashlight.flashintensity', label: 'Flash Intensity', type: 'number', min: 0, max: 100, value: 50, int: true, unit: '%' },
-      { name: 'imagealignment.imagerotation', label: 'Image Rotation', type: 'number', min: -180, max: 180, step: 0.1, value: 0, unit: '°' },
-    ],
   ];
+  /** Always visible; everything else sits behind the "Advanced" switch. */
+  const CAM_BASIC = ['imagealignment.imagerotation', 'takeimage.flashlight.flashtime', 'takeimage.flashlight.flashintensity', KEY_CAM + 'mirrorimage', KEY_CAM + 'flipimage'];
+  const CAM_ORDER = [
+    ...CAM_BASIC,
+    KEY_CAM + 'zoomfactor', KEY_CAM + 'zoomoffsetx', KEY_CAM + 'zoomoffsety',
+    KEY_CAM + 'brightness', KEY_CAM + 'contrast', KEY_CAM + 'saturation', KEY_CAM + 'sharpness',
+    KEY_CAM + 'gaincontrolmode', KEY_CAM + 'manualgainvalue', KEY_CAM + 'exposurecontrolmode', KEY_CAM + 'autoexposurelevel', KEY_CAM + 'manualexposurevalue',
+    KEY_CAM + 'specialeffect',
+  ];
+  /** Look of the custom controls: step of the -/+ buttons and how a select is shown (switch or segmented buttons). */
+  const CAM_UI = {
+    [KEY_CAM + 'zoomfactor']: { step: 100 },
+    [KEY_CAM + 'zoomoffsetx']: { step: 10 },
+    [KEY_CAM + 'zoomoffsety']: { step: 10 },
+    [KEY_CAM + 'manualexposurevalue']: { step: 10 },
+    'takeimage.flashlight.flashtime': { step: 100 },
+    'takeimage.flashlight.flashintensity': { step: 5 },
+    'imagealignment.imagerotation': { step: 0.1 },
+    [KEY_CAM + 'mirrorimage']: { kind: 'switch' },
+    [KEY_CAM + 'flipimage']: { kind: 'switch' },
+  };
   const CAM_FIELDS = CAM_ROWS.flat();
+  /** Text of the value shown next to a slider. */
+  function camFormat(f, v) {
+    switch (f.fmt) {
+      case 'zoom':
+        return `${(v / 1000).toFixed(2)}x`;
+      case 'deg':
+        return `${Number(v).toFixed(1)}°`;
+      case 'ms':
+        return `${v} ms`;
+      case 'pct':
+        return `${v} %`;
+      default:
+        return String(v);
+    }
+  }
   /** Parameters sent to /camera?task=capture: query key -> [config name, default] (same defaults as before) */
   const CAPTURE_PARAMS = [
     ['flashtime', 'takeimage.flashlight.flashtime', '2000'],
@@ -6891,28 +6927,40 @@ const App = (() => {
     ['zoomy', KEY_CAM + 'zoomoffsety', '0'],
   ];
 
-  /** Table markup for a list of CAM_ROWS (tooltips are looked up by tooltips.js via data-help = config name). */
-  function camTableMarkup() {
-    const cell = (f) => {
-      const help = f.name.replace(/\./g, '_');
+  /** Markup of the camera / flashlight controls (tooltips are looked up by tooltips.js via data-help = config name). The native inputs stay inside as the source of truth. */
+  function camPanelMarkup() {
+    const spec = Object.fromEntries(CAM_FIELDS.map((f) => [f.name, f]));
+    const ctl = (name) => {
+      const f = spec[name];
+      const ui = CAM_UI[name] || {};
+      const help = name.replace(/\./g, '_');
       const gate = f.gate ? ` setup-gate-${f.gate}` : '';
-      let control;
+      const adv = CAM_BASIC.includes(name) ? '' : ' setup-cam-adv';
+      const cls = `cam-ctl setup-cam-cell${adv}${gate}`;
+      const label = App.esc(f.label);
+      const head = (extra) => `<div class="cam-head"><div class="tooltip-trigger" data-help="${help}"></div><span class="cam-label">${label}</span>${extra}</div>`;
+      const btn = (dir, sign) => `<button type="button" class="cam-step" data-dir="${dir}" aria-label="${dir < 0 ? 'Decrease' : 'Increase'} ${label}">${sign}</button>`;
       if (f.type === 'range') {
-        control = `<output data-out="${f.name}">${f.fmt === 'zoom' ? '1.00x' : f.value}</output>
-          <input type="range" min="${f.min}" max="${f.max}" value="${f.value}" data-param="${f.name}" />`;
-      } else if (f.type === 'select') {
-        const opts = f.options.map(([v, t]) => `<option value="${v}"${f.value === v ? ' selected' : ''}>${App.esc(t)}</option>`).join('');
-        control = `<select data-param="${f.name}">${opts}</select>`;
-      } else {
-        const step = f.step !== undefined ? ` step="${f.step}"` : '';
-        const max = f.max !== undefined ? ` max="${f.max}"` : '';
-        control = `<input required type="number" min="${f.min}"${max}${step} value="${f.value}" data-param="${f.name}" />${f.unit}`;
+        return `<div class="${cls} cam-range" data-cam="${name}">${head(`<output data-out="${name}">${camFormat(f, f.value)}</output>`)}
+          <div class="cam-slide">${btn(-1, '\u2212')}<input type="range" min="${f.min}" max="${f.max}"${f.step !== undefined ? ` step="${f.step}"` : ''} value="${f.value}" data-param="${name}" aria-label="${label}" />${btn(1, '+')}</div></div>`;
       }
-      return `<td><div class="tooltip-trigger" data-help="${help}"></div></td>
-        <td><span>${App.esc(f.label)}</span></td>
-        <td class="setup-cam-cell${gate}"><div class="setup-cam-field">${control}</div></td>`;
+      if (f.type === 'select') {
+        const opts = f.options.map(([v, t]) => `<option value="${v}"${f.value === v ? ' selected' : ''}>${App.esc(t)}</option>`).join('');
+        const select = `<select data-param="${name}" hidden>${opts}</select>`;
+        if (ui.kind === 'switch') {
+          return `<div class="${cls} cam-toggle" data-cam="${name}">${head(`<label class="cam-sw"><input type="checkbox" class="cam-check" aria-label="${label}" /></label>`)}${select}</div>`;
+        }
+        return `<div class="${cls} cam-seg" data-cam="${name}">${head('')}<div class="m-seg cam-segbtns"></div>${select}</div>`;
+      }
+      const step = f.step !== undefined ? ` step="${f.step}"` : '';
+      const max = f.max !== undefined ? ` max="${f.max}"` : '';
+      return `<div class="${cls} cam-num" data-cam="${name}">${head('')}
+        <div class="cam-numrow">${btn(-1, '\u2212')}<input required type="number" min="${f.min}"${max}${step} value="${f.value}" data-param="${name}" aria-label="${label}" /><span class="cam-unit">${f.unit}</span>${btn(1, '+')}</div></div>`;
     };
-    return CAM_ROWS.map(([a, b]) => `<tr>${cell(a)}${cell(b)}</tr>`).join('');
+    const basicInputs = CAM_BASIC.filter((n) => CAM_UI[n]?.kind !== 'switch').map(ctl).join('');
+    const toggles = CAM_BASIC.filter((n) => CAM_UI[n]?.kind === 'switch').map(ctl).join('');
+    const advanced = CAM_ORDER.filter((n) => !CAM_BASIC.includes(n)).map(ctl).join('');
+    return `${basicInputs}<div class="cam-toggles">${toggles}</div>${advanced}`;
   }
 
   /* ======================================================================== */
@@ -6928,28 +6976,6 @@ const App = (() => {
     };
   }
 
-  /** Label background of the ROI name tag above (or below) a region. */
-  function drawTextBG(g, type, txt, x, y, dy, padding, highlight) {
-    g.font = '15px Arial';
-    g.textAlign = 'center';
-    const width = g.measureText(txt).width;
-    const height = parseInt(g.font, 10);
-    // Highlight selected ROI textbox
-    if (type === 'digit') g.fillStyle = highlight ? 'rgba(0, 0, 255, 0.6)' : 'rgba(0, 0, 150, 0.5)';
-    else if (type === 'analog') g.fillStyle = highlight ? 'rgba(0, 255, 0, 0.6)' : 'rgba(0, 150, 0, 0.5)';
-
-    if (y - height - 8 >= 0) {
-      g.fillRect(x - width / 2 - padding, y - height - 8, width + 2 * padding, height + 2 * padding);
-      g.fillStyle = 'black';
-      g.fillText(txt, x + padding / 2 - 1, y - height / 2 - 1);
-    } else {
-      // no space on top of the ROI: place the text below
-      g.fillRect(x - width / 2 - padding, y + dy + 4, width + 2 * padding, height + 2 * padding);
-      g.fillStyle = 'black';
-      g.fillText(txt, x + padding / 2 - 1, y + dy + height + 2 * padding);
-    }
-  }
-
   /** Validates a number sequence name. @returns {string} error text or '' */
   function validateSequenceName(name) {
     if (name.length === 0) return 'Number sequence name must not be empty';
@@ -6962,7 +6988,7 @@ const App = (() => {
   const EDITOR_HELP = `
     <div class="help-item">
       <h4>Image</h4>
-      <p>Capture a new reference image with your camera settings or keep the current one. Make sure it is level (use <i>Image Rotation</i>). Markers and ROIs are placed on this image.</p>
+      <p>Press <b>Update image</b> to take a new picture; then the camera values can be changed. Press it again after every change. Save the new image with the bar at the bottom or discard it to return to the stored one. Make sure it is level (use <i>Image Rotation</i>). Markers and ROIs are placed on this image.</p>
     </div>
     <div class="help-item">
       <h4>Markers</h4>
@@ -7013,6 +7039,7 @@ const App = (() => {
     let space = 3;
     let rect = {};
     let drag = false;
+    let mDragState = null; // drag of a region with a finger (compact layout)
     let markerSelected = 0;
     let markerRoi; // === delta.imagealignment.marker (an array: copied as a whole, never merged)
     let isActReference = false;
@@ -7045,6 +7072,17 @@ const App = (() => {
           <summary>How it works</summary>
           <div class="help-panel">${EDITOR_HELP}</div>
         </details>
+        <div class="card setup-seqcard">
+        <div class="m-only setup-seqglobal" data-ref="mSeqBar">
+          <div class="m-seqrow">
+            <div class="m-combo" data-ref="mSeqCombo"></div>
+            <div class="m-procs">
+              <label class="m-proc" title="Process digit ROIs"><span>Digits</span><input type="checkbox" data-change="digitProcessing" data-ref="digitProcessing" aria-label="Process digit ROIs" /><span hidden data-ref="digitProcessingText"></span></label>
+              <label class="m-proc" title="Process analog ROIs"><span>Analog</span><input type="checkbox" data-change="analogProcessing" data-ref="analogProcessing" aria-label="Process analog ROIs" /><span hidden data-ref="analogProcessingText"></span></label>
+            </div>
+          </div>
+        </div>
+        </div>
         ${o.tabs ? `<div class="setup-tabs" role="tablist">${tabButtons}</div>` : ''}
       </div>
 
@@ -7054,28 +7092,29 @@ const App = (() => {
             <div class="card setup-imgcard">
               <div class="card-header">
                 <span data-ref="canvasTitle">Reference image</span>
-                <div class="setup-header-actions" data-ref="optsImage" hidden>
-                  <button type="button" class="button" data-click="createImage" data-ref="createImage">Create New Image</button>
-                  <button type="button" class="button" data-click="showActual" data-ref="showActual" disabled>Show Actual Image</button>
-                </div>
                 <div class="setup-canvas-options" data-ref="optsRoi" hidden>
-                  <label class="check setup-vis-digitanalog">
+                  <label class="check setup-vis-digitanalog setup-switch">
                     <input type="checkbox" data-change="redraw" data-ref="showDigitAnalog" checked />Show digit + analog ROIs
                   </label>
-                  <label class="check setup-vis-roionly">
-                    <input type="checkbox" data-change="redraw" data-ref="showSelectedOnly" />Selected ROI only
-                  </label>
+                </div>
+                <div class="setup-header-actions" data-ref="optsImage" hidden>
+                  <button type="button" class="button setup-takebtn" data-click="take" data-ref="take">Update image</button>
                 </div>
               </div>
-              <div class="m-only setup-seqbar" data-ref="mSeqBar" hidden>
-                <select data-change="mSeq" data-ref="mSeq" aria-label="Number sequence"></select>
-                <button type="button" class="m-icon" data-click="newSequence" aria-label="New number sequence" title="New"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
-                <button type="button" class="m-icon" data-click="renameSequence" aria-label="Rename number sequence" title="Rename"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg></button>
-                <button type="button" class="m-icon m-danger" data-click="deleteSequence" data-ref="mDeleteSeq" aria-label="Delete number sequence" title="Delete"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg></button>
+              <div class="m-only setup-seqbar" data-ref="mMarkerBar" hidden>
+                <div class="m-combo" data-ref="mMarkerCombo"></div>
+              </div>
+              <div class="m-only setup-seqbar setup-roibar" data-ref="mRoiBar" hidden>
+                <div class="m-combo" data-ref="mRoiCombo"></div>
               </div>
               <div class="canvas-wrap">
                 <img data-ref="loading" alt="Loading..." />
                 <canvas data-ref="canvas" style="display: none"></canvas>
+              </div>
+              <div class="setup-imgtools" data-ref="zoomBox" hidden>
+                <label class="check setup-zoom">
+                  <input type="checkbox" data-change="zoomRoi" data-ref="zoomRoi" />Zoom in
+                </label>
               </div>
             </div>
 
@@ -7089,50 +7128,25 @@ const App = (() => {
               </div>
             </div>
 
+          </div>
+
+          <div class="editor-side" data-ref="side">
             <div data-ref="panelImage" hidden>
               <div class="card">
-                <div class="card-header">
-                  <span>Parametrization</span>
-                  <div class="setup-header-actions">
-                    <button type="button" class="button" data-click="take" data-ref="take" disabled>Update Image</button>
-                  </div>
+                <div class="card-header setup-cam-head">
+                  <label class="check setup-switch setup-cam-switch">
+                    <input type="checkbox" data-change="camAdvanced" data-ref="camAdv" />Advanced
+                  </label>
                 </div>
-                <div class="setup-param-scroll">
-                  <table class="setup-cam-table" data-ref="camTable">
-                    <colgroup>
-                      <col style="width: 4%" /><col style="width: 21%" /><col style="width: 23%" />
-                      <col style="width: 8%" /><col style="width: 21%" /><col style="width: 23%" />
-                    </colgroup>
-                    <tbody>${camTableMarkup()}</tbody>
-                  </table>
+                <div class="cam-wrap">
+                  <div class="cam-grid" data-ref="camGrid">${camPanelMarkup()}</div>
+                  <div class="cam-lock" data-ref="camLock"><span>Update the image first, then you can change the settings.</span></div>
                 </div>
               </div>
             </div>
-          </div>
-
-          <div class="editor-side" data-ref="side" hidden>
             <div data-ref="panelMarkers" hidden>
-              <div class="m-only setup-roibar"><div class="m-chips" data-ref="mMarkerChips" role="listbox" aria-label="Alignment markers"></div></div>
               <div class="m-only setup-pair" data-ref="mPairMarker"></div>
-              <div class="card setup-proc">
-                <div class="card-header"><span>Processing</span></div>
-                <div class="setup-proc-row">
-                  <span class="setup-proc-label">Process digit ROIs</span>
-                  <span class="cfg-switch-wrap">
-                    <label class="cfg-switch"><input type="checkbox" data-change="digitProcessing" data-ref="digitProcessing" aria-label="Process digit ROIs" /><span></span></label>
-                    <span class="cfg-switch-text" data-ref="digitProcessingText">Off</span>
-                  </span>
-                </div>
-                <div class="setup-proc-row">
-                  <span class="setup-proc-label">Process analog ROIs</span>
-                  <span class="cfg-switch-wrap">
-                    <label class="cfg-switch"><input type="checkbox" data-change="analogProcessing" data-ref="analogProcessing" aria-label="Process analog ROIs" /><span></span></label>
-                    <span class="cfg-switch-text" data-ref="analogProcessingText">Off</span>
-                  </span>
-                </div>
-              </div>
-
-              <div class="card setup-markercard">
+              <div class="card setup-markercard m-hide">
                 <div class="card-header"><span>Marker</span></div>
                 <div class="side-body">
                   <label class="field m-hide">
@@ -7169,14 +7183,7 @@ const App = (() => {
             </div>
 
             <div class="setup-contents" data-ref="panelRoi" hidden>
-              <div class="m-only setup-roibar">
-                <div class="m-chips" data-ref="mChips" role="listbox" aria-label="Regions of interest"></div>
-                <div class="m-roiact">
-                  <button type="button" class="m-icon" data-click="newROI" aria-label="New region" title="New region"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
-                  <button type="button" class="m-icon" data-click="copyROI" data-ref="mCopy" aria-label="Copy region to the right" title="Copy to the right"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg></button>
-                  <button type="button" class="m-icon m-danger" data-click="deleteROI" data-ref="mDelete" aria-label="Delete region" title="Delete region"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg></button>
-                </div>
-              </div>
+              <div class="m-only m-offnote" data-ref="mOffNote" hidden></div>
               <div class="m-only setup-pair" data-ref="mPairRoi"></div>
               <div class="card m-hide">
                 <div class="card-header"><span>Number sequence</span></div>
@@ -7266,6 +7273,7 @@ const App = (() => {
     const g = R.canvas.getContext('2d');
     R.loading.src = loaderSpinner;
     const camInput = {};
+    const camUI = {}; // name -> function that mirrors the native input into its custom control
     all('[data-param]').forEach((el) => {
       camInput[el.dataset.param] = el;
     });
@@ -7287,7 +7295,6 @@ const App = (() => {
     function setInputVisibility() {
       const enabled = !!(delta.digit.enabled || delta.analog.enabled);
       R.roiInputs.hidden = !enabled;
-      all('.setup-vis-roionly').forEach((el) => show(el, enabled));
     }
 
     function digitProcessingChanged(init = false) {
@@ -7305,6 +7312,8 @@ const App = (() => {
         all('.setup-vis-digitanalog').forEach((el) => show(el, false));
         roiType = 'analog';
       }
+      // the switches sit above all tabs: switching one never changes the tab the user is on
+      if (!init && isRoiMode()) roiType = mode;
       refreshROI();
       parseROIArrangement();
       onTypeChanged();
@@ -7325,6 +7334,7 @@ const App = (() => {
         all('.setup-vis-digitanalog').forEach((el) => show(el, false));
         roiType = 'digit';
       }
+      if (!init && isRoiMode()) roiType = mode;
       refreshROI();
       parseROIArrangement();
       onTypeChanged();
@@ -7579,7 +7589,7 @@ const App = (() => {
       const rois = roisOf();
       const dependent = [
         R.refx, R.refdx, R.refy, R.refdy, R.lockAspectDigit, R.lockAspectAnalog, R.lockSizesDigit, R.lockSizesAnalog,
-        R.lockSpace, R.space, R.ccw, R.showSelectedOnly,
+        R.lockSpace, R.space, R.ccw, R.zoomRoi,
       ];
       const sel = R.roiSelect;
       while (sel.length) sel.remove(0);
@@ -7780,19 +7790,78 @@ const App = (() => {
       g.stroke();
     }
 
-    function drawEllipseRoi(x0, y0, dx, dy) {
-      g.beginPath();
-      g.ellipse(x0 + dx / 2, y0 + dy / 2, dx / 2, dy / 2, 0, 0, 2 * Math.PI);
+    let canvasZoom = 1; // scale of the zoomed canvas (1 = whole image)
+
+    /** One region in the look of the dashboard: soft fill, clean frame, rounded name badge above it (lines and text keep their size while zoomed). */
+    function drawRoiMark(kind, x0, y0, w0, h0, label, selected, accent) {
+      const z = canvasZoom;
+      const x = w0 < 0 ? x0 + w0 : x0; // a region that is dragged leftwards or upwards has a negative size for a moment
+      const y = h0 < 0 ? y0 + h0 : y0;
+      const w = Math.abs(w0);
+      const h = Math.abs(h0);
+      const col = selected ? accent : '#f8fafc';
+      const analog = kind === 'analog';
+      const path = () => {
+        g.beginPath();
+        if (analog) g.ellipse(x + w / 2, y + h / 2, Math.max(w / 2, 0.01), Math.max(h / 2, 0.01), 0, 0, 2 * Math.PI);
+        else g.rect(x, y, w, h);
+      };
+      // focus: the selected region is solid with a light halo, the others step back through transparency
+      g.save();
+      g.globalAlpha = selected ? 0.24 : 0.06;
+      g.fillStyle = col;
+      path();
+      g.fill();
+      g.restore();
+      if (selected) {
+        g.lineWidth = 5.5 / z;
+        g.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+        path();
+        g.stroke();
+      }
+      g.save();
+      g.globalAlpha = selected ? 1 : 0.55;
+      g.lineWidth = (selected ? 2.5 : 1.5) / z;
+      g.strokeStyle = col;
+      path();
       g.stroke();
-      // inner crosshair
-      g.setLineDash([2, 2]);
+      g.restore();
+      // guide lines as before: digits get the middle line and the inner frame, analog regions the dashed crosshair
+      g.save();
+      g.globalAlpha = selected ? 1 : 0.4;
+      g.lineWidth = 1 / z;
+      g.setLineDash([2 / z, 2 / z]);
       g.beginPath();
-      g.moveTo(x0 + dx / 2, y0);
-      g.lineTo(x0 + dx / 2, y0 + dy);
-      g.moveTo(x0, y0 + dy / 2);
-      g.lineTo(x0 + dx, y0 + dy / 2);
+      g.moveTo(x, y + h / 2);
+      g.lineTo(x + w, y + h / 2);
+      if (analog) {
+        g.moveTo(x + w / 2, y);
+        g.lineTo(x + w / 2, y + h);
+      }
       g.stroke();
-      g.setLineDash([]);
+      if (!analog) g.strokeRect(x + w * 0.2, y + h * 0.2, w * 0.6, h * 0.6);
+      g.restore();
+      drawBadge(label, x, y, w, h, selected ? accent : 'rgba(15, 23, 42, 0.5)');
+    }
+
+    /** Rounded name badge above a frame (below it when there is no room), as on the dashboard. */
+    function drawBadge(label, x, y, w, h, color) {
+      const z = canvasZoom;
+      g.font = `700 ${12 / z}px system-ui, sans-serif`;
+      const tw = g.measureText(label).width + 10 / z;
+      const bh = 17 / z;
+      let by = y - 5 / z - bh;
+      if (by < 0) by = y + h + 5 / z;
+      g.fillStyle = color;
+      g.beginPath();
+      if (g.roundRect) g.roundRect(x + w / 2 - tw / 2, by, tw, bh, 5 / z);
+      else g.rect(x + w / 2 - tw / 2, by, tw, bh);
+      g.fill();
+      g.fillStyle = '#fff';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText(label, x + w / 2, by + bh / 2 + 0.5 / z);
+      g.textBaseline = 'alphabetic';
     }
 
     /** Draws the reference image and the digit / analog ROI overlay (also writes the dragged rectangle back into the data). */
@@ -7801,7 +7870,24 @@ const App = (() => {
       g.drawImage(imageObj, 0, 0);
       const idx = seqIdx();
       const showBoth = R.showDigitAnalog.checked;
-      const selectedOnly = R.showSelectedOnly.checked;
+      const primary = getComputedStyle(root).getPropertyValue('--primary').trim() || '#2563eb';
+      const colors = { digit: primary, analog: '#f59e0b' };
+
+      const drawKind = (kind, rois, tagOf) => {
+        const active = roiType === kind;
+        // the others first, the selected one on top
+        for (let i = 0; i < rois.length; i++) {
+          if (active && i === roiSelected) continue;
+          drawRoiMark(kind, toInt(rois[i].x), toInt(rois[i].y), toInt(rois[i].dx), toInt(rois[i].dy), tagOf(i), false, colors[kind]);
+        }
+        if (active && rois[roiSelected]) {
+          drawRoiMark(kind, toInt(rect.startX), toInt(rect.startY), toInt(rect.w), toInt(rect.h), tagOf(roiSelected), true, colors[kind]);
+          rois[roiSelected].x = toInt(rect.startX);
+          rois[roiSelected].y = toInt(rect.startY);
+          rois[roiSelected].dx = toInt(rect.w);
+          rois[roiSelected].dy = toInt(rect.h);
+        }
+      };
 
       // digit ROI overlay
       if (R.digitProcessing.checked && (roiType === 'digit' || showBoth)) {
@@ -7816,49 +7902,7 @@ const App = (() => {
             }
           }
         }
-        for (let i = 0; i < rois.length; i++) {
-          if ((i !== roiSelected || (roiType === 'analog' && showBoth)) && !selectedOnly) {
-            const lw = 1;
-            g.lineWidth = lw;
-            g.strokeStyle = 'rgb(0, 0, 150)';
-            const x0 = toInt(rois[i].x) - toInt(lw / 2);
-            const y0 = toInt(rois[i].y) - toInt(lw / 2);
-            const dx = toInt(rois[i].dx) + toInt(lw);
-            const dy = toInt(rois[i].dy) + toInt(lw);
-            g.strokeRect(x0, y0, dx, dy);
-            drawTextBG(g, 'digit', 'dig' + (i + 1).toString(), x0 + dx / 2, toInt(rois[i].y), toInt(rect.h), 2, false);
-            // horizontal line + inner rect
-            g.setLineDash([2, 2]);
-            g.beginPath();
-            g.moveTo(x0, y0 + dy / 2);
-            g.lineTo(x0 + dx, y0 + dy / 2);
-            g.stroke();
-            g.strokeRect(x0 + dx * 0.2, y0 + dy * 0.2, dx * 0.6, dy * 0.6);
-            g.setLineDash([]);
-          } else if (roiType === 'digit' && i === roiSelected) {
-            const lw = 2;
-            g.lineWidth = lw;
-            g.strokeStyle = 'rgb(0, 0, 255)';
-            const x0 = toInt(rect.startX) - toInt(lw / 2);
-            const y0 = toInt(rect.startY) - toInt(lw / 2);
-            const dx = toInt(rect.w) + toInt(lw);
-            const dy = toInt(rect.h) + toInt(lw);
-            g.strokeRect(x0, y0, dx, dy);
-            drawTextBG(g, 'digit', 'dig' + (i + 1).toString(), x0 + dx / 2, toInt(rect.startY), toInt(rect.h), 2, true);
-            g.lineWidth = 1;
-            g.setLineDash([2, 2]);
-            g.strokeRect(x0 + dx * 0.2, y0 + dy * 0.2, dx * 0.6, dy * 0.6);
-            g.beginPath();
-            g.moveTo(x0, y0 + dy / 2);
-            g.lineTo(x0 + dx, y0 + dy / 2);
-            g.stroke();
-            g.setLineDash([]);
-            rois[roiSelected].x = toInt(rect.startX);
-            rois[roiSelected].y = toInt(rect.startY);
-            rois[roiSelected].dx = toInt(rect.w);
-            rois[roiSelected].dy = toInt(rect.h);
-          }
-        }
+        drawKind('digit', rois, (i) => `dig${i + 1}`);
       }
 
       // analog ROI overlay
@@ -7873,35 +7917,7 @@ const App = (() => {
             }
           }
         }
-        for (let i = 0; i < rois.length; i++) {
-          const tag = 'ana' + (i + 1).toString() + (rois[i].ccw === false ? '' : ' (CCW)');
-          if ((i !== roiSelected || (roiType === 'digit' && showBoth)) && !selectedOnly) {
-            const lw = 1;
-            g.lineWidth = lw;
-            g.strokeStyle = 'rgb(0, 150, 0)';
-            const x0 = toInt(rois[i].x) - toInt(lw / 2);
-            const y0 = toInt(rois[i].y) - toInt(lw / 2);
-            const dx = toInt(rois[i].dx) + toInt(lw);
-            const dy = toInt(rois[i].dy) + toInt(lw);
-            drawTextBG(g, 'analog', tag, x0 + dx / 2 - 0.5, toInt(rois[i].y), toInt(rect.h), 2, false);
-            drawEllipseRoi(x0, y0, dx, dy);
-          } else if (roiType === 'analog' && i === roiSelected) {
-            const lw = 2;
-            g.lineWidth = lw;
-            g.strokeStyle = 'rgb(0, 255, 0)';
-            const x0 = toInt(rect.startX) - toInt(lw / 2);
-            const y0 = toInt(rect.startY) - toInt(lw / 2);
-            const dx = toInt(rect.w) + toInt(lw);
-            const dy = toInt(rect.h) + toInt(lw);
-            drawTextBG(g, 'analog', tag, x0 + dx / 2, toInt(rect.startY), toInt(rect.h), 2, true);
-            g.lineWidth = 1;
-            drawEllipseRoi(x0, y0, dx, dy);
-            rois[roiSelected].x = toInt(rect.startX);
-            rois[roiSelected].y = toInt(rect.startY);
-            rois[roiSelected].dx = toInt(rect.w);
-            rois[roiSelected].dy = toInt(rect.h);
-          }
-        }
+        drawKind('analog', rois, (i) => `ana${i + 1}${rois[i].ccw === false ? '' : ' (CCW)'}`);
       }
     }
 
@@ -7986,6 +8002,17 @@ const App = (() => {
       delta.imagealignment = { marker: structuredClone(cfg.imagealignment.marker) };
       markerRoi = delta.imagealignment.marker; // shorter name; an array, saved as a whole
       if (markerSelected >= markerRoi.length) markerSelected = 0;
+      // the size of a marker is the size of its image: read it for both markers (the preview and the steppers need it)
+      markerRoi.forEach((m, i) => {
+        const im = new Image();
+        im.onload = () => {
+          if (destroyed || markerRoi[i] !== m || m.dx0 !== undefined) return;
+          m.dx = m.dx0 = im.naturalWidth;
+          m.dy = m.dy0 = im.naturalHeight;
+          mSync(true);
+        };
+        im.src = Api.setup.markerImageUrl(i + 1, false);
+      });
       R.markerSelect.options.length = 0;
       for (let i = 0; i < Math.max(markerRoi.length, 1); i++) R.markerSelect.add(new Option(`Marker ${i + 1}`, i));
       R.markerSelect.selectedIndex = markerSelected;
@@ -8040,8 +8067,13 @@ const App = (() => {
       img.onload = function () {
         if (mode !== 'markers' || destroyed) return;
         // dx, dy derive from the marker image size
-        rect.w = roi.dx = R.mdx.value = this.naturalWidth;
-        rect.h = roi.dy = R.mdy.value = this.naturalHeight;
+        // (a size that was set with the steppers stays: only the first load of the saved image defines it)
+        if (roi.dx0 === undefined) {
+          roi.dx = roi.dx0 = this.naturalWidth;
+          roi.dy = roi.dy0 = this.naturalHeight;
+        }
+        rect.w = R.mdx.value = roi.dx;
+        rect.h = R.mdy.value = roi.dy;
         roiPositionValidation(roi);
         rect.startX = R.mx.value = roi.x;
         rect.startY = R.my.value = roi.y;
@@ -8064,10 +8096,37 @@ const App = (() => {
       g.drawImage(imageObj, 0, 0);
       // during init markerRoi is not defined yet, or no marker is defined
       if (!Array.isArray(markerRoi) || markerRoi.length === 0) return;
-      const lw = 2;
-      g.lineWidth = lw;
-      g.strokeStyle = 'rgb(255, 51, 51)';
-      g.strokeRect(toInt(rect.startX) - toInt(lw / 2), toInt(rect.startY) - toInt(lw / 2), toInt(rect.w) + toInt(lw), toInt(rect.h) + toInt(lw));
+      // same colors and focus as the digit regions: the selected marker in the accent color with a halo, the other one white and transparent
+      const accent = getComputedStyle(root).getPropertyValue('--primary').trim() || '#2563eb';
+      const frame = (x0, y0, w0, h0, selected) => {
+        const x = w0 < 0 ? x0 + w0 : x0;
+        const y = h0 < 0 ? y0 + h0 : y0;
+        const w = Math.abs(w0);
+        const h = Math.abs(h0);
+        g.save();
+        g.globalAlpha = selected ? 0.24 : 0.06;
+        g.fillStyle = selected ? accent : '#f8fafc';
+        g.fillRect(x, y, w, h);
+        g.restore();
+        if (selected) {
+          g.lineWidth = 5.5;
+          g.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+          g.strokeRect(x, y, w, h);
+        }
+        g.lineWidth = selected ? 2.5 : 1.5;
+        g.globalAlpha = selected ? 1 : 0.55;
+        g.strokeStyle = selected ? accent : '#f8fafc';
+        g.strokeRect(x, y, w, h);
+        g.globalAlpha = 1;
+        return [x, y, w, h];
+      };
+      markerRoi.forEach((m, i) => {
+        if (i === markerSelected) return;
+        const [x, y, w, h] = frame(toInt(m.x), toInt(m.y), toInt(m.dx), toInt(m.dy), false);
+        drawBadge(`Marker ${i + 1}`, x, y, w, h, 'rgba(15, 23, 42, 0.5)');
+      });
+      const [x, y, w, h] = frame(toInt(rect.startX), toInt(rect.startY), toInt(rect.w), toInt(rect.h), true);
+      drawBadge(`Marker ${markerSelected + 1}`, x, y, w, h, accent);
     }
 
     function markerPointerDown(e) {
@@ -8208,7 +8267,8 @@ const App = (() => {
     function updateParamOutput(el) {
       const out = root.querySelector(`[data-out="${el.dataset.param}"]`);
       if (!out) return;
-      out.value = camSpec[el.dataset.param].fmt === 'zoom' ? (el.value / 1000.0).toFixed(2) + 'x' : el.value;
+      out.value = camFormat(camSpec[el.dataset.param], el.value);
+      camUI[el.dataset.param]?.();
     }
 
     /** Enables / disables the dependent parameters (zoom offsets, manual gain, auto / manual exposure). */
@@ -8226,11 +8286,13 @@ const App = (() => {
         const input = cell.querySelector('[data-param]');
         cell.classList.toggle('is-off', !!input && input.disabled);
       });
+      Object.values(camUI).forEach((sync) => sync());
     }
 
     /** Locks (saved reference shown) or releases (new image) all camera parameters. */
     function camEnable(flag) {
       camUnlocked = flag;
+      if (R.camLock) R.camLock.hidden = flag; // blurred with a hint until a new picture exists
       CAM_FIELDS.forEach((f) => {
         camInput[f.name].disabled = !flag;
       });
@@ -8320,13 +8382,40 @@ const App = (() => {
       delta = mergeParam(delta, f.name, el.value, !!f.int);
     }
 
+    const CAM_ADV_KEY = 'camAdvanced';
+    function setCamAdvanced(on, remember) {
+      R.camAdv.checked = on;
+      root.dataset.camAdv = on ? '1' : '0';
+      if (!remember) return;
+      try {
+        localStorage.setItem(CAM_ADV_KEY, on ? '1' : '0');
+      } catch (e) {
+        /* storage not available: the switch simply starts closed next time */
+      }
+    }
+    /** Advanced rows stay visible when one of their values is not the default, so nothing hidden has an effect. */
+    function camAdvancedInUse() {
+      return CAM_FIELDS.filter((f) => !CAM_BASIC.includes(f.name)).some((f) => {
+          const el = camInput[f.name];
+          const def = f.value !== undefined ? String(f.value) : f.options ? f.options[0][0] : '';
+        return !!el && !f.gate && String(el.value) !== def; // dependent values only count through their switch
+      });
+    }
     function parseCamParams() {
       CAM_FIELDS.forEach((f) => setControlValue(camInput[f.name], getPath(cfg, f.name)));
       CAM_FIELDS.filter((f) => f.type === 'range').forEach((f) => updateParamOutput(camInput[f.name]));
       setVariableInputLimits(false);
       applyCamGates();
+      let stored = false;
+      try {
+        stored = localStorage.getItem(CAM_ADV_KEY) === '1';
+      } catch (e) {
+        stored = false;
+      }
+      setCamAdvanced(stored || camAdvancedInUse(), false);
     }
 
+    let taking = false; // a picture is being taken
     async function doTake() {
       const params = {};
       CAPTURE_PARAMS.forEach(([key, name, def]) => {
@@ -8335,10 +8424,19 @@ const App = (() => {
       });
       specialeffect = params.specialeffect;
 
-      const { ok, blob } = await Api.setup.capture(params);
+      if (taking) return;
+      taking = true;
+      R.take.disabled = true;
+      let result;
+      try {
+        result = await Api.setup.capture(params);
+      } finally {
+        taking = false;
+        if (!destroyed) R.take.disabled = false;
+      }
+      const { ok, blob } = result;
       if (destroyed) return;
       if (!ok) {
-        R.createImage.disabled = false;
         showReference();
         return;
       }
@@ -8347,15 +8445,8 @@ const App = (() => {
       refLoadCanvas(currentBlobUrl, true);
       isActReference = false;
       imagePending = true;
-      R.showActual.disabled = false;
-      R.createImage.disabled = true;
+      camEnable(true); // now the settings can be changed; "Update image" again takes the next picture
       refreshSaveBar();
-    }
-
-    function loadRawImage() {
-      camEnable(true); // release all camera parameters
-      delta = {}; // reset the modified parameters after the parameter lock update
-      doTake();
     }
 
     function drawRotated(grid = true) {
@@ -8405,7 +8496,6 @@ const App = (() => {
     function refLoadCanvas(url, grid) {
       loadImageSource(url, () => {
         drawRotated(!!grid);
-        if (grid) R.take.disabled = false;
       });
     }
 
@@ -8437,13 +8527,13 @@ const App = (() => {
       refLoadCanvas(Api.setup.referenceImageUrl(), false);
       isActReference = true;
       imagePending = false;
-      R.createImage.disabled = false;
-      R.showActual.disabled = true;
-      R.take.disabled = true;
+      // a discarded picture takes its camera settings with it: the inputs show the stored values again
+      delete delta.takeimage;
+      if (delta.imagealignment) delete delta.imagealignment.imagerotation;
 
       cfg = Api.setup.getConfig() || cfg; // stored values back into the parameter inputs
       parseCamParams();
-      camEnable(false); // lock all camera parameters
+      camEnable(false); // locked (and blurred) until "Update image" has taken a new picture
       refreshSaveBar();
     }
 
@@ -8457,10 +8547,40 @@ const App = (() => {
     }
 
     function refreshDraw() {
+      applyZoom();
       redraw();
       updateCounts();
       mSync();
       if (!drag) refreshSaveBar();
+    }
+
+    /** "Zoom in": the view follows the selected region (not while it is dragged, so the picture does not run away). */
+    function applyZoom() {
+      const cv = R.canvas;
+      const wrap = cv.parentElement;
+      const sel = isRoiMode() && R.zoomRoi.checked && roiCount() > 0 ? roisOf()[roiSelected] : null;
+      if (!sel || !cv.offsetWidth || !cv.width) {
+        canvasZoom = 1;
+        wrap.classList.remove('zoomed');
+        cv.style.transform = '';
+        wrap.style.clipPath = '';
+        return;
+      }
+      if (drag || mDragState) return;
+      const W = cv.width;
+      const H = cv.height;
+      const k = cv.offsetWidth / W; // canvas pixel -> screen pixel
+      const vw = clampN(Math.max(toInt(sel.dx) * 9, 260), 260, W); // about 2.5x for a digit
+      const vh = (vw * H) / W;
+      const vx = clampN(toInt(sel.x) + toInt(sel.dx) / 2 - vw / 2, 0, W - vw);
+      const vy = clampN(toInt(sel.y) + toInt(sel.dy) / 2 - vh / 2, 0, H - vh);
+      canvasZoom = W / vw;
+      wrap.classList.add('zoomed');
+      // the zoomed picture is clipped to the place of the canvas (not to the padding of the frame)
+      const l = cv.offsetLeft;
+      const t = cv.offsetTop;
+      wrap.style.clipPath = `inset(${t}px ${wrap.clientWidth - l - cv.offsetWidth}px ${wrap.clientHeight - t - cv.offsetHeight}px ${l}px round 0.6rem)`;
+      cv.style.transform = `translate(${-vx * k * canvasZoom}px, ${-vy * k * canvasZoom}px) scale(${canvasZoom})`;
     }
 
     function updateCounts() {
@@ -8561,13 +8681,13 @@ const App = (() => {
       else if (isRoi && lastRecTab !== mode) renderMarkerRecognition(); // digits <-> analog: same data, other regions
       lastRecTab = mode;
       R.panelRoi.hidden = !isRoi;
-      R.side.hidden = mode === 'image';
-      R.layout.classList.toggle('single', mode === 'image');
       R.optsImage.hidden = mode !== 'image';
       R.optsRoi.hidden = !isRoi;
+      R.zoomBox.hidden = !isRoi;
       R.canvasTitle.textContent = TAB_TITLE[mode];
       R.canvas.classList.toggle('setup-canvas-draw', mode !== 'image'); // touch drawing must not scroll the page
-      R.mSeqBar.hidden = !isRoi;
+      R.mMarkerBar.hidden = mode !== 'markers';
+      R.mRoiBar.hidden = !isRoi;
       root.dataset.mode = mode;
       mSync(true);
       updateCounts();
@@ -8578,7 +8698,12 @@ const App = (() => {
      * Derived values (aspect ratio `ar`, marker size dx/dy) are left out so that just looking at a tab never counts as a change.
      */
     function editorState() {
-      const markers = (delta.imagealignment?.marker || []).map((m) => ({ x: m.x, y: m.y, updated: !!m.modified }));
+      const markers = (delta.imagealignment?.marker || []).map((m) => ({
+        x: m.x,
+        y: m.y,
+        updated: !!m.modified,
+        size: m.dx0 !== undefined && (m.dx !== m.dx0 || m.dy !== m.dy0), // a changed size needs a new marker image as well
+      }));
       return JSON.stringify(
         { markers, sequences: delta.numbersequences, digit: delta.digit, analog: delta.analog },
         (k, v) => (k === 'ar' ? undefined : v),
@@ -8660,6 +8785,14 @@ const App = (() => {
 
       if (newTab === 'image') {
         showReference();
+        if (initial) {
+          // the number sequence and the switches above the tabs need the data right away, also on the image tab
+          try {
+            loadEditorData();
+          } catch (e) {
+            console.error(e);
+          }
+        }
         return true;
       }
 
@@ -8710,6 +8843,18 @@ const App = (() => {
       setBusy(true);
       try {
         if (Array.isArray(markerRoi)) {
+          // a marker that was moved or resized gets its new image cut from the reference image, then all new images are stored
+          for (let i = 0; i < markerRoi.length; i++) {
+            const m = markerRoi[i];
+            const o = cfg.imagealignment?.marker?.[i];
+            const moved = o && (toInt(m.x) !== toInt(o.x) || toInt(m.y) !== toInt(o.y));
+            const resized = m.dx0 !== undefined && (m.dx !== m.dx0 || m.dy !== m.dy0);
+            if (!m.modified && (moved || resized)) {
+              const cut = await Api.setup.cutMarker(i + 1, m);
+              if (!cut) throw new Error(`Marker ${i + 1} could not be cut`);
+              m.modified = true;
+            }
+          }
           for (let i = 0; i < markerRoi.length; i++) {
             if (markerRoi[i].modified) await Api.setup.commitMarker(i + 1);
           }
@@ -8746,7 +8891,7 @@ const App = (() => {
     /* same logic as the fields of the desktop layout                     */
     /* ================================================================== */
     const mq = window.matchMedia('(max-width: 860px)');
-    const compact = () => mq.matches;
+    const compact = () => true; // the controls are the same on every screen size (the layout around them differs)
     let mStep = 10;
     const clampN = (v, a, b) => Math.max(a, Math.min(b, v));
     const mEl = (tag, cls, html) => {
@@ -8876,7 +9021,7 @@ const App = (() => {
         b.type = 'button';
         b.addEventListener('click', () => {
           mStep = n;
-          document.querySelectorAll('.m-seg button').forEach((x) => x.classList.toggle('active', Number(x.textContent) === n));
+          by.querySelectorAll('button').forEach((x) => x.classList.toggle('active', Number(x.textContent) === n));
         });
         seg.append(b);
       });
@@ -8996,115 +9141,274 @@ const App = (() => {
     }
     const mPairs = {};
 
-    // chips: select a region, drag to change the order (touch: press and hold first)
-    function mRenderChips(box, count, selected, sortable, onSelect) {
-      box.textContent = '';
-      for (let i = 0; i < count; i++) {
-        const b = mEl('button', `m-chip${i === selected ? ' active' : ''}`, String(i + 1));
-        b.type = 'button';
-        b.setAttribute('role', 'option');
-        b.setAttribute('aria-selected', String(i === selected));
-        b.addEventListener('click', () => onSelect(i));
-        box.append(b);
+    // preview of a marker: the cut-out of the reference image at its current position (follows the pad)
+    function mThumb(m) {
+      const c = document.createElement('canvas');
+      const h = 36;
+      if (!m || !(m.w >= 1) || !(m.h >= 1) || !imageObj.naturalWidth) {
+        c.width = 40;
+        c.height = h;
+        return c;
       }
-      box.dataset.sortable = sortable ? '1' : '';
+      c.width = clampN(Math.round((h * m.w) / m.h), 22, 90);
+      c.height = h;
+      c.getContext('2d').drawImage(imageObj, m.x, m.y, m.w, m.h, 0, 0, c.width, c.height);
+      return c;
     }
 
-    function mAttachSort(box, onMove) {
-      const LONG = 260;
-      const GAP = 8;
-      let d = null;
-      let suppress = false;
-      let auto = null;
-      const chipOf = (el) => el.closest && el.closest('.m-chip');
-      const targetIndex = () => {
-        const c = d.rects[d.i];
-        const center = c.left + c.width / 2 + d.dx;
-        return clampN(d.rects.filter((r, k) => k !== d.i && r.left + r.width / 2 < center).length, 0, d.rects.length - 1);
-      };
-      const layout = () => {
-        const t = targetIndex();
-        const w = d.rects[d.i].width + GAP;
-        [...box.children].forEach((c, j) => {
-          if (j === d.i) {
-            c.style.transform = `translateX(${d.dx}px)`;
-            return;
-          }
-          let shift = 0;
-          if (d.i < t && j > d.i && j <= t) shift = -w;
-          else if (d.i > t && j < d.i && j >= t) shift = w;
-          c.style.transform = shift ? `translateX(${shift}px)` : '';
+    // combo box (markers, number sequences): items = [{ thumb?: canvas, title, sub }]
+    function mComboClose(host) {
+      host._open = false;
+      const list = host.querySelector('.m-combo-list');
+      if (list) list.hidden = true;
+      host.querySelector('.m-combo-btn')?.setAttribute('aria-expanded', 'false');
+    }
+    function mComboRender(host, { caption, items, selected, onPick, add, empty }) {
+      if (!host.firstChild) {
+        const btn = mEl('button', 'm-combo-btn');
+        btn.type = 'button';
+        btn.setAttribute('aria-haspopup', 'listbox');
+        btn.setAttribute('aria-expanded', 'false');
+        const ul = mEl('ul', 'm-combo-list');
+        ul.setAttribute('role', 'listbox');
+        ul.hidden = true;
+        host.append(btn, ul);
+        btn.addEventListener('click', () => {
+          host._open = ul.hidden;
+          ul.hidden = !host._open;
+          btn.setAttribute('aria-expanded', String(host._open));
         });
-      };
-      const activate = () => {
-        if (!d || d.active) return;
-        d.active = true;
-        d.rects = [...box.children].map((c) => ({ left: c.offsetLeft, width: c.offsetWidth }));
-        d.scroll0 = box.scrollLeft;
-        d.dx = 0;
-        d.chip.classList.add('dragging');
-        box.classList.add('sorting');
-        try { d.chip.setPointerCapture(d.id); } catch (e) { /* not capturable */ }
-        if (navigator.vibrate) navigator.vibrate(12);
-        auto = setInterval(() => {
-          if (!d || !d.active) return;
-          const b = box.getBoundingClientRect();
-          const v = d.x < b.left + 36 ? -9 : d.x > b.right - 36 ? 9 : 0;
-          if (v) {
-            box.scrollLeft += v;
-            d.dx = d.x - d.x0 + (box.scrollLeft - d.scroll0);
-            layout();
-          }
-        }, 16);
-      };
-      const cleanup = () => {
-        if (d) clearTimeout(d.timer);
-        clearInterval(auto);
-        [...box.children].forEach((c) => {
-          c.style.transform = '';
-          c.classList.remove('dragging');
+        document.addEventListener('pointerdown', (e) => {
+          if (host._open && !host.contains(e.target)) mComboClose(host);
         });
-        box.classList.remove('sorting');
-        d = null;
+        host.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') mComboClose(host);
+        });
+      }
+      const btn = host.querySelector('.m-combo-btn');
+      const ul = host.querySelector('.m-combo-list');
+      const entry = (it, withCaption) => {
+        const wrap = mEl('span', 'm-combo-entry');
+        if (it && it.thumb) {
+          // a node can only sit in one place: the button and the list entry each get a copy of the preview
+          const copy = document.createElement('canvas');
+          copy.width = it.thumb.width;
+          copy.height = it.thumb.height;
+          copy.getContext('2d').drawImage(it.thumb, 0, 0);
+          wrap.append(copy);
+        }
+        const txt = mEl('span', 'm-combo-text');
+        if (withCaption && caption) txt.append(mEl('i', 'm-combo-caption', caption));
+        txt.append(mEl('b', '', it ? it.title : ''), mEl('small', '', it ? it.sub || '' : ''));
+        wrap.append(txt);
+        return wrap;
       };
-      box.addEventListener('pointerdown', (e) => {
-        const chip = chipOf(e.target);
-        if (!chip || box.dataset.sortable !== '1' || (e.pointerType === 'mouse' && e.button !== 0)) return;
-        d = { chip, i: [...box.children].indexOf(chip), id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, active: false, touch: e.pointerType !== 'mouse' };
-        if (d.touch) d.timer = setTimeout(activate, LONG);
-      });
-      box.addEventListener('pointermove', (e) => {
-        if (!d || e.pointerId !== d.id) return;
-        d.x = e.clientX;
-        if (!d.active) {
-          const dist = Math.hypot(e.clientX - d.x0, e.clientY - d.y0);
-          if (d.touch && dist > 8) {
-            cleanup();
-            return;
-          }
-          if (d.touch || dist <= 5) return;
-          activate();
+      btn.textContent = '';
+      btn.append(entry(items[selected] || { title: empty || '', sub: '' }, true), mEl('span', 'm-combo-chev', '&#9662;'));
+      if (host._adding) return; // a name is being typed: keep the list as it is
+      ul.textContent = '';
+      const pencil = '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg>';
+      const trash = '<svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg>';
+      items.forEach((it, i) => {
+        const li = mEl('li', `m-combo-item${i === selected ? ' selected' : ''}`);
+        li.setAttribute('role', 'option');
+        li.setAttribute('aria-selected', String(i === selected));
+        const main = mEl('div', 'm-combo-main');
+        main.append(entry(it, false));
+        main.addEventListener('click', () => {
+          mComboClose(host);
+          onPick(i);
+        });
+        li.append(main);
+        if (it.actions) {
+          const acts = mEl('span', 'm-combo-acts');
+          const edit = mEl('button', 'm-combo-act', pencil);
+          edit.type = 'button';
+          edit.title = 'Rename';
+          edit.setAttribute('aria-label', `Rename ${it.title}`);
+          const del = mEl('button', 'm-combo-act m-danger', trash);
+          del.type = 'button';
+          del.title = 'Delete';
+          del.setAttribute('aria-label', `Delete ${it.title}`);
+          del.disabled = !it.actions.canDelete;
+          edit.addEventListener('click', (e) => {
+            e.stopPropagation();
+            host._adding = true; // keep the list while the name is edited
+            li.textContent = '';
+            li.classList.add('editing');
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.maxLength = 30;
+            inp.value = it.title;
+            inp.setAttribute('aria-label', 'New name');
+            const ok = mEl('button', 'm-combo-addok', 'Save');
+            ok.type = 'button';
+            const leave = () => {
+              host._adding = false;
+              it.actions.refresh();
+            };
+            const submit = () => {
+              const name = inp.value.trim();
+              if (!name || name === it.title) return leave();
+              host._adding = false;
+              const err = it.actions.rename(name);
+              if (err) {
+                host._adding = true;
+                inp.classList.add('invalid');
+                inp.title = err;
+              }
+            };
+            ok.addEventListener('click', submit);
+            inp.addEventListener('keydown', (ev) => {
+              ev.stopPropagation();
+              if (ev.key === 'Enter') submit();
+              if (ev.key === 'Escape') leave();
+            });
+            inp.addEventListener('input', () => inp.classList.remove('invalid'));
+            li.append(inp, ok);
+            inp.focus();
+            inp.select();
+          });
+          del.addEventListener('click', (e) => {
+            e.stopPropagation();
+            mComboClose(host);
+            it.actions.remove();
+          });
+          acts.append(edit, del);
+          li.append(acts);
         }
-        d.dx = e.clientX - d.x0 + (box.scrollLeft - d.scroll0);
-        layout();
-      });
-      box.addEventListener('pointerup', (e) => {
-        if (!d || e.pointerId !== d.id) return;
-        if (!d.active) {
-          cleanup();
-          return;
+        if (it.buttons) {
+          // free buttons of an entry (regions: move up / down, copy, delete); moving keeps the list open
+          const acts = mEl('span', 'm-combo-acts');
+          it.buttons.forEach((bt) => {
+            const b = mEl('button', `m-combo-act${bt.danger ? ' m-danger' : ''}`, bt.icon);
+            b.type = 'button';
+            b.title = bt.title;
+            b.setAttribute('aria-label', `${bt.title}: ${it.title}`);
+            b.disabled = !!bt.disabled;
+            b.addEventListener('click', (e) => {
+              e.stopPropagation();
+              if (bt.close) mComboClose(host);
+              bt.onClick();
+            });
+            acts.append(b);
+          });
+          li.append(acts);
         }
-        const from = d.i;
-        const to = targetIndex();
-        cleanup();
-        suppress = true;
-        setTimeout(() => { suppress = false; }, 0);
-        if (to !== from) onMove(from, to);
+        ul.append(li);
       });
-      box.addEventListener('pointercancel', (e) => { if (d && e.pointerId === d.id) cleanup(); });
-      box.addEventListener('click', (e) => { if (suppress) { e.stopPropagation(); e.preventDefault(); } }, true);
-      box.addEventListener('touchmove', (e) => { if (d && d.active) e.preventDefault(); }, { passive: false });
-      box.addEventListener('contextmenu', (e) => { if (d) e.preventDefault(); });
+      if (add) {
+        // new entry right in the list: a click turns it into an input
+        const li = mEl('li', 'm-combo-add');
+        const show = () => {
+          host._adding = false;
+          li.textContent = '';
+          const b = mEl('button', 'm-combo-addbtn', '<span>+</span> ' + add.label);
+          b.type = 'button';
+          b.addEventListener('click', add.immediate ? () => {
+            mComboClose(host);
+            add.immediate();
+          } : edit);
+          li.append(b);
+        };
+        const edit = () => {
+          host._adding = true;
+          li.textContent = '';
+          const inp = document.createElement('input');
+          inp.type = 'text';
+          inp.maxLength = 30;
+          inp.placeholder = add.placeholder || 'Name';
+          inp.setAttribute('aria-label', add.label);
+          const ok = mEl('button', 'm-combo-addok', 'Add');
+          ok.type = 'button';
+          const submit = () => {
+            const name = inp.value.trim();
+            if (!name) return;
+            const err = add.onSubmit(name);
+            if (err) {
+              inp.classList.add('invalid');
+              inp.title = err;
+              return;
+            }
+            host._adding = false;
+            mComboClose(host);
+            mFillSeq(); // rebuild the list with the new entry
+          };
+          ok.addEventListener('click', submit);
+          inp.addEventListener('keydown', (e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter') submit();
+            if (e.key === 'Escape') {
+              show();
+              mComboClose(host);
+            }
+          });
+          inp.addEventListener('input', () => inp.classList.remove('invalid'));
+          li.append(inp, ok);
+          inp.focus();
+        };
+        show();
+        ul.append(li);
+      }
+    }
+    function mRenderMarkerCombo(t, sel) {
+      const items = t.list().map((m, i) => ({ thumb: mThumb(m), title: `Marker ${i + 1}`, sub: m.w >= 1 && m.h >= 1 ? `${m.x}, ${m.y} \u00b7 ${m.w} \u00d7 ${m.h}` : `${m.x}, ${m.y}` }));
+      mComboRender(R.mMarkerCombo, { caption: 'Markers', items, selected: sel, onPick: (i) => t.select(i) });
+    }
+
+    const MI = {
+      up: '<svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg>',
+      down: '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>',
+      copy: '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>',
+      trash: '<svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg>',
+    };
+    function mRenderRoiCombo(t, sel) {
+      const digit = roiType === 'digit';
+      let list = [];
+      try {
+        list = t.ready() ? t.list() : [];
+      } catch (e) {
+        list = []; // data not loaded yet
+      }
+      const pick = (i) => {
+        if (i !== roiSelected) t.select(i);
+      };
+      const items = list.map((m, i) => ({
+        thumb: mThumb(m),
+        title: `${digit ? 'Digit' : 'Analog'} ${i + 1}`,
+        sub: m.w >= 1 && m.h >= 1 ? `${m.x}, ${m.y} \u00b7 ${m.w} \u00d7 ${m.h}` : `${m.x}, ${m.y}`,
+        buttons: [
+          { icon: MI.up, title: 'Move up', disabled: i === 0, onClick: () => mMoveROI(i, i - 1) },
+          { icon: MI.down, title: 'Move down', disabled: i === list.length - 1, onClick: () => mMoveROI(i, i + 1) },
+          {
+            icon: MI.copy,
+            title: 'Copy to the right',
+            close: true,
+            onClick: () => {
+              pick(i);
+              onClickCopyROI();
+            },
+          },
+          {
+            icon: MI.trash,
+            title: 'Delete',
+            danger: true,
+            close: true,
+            onClick: () => {
+              pick(i);
+              onClickDeleteROI();
+            },
+          },
+        ],
+      }));
+      mComboRender(R.mRoiCombo, {
+        caption: digit ? 'Digit region' : 'Analog region',
+        items,
+        selected: sel,
+        onPick: (i) => pick(i),
+        add: { label: digit ? 'Add digit' : 'Add analog region', immediate: () => onClickNewROI() },
+        empty: { title: 'No regions yet', sub: 'Add the first one' }.title,
+      });
     }
 
     function mMoveROI(from, to) {
@@ -9128,19 +9432,87 @@ const App = (() => {
       onValueManualChanged();
     }
 
-    // sequence selection of the flat bar mirrors the original selection
+    // number sequences: one combo for the digit and the analog tab; the counts show what a sequence contains
     function mFillSeq() {
-      if (!R.mSeq) return;
-      R.mSeq.textContent = '';
-      Array.from(R.seqSelect.options).forEach((o) => R.mSeq.add(new Option(o.text, o.value)));
-      R.mSeq.selectedIndex = R.seqSelect.selectedIndex;
-      R.mDeleteSeq.disabled = R.deleteSeq.disabled;
+      if (!R.mSeqCombo) return;
+      const opts = Array.from(R.seqSelect.options);
+      const items = opts.map((o, i) => {
+        const nd = delta.digit?.sequence?.[i]?.roi?.length ?? 0;
+        const na = delta.analog?.sequence?.[i]?.roi?.length ?? 0;
+        const dOff = delta.digit && !delta.digit.enabled ? ' (off)' : '';
+        const aOff = delta.analog && !delta.analog.enabled ? ' (off)' : '';
+        return {
+          title: o.text,
+          sub: `${nd} digit${nd === 1 ? '' : 's'}${dOff} \u00b7 ${na} analog${aOff}`,
+          actions: {
+            canDelete: opts.length > 1,
+            refresh: () => mFillSeq(),
+            rename: (name) => {
+              const keep = seqName();
+              const nm = name.toLowerCase();
+              const err = renameNumberSequence(i, nm);
+              if (err) {
+                firework.launch(err, 'danger', 5000);
+                return err;
+              }
+              fillSequenceSelectionOptions(i === seqIdx() ? nm : keep);
+              return '';
+            },
+            remove: async () => {
+              const confirmed = await confirmDialog({
+                title: `Delete number sequence "${o.text}"?`,
+                text: 'The entire sequence including all of its digit and analog ROIs will be removed.',
+                okLabel: 'Delete sequence',
+                danger: true,
+              });
+              if (destroyed || !confirmed) return;
+              const keep = seqName();
+              const err = deleteNumberSequence(i);
+              if (err) {
+                firework.launch(err, 'danger', 5000);
+                return;
+              }
+              fillSequenceSelectionOptions(keep === o.text ? undefined : keep);
+              onTypeChanged();
+            },
+          },
+        };
+      });
+      mComboRender(R.mSeqCombo, {
+        caption: 'Number sequence',
+        add: {
+          label: 'Add sequence',
+          placeholder: 'Name of the new sequence',
+          onSubmit: (name) => {
+            const nm = name.toLowerCase();
+            const err = createNumberSequence(nm);
+            if (err) {
+              firework.launch(err, 'danger', 5000);
+              return err;
+            }
+            fillSequenceSelectionOptions(nm);
+            onTypeChanged();
+            return '';
+          },
+        },
+        items,
+        selected: Math.max(0, R.seqSelect.selectedIndex),
+        onPick: (i) => {
+          R.seqSelect.selectedIndex = i;
+          onSequenceChanged();
+        },
+      });
     }
 
     // keeps chips and values in step with the editor state (cheap: called after every redraw)
-    let mChipKey = '';
     function mSync(force) {
-      if (!R.mChips) return;
+      if (!R.mRoiCombo) return;
+      mFillSeq(); // the number sequence applies to every tab
+      // regions of a switched-off kind stay saved but are ignored: the controls are greyed out and say so
+      const off = isRoiMode() && !(mode === 'digit' ? R.digitProcessing.checked : R.analogProcessing.checked);
+      root.dataset.procOff = off ? '1' : '';
+      R.mOffNote.hidden = !off;
+      R.mOffNote.textContent = off ? `${mode === 'digit' ? 'Digit' : 'Analog'} processing is switched off. The regions stay saved but are ignored.` : '';
       const t = mTarget();
       if (!t) return;
       let count = 0;
@@ -9150,36 +9522,20 @@ const App = (() => {
         count = 0;
       }
       const which = mode === 'markers' ? 'marker' : 'roi';
-      const box = which === 'marker' ? R.mMarkerChips : R.mChips;
       const sel = t.index();
-      const key = `${which}|${roiType}|${seqIdx()}|${count}`;
-      if (force || key !== mChipKey) {
-        mChipKey = key;
-        mRenderChips(box, count, sel, which === 'roi', (i) => t.select(i));
-      }
-      [...box.children].forEach((c, i) => {
-        c.classList.toggle('active', i === sel);
-        c.setAttribute('aria-selected', String(i === sel));
-      });
-      const cur = box.children[sel];
-      if (cur && !box.classList.contains('sorting')) box.scrollTo({ left: cur.offsetLeft - (box.clientWidth - cur.offsetWidth) / 2 });
-      if (which === 'roi') {
-        R.mCopy.disabled = count === 0;
-        R.mDelete.disabled = count === 0;
+      if (which === 'marker') {
+        mRenderMarkerCombo(t, sel);
+      } else {
+        mRenderRoiCombo(t, sel);
       }
       mPairs[which]?.update();
-      mFillSeqState();
-    }
-    function mFillSeqState() {
-      if (R.mSeq && R.mSeq.selectedIndex !== R.seqSelect.selectedIndex) R.mSeq.selectedIndex = R.seqSelect.selectedIndex;
-      if (R.mDeleteSeq) R.mDeleteSeq.disabled = R.deleteSeq.disabled;
     }
 
     // on a phone the region is moved by dragging it in the image (the size is changed with the steppers)
-    let mDragState = null;
     function mPointerDown(e) {
       const t = mTarget();
       if (!t || !t.ready()) return false;
+      if (root.dataset.procOff === '1') return true; // switched off: the regions are not shown and cannot be grabbed
       const p = pointerPos(e, R.canvas);
       const list = t.list();
       const cur = t.index();
@@ -9213,12 +9569,85 @@ const App = (() => {
     function mInit() {
       mPairs.roi = mBuildPair(R.mPairRoi, 'roi');
       mPairs.marker = mBuildPair(R.mPairMarker, 'marker');
-      mAttachSort(R.mChips, (from, to) => mMoveROI(from, to));
-      mAttachSort(R.mMarkerChips, () => {});
       mq.addEventListener?.('change', () => mSync(true));
     }
 
     mInit();
+
+    /* ---------------------------------------------------------- camera controls (-/+ buttons, slider, switch, segmented buttons) */
+    function camSend(el, value) {
+      el.value = String(value);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    function camNudge(el, delta) {
+      let v = Number((parseFloat(el.value) || 0) + delta);
+      v = Number(v.toFixed(Math.abs(delta) < 1 ? 1 : 0));
+      const min = parseFloat(el.min);
+      const max = parseFloat(el.max);
+      if (Number.isFinite(min)) v = Math.max(min, v);
+      if (Number.isFinite(max)) v = Math.min(max, v);
+      if (String(v) !== el.value) camSend(el, v);
+    }
+    function camBuildUI() {
+      root.querySelectorAll('[data-cam]').forEach((box) => {
+        const name = box.dataset.cam;
+        const el = camInput[name];
+        const step = CAM_UI[name]?.step ?? (parseFloat(el.getAttribute('step')) || 1);
+        box.querySelectorAll('.cam-step').forEach((b) => {
+          const dir = Number(b.dataset.dir);
+          mHold(b, () => {
+            if (!el.disabled) camNudge(el, dir * step);
+          });
+          b.addEventListener('click', (e) => {
+            if (e.detail === 0 && !el.disabled) camNudge(el, dir * step); // keyboard
+          });
+        });
+        const sw = box.querySelector('.cam-check');
+        if (sw) sw.addEventListener('change', () => camSend(el, sw.checked ? 'true' : 'false'));
+        const seg = box.querySelector('.cam-segbtns');
+        if (seg) {
+          [...el.options].forEach((o) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.dataset.v = o.value;
+            b.textContent = o.text;
+            b.addEventListener('click', () => {
+              if (!el.disabled && el.value !== o.value) camSend(el, o.value);
+            });
+            seg.append(b);
+          });
+          seg.dataset.cols = String(el.options.length > 3 ? 2 : el.options.length);
+        }
+        camUI[name] = () => {
+          const off = el.disabled;
+          box.querySelectorAll('.cam-step').forEach((b) => {
+            b.disabled = off;
+          });
+          if (sw) {
+            sw.checked = el.value === 'true';
+            sw.disabled = off;
+          }
+          if (seg) {
+            [...seg.children].forEach((b) => {
+              b.classList.toggle('active', b.dataset.v === el.value);
+              b.disabled = off;
+            });
+          }
+          if (el.type === 'range') {
+            const min = parseFloat(el.min);
+            const max = parseFloat(el.max);
+            const at = (v) => ((v - min) / (max - min || 1)) * 100;
+            const pos = at(parseFloat(el.value) || 0);
+            const zero = min < 0 && max > 0 ? at(0) : 0; // ranges around zero are filled from the middle
+            box.style.setProperty('--from', `${Math.min(zero, pos)}%`);
+            box.style.setProperty('--to', `${Math.max(zero, pos)}%`);
+          }
+        };
+        camUI[name]();
+      });
+    }
+    camBuildUI();
 
     /* ---------------------------------------------------------- events */
     const CLICKS = {
@@ -9226,8 +9655,6 @@ const App = (() => {
         if (o.onNavigate) o.onNavigate(t.dataset.tab);
         else setTab(t.dataset.tab);
       },
-      createImage: () => loadRawImage(),
-      showActual: () => showReference(),
       take: () => doTake(),
       updateMarker: () => requestMarkerCut(),
       recRefresh: () => loadMarkerRecognition(),
@@ -9244,11 +9671,9 @@ const App = (() => {
     };
     const CHANGES = {
       redraw: () => refreshDraw(),
+      camAdvanced: () => setCamAdvanced(R.camAdv.checked, true),
+      zoomRoi: () => refreshDraw(),
       markerSelect: () => markerSelectionChanged(),
-      mSeq: () => {
-        R.seqSelect.selectedIndex = R.mSeq.selectedIndex;
-        onSequenceChanged();
-      },
       markerValue: (t) => {
         clampMin(t, 1);
         markerValueChanged();
@@ -9291,7 +9716,10 @@ const App = (() => {
     };
     const onRootInput = (e) => {
       const p = e.target.closest('[data-param]');
-      if (p && p.type === 'range') updateParamOutput(p); // live value while dragging a slider
+      if (p && p.type === 'range') {
+        updateParamOutput(p); // live value while dragging a slider
+        if (p.dataset.param === 'imagealignment.imagerotation' && !isActReference) drawRotated(); // the preview turns along with the slider
+      }
     };
     root.addEventListener('click', onRootClick);
     root.addEventListener('change', onRootChange);
@@ -9300,7 +9728,7 @@ const App = (() => {
     const onPointerDown = (e) => {
       if (!imageOk || (e.pointerType === 'mouse' && e.button !== 0)) return;
       if (compact() && (mode === 'markers' || isRoiMode())) {
-        // phone: the region is moved by dragging (its size is changed with the steppers)
+        // the region is moved by dragging (its size is changed with the steppers)
         if (!mPointerDown(e)) return;
         try {
           R.canvas.setPointerCapture(e.pointerId);
@@ -9323,6 +9751,7 @@ const App = (() => {
     const onPointerUp = (e) => {
       if (mDragState) {
         mDragState = null;
+        applyZoom(); // the view follows the region again after the drag
         return;
       }
       if (!drag) return;
