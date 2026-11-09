@@ -28,6 +28,7 @@ Further details can be found in the respective REST API endpoint description.
 | [/ota](ota.md)                       | Over The Air Update                                | HTML        | 
 | [/api/update](update.md)             | One-click Update (Device Downloads Release From GitHub)| JSON    | 
 | [/api/reboot](reboot.md)             | Trigger Reboot (POST)                              | JSON        | 
+| [/mcp, /api/mcp](mcp.md)             | Optional MCP Server For AI Assistants (Token)      | JSON-RPC    | 
 | [/wlan](wlan.md)                     | WLAN Scan                                          | JSON        |
 | [/coredump](coredump.md)             | Handle Core Dumps (Software Exception)             | HTML        | 
 | [/fileserver](fileserver.md)         | Fileserver (File Download / Show Folder Content)   | JSON + HTML | 

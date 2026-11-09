@@ -28,6 +28,7 @@
 #include "gpioControl.h"
 #include "server_file.h"
 #include "server_ota.h"
+#include "mcp_server.h"
 #include "server_camera.h"
 #include "server_wlan.h"
 #include "improvWifiProvisioning.h"
@@ -294,6 +295,7 @@ extern "C" void app_main(void)
 
     // Start webserver + register URI handler
     // ********************************************
+    mcpInit(); // optional MCP server: state and token hash from NVS
     server = startWebserver();
     registerConfigFileUri(server);
     registerWlanUri(server);
@@ -310,6 +312,7 @@ extern "C" void app_main(void)
         gpioHandle->registerGpioUri(server);
     }
 
+    registerMcpUri(server);
     registerWebserverUri(server, "/sdcard");
 
     // Check basic device init status
