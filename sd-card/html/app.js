@@ -2979,15 +2979,16 @@ const App = (() => {
         r.install.disabled = !picker.file();
       };
 
-      // Step 3: wait until the device is back, then reload the app
+      // Step 2 (install) lasts while the device installs and restarts; step 3 once it is back, then the app reloads
       const waitForDevice = async () => {
-        overlay.step(3);
-        overlay.title('Restarting ...');
+        overlay.step(2); // the package is installed while the device is away: that is the install step
+        overlay.title('Installing ...');
         overlay.text('The device installs the update and restarts. This page reloads automatically. Do not unplug the device.');
         overlay.progress(null);
         const result = await Api.ota.rebootAndWait({ cancelled: () => !alive });
         if (!alive) return;
         if (result === 'online') {
+          overlay.step(3);
           overlay.title('Update installed');
           overlay.text('Reloading ...');
           reloadApp();
