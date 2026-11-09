@@ -15,8 +15,8 @@ What this fork changed: a new single page WebUI (Doorbell look, see the owner's 
 update from GitHub, only the `esp32cam` board, automatic migration of a v16 `config.ini`, meter type themes, a live picture animation of the
 running cycle (needs firmware support, see `docs/API/REST/live.md`).
 
-Productive devices of the owner: **gasmeter** and **watermeter** (both ESP32-CAM, reachable by host name behind a reverse proxy; the proxy
-redirects plain POST requests of some clients, so test with the same host name the owner uses).
+The owner runs two productive ESP32-CAM devices (a gas meter and a water meter). Ask the owner before touching them; the owner often flashes
+them personally.
 
 ## Repository layout
 
