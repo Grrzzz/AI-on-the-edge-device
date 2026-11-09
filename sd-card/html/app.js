@@ -5076,15 +5076,23 @@ const App = (() => {
 
     // ---- drawing -----------------------------------------------------------------
     // blurred fill of the card: the picture in its current state, covering the whole card
-    function drawBg(P, W, H, pose, raw, alg) {
+    // it follows the zoom of the picture: when the regions are zoomed in, the fill behind is the blurred zoomed view, not the whole picture
+    function drawBg(P, W, H, pose, raw, alg, zoom) {
       const bw = bgCanvas.width, bh = bgCanvas.height;
       bgCtx.setTransform(1, 0, 0, 1, 0, 0);
       bgCtx.clearRect(0, 0, bw, bh);
-      const kc = Math.max(bw / W, bh / H);
+      const cover = Math.max(lay.cw / W, lay.ch / H); // card pixels per picture pixel when the picture covers the card
+      const sCard = Math.max(cover, lerp(cover, lay.k * zoom.k, P.z));
+      const kc = sCard * (bw / lay.cw);
+      let cx = lerp(W / 2, zoom.c[0], P.z);
+      let cy = lerp(H / 2, zoom.c[1], P.z);
+      const hw = bw / 2 / kc, hh = bh / 2 / kc; // keep the view inside the picture: no empty edges
+      cx = hw < W / 2 ? Math.max(hw, Math.min(cx, W - hw)) : W / 2;
+      cy = hh < H / 2 ? Math.max(hh, Math.min(cy, H - hh)) : H / 2;
       const base = () => {
         bgCtx.translate(bw / 2, bh / 2);
         bgCtx.scale(kc, kc);
-        bgCtx.translate(-W / 2, -H / 2);
+        bgCtx.translate(-cx, -cy);
       };
       if (pose && raw && P.algMix < 1) {
         bgCtx.save();
@@ -5110,17 +5118,17 @@ const App = (() => {
       const { W, H, pose, rois } = D;
       const raw = D.raw, alg = D.alg;
       if (!lay) return;
-      drawBg(P, W, H, pose, raw, alg);
-      ctx.setTransform(lay.dpr, 0, 0, lay.dpr, 0, 0);
-      ctx.clearRect(0, 0, lay.cw, lay.ch);
-      ctx.setTransform(lay.dpr * lay.k, 0, 0, lay.dpr * lay.k, lay.dpr * lay.vx, lay.dpr * lay.vy);
-
       // zoom target: the regions of interest
       const have = rois.length > 0;
       const bx0 = have ? Math.min(...rois.map((r) => r.x)) : 0, bx1 = have ? Math.max(...rois.map((r) => r.x + r.w)) : W;
       const by0 = have ? Math.min(...rois.map((r) => r.y)) : 0, by1 = have ? Math.max(...rois.map((r) => r.y + r.h)) : H;
       const zoomK = Math.min(((lay.cw / lay.k) * 0.9) / (bx1 - bx0), ((lay.ch / lay.k) * 0.8) / (by1 - by0 + 30));
       const zc = [(bx0 + bx1) / 2, (by0 + by1) / 2];
+
+      drawBg(P, W, H, pose, raw, alg, { k: zoomK, c: zc });
+      ctx.setTransform(lay.dpr, 0, 0, lay.dpr, 0, 0);
+      ctx.clearRect(0, 0, lay.cw, lay.ch);
+      ctx.setTransform(lay.dpr * lay.k, 0, 0, lay.dpr * lay.k, lay.dpr * lay.vx, lay.dpr * lay.vy);
 
       const win = P.reveal < 1 ? { cx: lerp(geo.cx, W / 2, P.reveal), cy: lerp(geo.cy, H / 2, P.reveal), w: lerp(geo.sq, W, P.reveal), h: lerp(geo.sq, H, P.reveal) } : null;
       ctx.save();
