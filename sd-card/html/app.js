@@ -9943,17 +9943,6 @@ const App = (() => {
           </div>
 
           <div class="wiz-restore" data-ref="restoreHost" hidden></div>
-
-          <div class="card">
-            <div class="card-header"><span>What you will set up</span></div>
-            <ol class="wiz-overview">
-              <li><div><strong>Flashlight and lens focus</strong><span>Basic flashlight setup and sharp focus</span></div></li>
-              <li><div><strong>Camera and flashlight</strong><span>Parameters for a clean, evenly lit image</span></div></li>
-              <li><div><strong>Alignment markers</strong><span>Keep the image orientation consistent</span></div></li>
-              <li><div><strong>Number sequences</strong><span>Group digit and analog ROIs into your reading</span></div></li>
-              <li><div><strong>Security and completion</strong><span>Protect the web interface and finish</span></div></li>
-            </ol>
-          </div>
         </div>
 
         <div class="wiz-step hidden" data-panel="1">

@@ -7836,17 +7836,16 @@ a.nav-sub-item {
   padding-top: 0;
 }
 
-/* wizard start screen: the welcome card and two big choices next to it */
+/* wizard start screen: the welcome card and two big choices below it, side by side */
 .wiz-welcome {
-  display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: var(--card-gap);
-  align-items: stretch;
 }
 
 .wiz-start {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--card-gap);
 }
 
@@ -7923,12 +7922,8 @@ a.nav-sub-item {
 }
 
 @media screen and (max-width: 900px) {
-  .wiz-welcome {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .wiz-start {
-    order: -1; /* the choices come first on narrow screens */
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .wiz-choice {
