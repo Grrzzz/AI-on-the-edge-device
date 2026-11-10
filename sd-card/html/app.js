@@ -3554,15 +3554,16 @@ const App = (() => {
           accept: '.zip',
         })}
         <button class="button btn-wide btn-action" type="button" data-r="startRestore" data-action="restore" disabled>Restore</button>
-        <div class="prog sys-prog-flat">
-          <progress data-r="restoreBar" value="0" max="100"></progress>
-          <div class="prog-meta"><span data-r="status">Status: Idle</span><span data-r="loadedBytes"></span></div>
-        </div>
       </div>
     </div>`;
     const r = collectRefs(host);
     let alive = true;
     const picker = setupPicker(r, () => validateFile());
+    const overlay = createUpdateOverlay(); // restore and import show the same full screen progress as an update
+    const unlock = () => {
+      r.startRestore.disabled = false;
+      picker.setBusy(false);
+    };
 
     // ---------------------------------------------------------------- restore
     let legacy = null; // unzipped v16 backup (config.ini), imported instead of restored
@@ -3609,19 +3610,17 @@ const App = (() => {
       }
     };
 
-    const restoreFailed = (message) => {
-      console.error('OTA upload failed:', message);
-      r.status.textContent = 'Status: Upload failed. Status: ' + message;
-      firework.launch('Upload failed. Status: ' + message, 'danger', 30000);
-      r.startRestore.disabled = false;
-      picker.setBusy(false);
-      r.loadedBytes.textContent = '';
-    };
-
     const runLegacyImport = async () => {
       const c = LegacyImport.convert(legacy.ini, legacy.prevalue);
       const notes = [...c.notes];
-      const setStatus = (text) => { r.status.textContent = 'Status: ' + text; };
+      const setStatus = (text) => overlay.text(text);
+      const importFailed = (message) => {
+        console.error('Import failed:', message);
+        overlay.fail('Import failed', message, unlock);
+      };
+      overlay.open('Importing backup', 'Uploading files ...', ['Files', 'Configuration', 'Finish']);
+      overlay.step(1);
+      overlay.progress(0);
 
       // 1. images and models
       const uploads = [];
@@ -3638,23 +3637,26 @@ const App = (() => {
       for (let i = 0; i < uploads.length; i++) {
         const [path, data] = uploads[i];
         setStatus(`Uploading ${path.split('/').pop()} (${i + 1}/${uploads.length}) ...`);
-        r.restoreBar.value = Math.round((i / (uploads.length + 2)) * 100);
+        overlay.progress(Math.round((i / (uploads.length + 2)) * 100), `${i + 1} of ${uploads.length} files`);
         const res = await Api.files.upload(path, data);
-        if (!res.ok) return restoreFailed(`${path}: ${res.message}`);
+        if (!res.ok) return importFailed(`${path}: ${res.message}`);
       }
 
       // 2. configuration
+      overlay.step(2);
       setStatus('Saving the configuration ...');
-      r.restoreBar.value = Math.round((uploads.length / (uploads.length + 2)) * 100);
+      overlay.progress(Math.round((uploads.length / (uploads.length + 2)) * 100));
       try {
         await Api.config.save(c.delta, true);
       } catch (e) {
-        return restoreFailed('Configuration could not be saved: ' + e.message);
+        return importFailed('Configuration could not be saved: ' + e.message);
       }
 
       // 3. last valid value, once the process is initialized
+      overlay.step(3);
       if (c.fallback) {
         setStatus('Setting the last valid value ...');
+        overlay.progress(null);
         let done = false;
         for (let attempt = 0; attempt < 24 && alive && !done; attempt++) {
           await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -3668,8 +3670,7 @@ const App = (() => {
         if (!done) notes.push(`The last valid value (${c.fallback.value}) could not be set. Set it on the dashboard.`);
       }
 
-      r.restoreBar.value = 100;
-      setStatus('Import completed');
+      overlay.close();
       picker.setBusy(false);
       firework.launch('Backup of firmware v16 imported', 'success', 5000);
       notes.push('Check the result under Configuration (markers, regions) and System > Setup.');
@@ -3697,36 +3698,39 @@ const App = (() => {
         danger: true,
       }))) return;
 
-      firework.launch('Do not reload this page or switch to another page while the restore is in progress', 'warning', 90000);
-
       r.startRestore.disabled = true;
       picker.setBusy(true);
-      r.status.textContent = 'Status: Uploading...';
+      overlay.open('Restoring backup', 'Uploading ...', ['Upload', 'Restore', 'Restart'], { expected: 60 });
+      overlay.step(1);
+      overlay.progress(0);
 
       const res = await Api.ota.upload(file, (loaded, total) => {
         const percent = Math.round((loaded / total) * 100);
-        r.restoreBar.value = percent;
-        r.status.textContent = 'Status: ' + percent + '% uploaded. Please wait...';
-        r.loadedBytes.textContent = 'Uploaded ' + (loaded / 1024 / 1024).toFixed(2) + ' MB of ' + (total / 1024 / 1024).toFixed(2) + ' MB';
+        overlay.progress(percent, `${(loaded / 1048576).toFixed(2)} of ${(total / 1048576).toFixed(2)} MB`);
+        overlay.text(`${percent} % uploaded. Please wait ...`);
       });
+      if (!alive) return;
+      if (!res.ok) {
+        console.error('OTA upload failed:', res.message);
+        overlay.fail('Upload failed', res.message, unlock);
+        return;
+      }
 
-      r.status.textContent = 'Status: Upload completed';
-      r.restoreBar.value = 0;
-      r.loadedBytes.textContent = '';
-      if (!res.ok) return restoreFailed(res.message);
+      // the package is processed during the restart: that is the restore step, the restart is over when the device answers again
+      overlay.step(2);
+      overlay.title('Restoring ...');
+      overlay.text('The device restores the configuration and restarts. This page reloads automatically. Do not unplug the device.');
+      overlay.progress(null);
 
-      r.status.textContent = 'Status: Restoring...';
-      firework.launch('Package staged. The device will restart and restore the configuration', 'success', 5000);
-
-      const result = await Api.ota.rebootAndWait({
-        onTick: (elapsed) => { r.restoreBar.value = Math.min(Math.round(elapsed / 1250), 100); },
-        cancelled: () => !alive,
-      });
+      const result = await Api.ota.rebootAndWait({ cancelled: () => !alive });
+      if (!alive) return;
       if (result === 'online') {
-        r.restoreBar.value = 100;
+        overlay.step(3);
+        overlay.title('Backup restored');
+        overlay.text('Reloading ...');
         reloadApp();
       } else if (result === 'timeout') {
-        firework.launch('Restore takes unusually long. Reload this page or power cycle the device', 'danger', 30000);
+        overlay.fail('Restore takes unusually long', 'Reload this page or power cycle the device.', unlock);
       }
     };
 
@@ -3744,6 +3748,7 @@ const App = (() => {
     return {
       destroy() {
         alive = false;
+        overlay.close();
         host.removeEventListener('click', onClick);
         host.textContent = '';
       },
