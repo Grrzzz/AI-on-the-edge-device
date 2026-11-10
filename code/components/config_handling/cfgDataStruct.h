@@ -100,6 +100,14 @@ enum NetworkIpConfig {
 };
 
 
+enum WifiPowerMode {
+    WIFI_POWERSAVING_DISABLED = 0,
+    WIFI_POWERSAVING_WAKEUP_BY_DTIM = 1,
+    WIFI_POWERSAVING_WAKEUP_BY_INTERVAL = 2,
+    WIFI_POWERSAVING_MAX,
+};
+
+
 enum NetworkOperationMode {
     NETWORK_OPMODE_DISABLED = -1,
     NETWORK_OPMODE_WLAN_CLIENT = 0,
@@ -202,7 +210,7 @@ struct TLSParams {
 struct CfgData {
     // Config File
     struct SectionConfig {
-        int version = 8; // NOTE: Increment whenever existing parameter names changed or any migration is required
+        int version = 9; // NOTE: Increment whenever existing parameter names changed or any migration is required
         std::string lastModified = "";
     } sectionConfig;
 
@@ -412,7 +420,14 @@ struct CfgData {
 
     // System
     struct SectionSystem {
-        int cpuFrequency = 160;
+        struct PowerManagement {
+            struct Cpu {
+                int maxFrequency = 160;
+            } cpu;
+            struct Wifi {
+                int powerMode = WIFI_POWERSAVING_WAKEUP_BY_DTIM;
+            } wifi;
+        } powerManagement;
     } sectionSystem;
 
     // WebUI
