@@ -7956,3 +7956,95 @@ a.nav-sub-item {
 .wiz-preview[hidden] {
   display: none;
 }
+
+/* wizard bar: the way forward is the main thing on the screen */
+.wiz-actions {
+  border-top: 0;
+  box-shadow: 0 -12px 32px rgba(17, 24, 39, 0.14);
+}
+
+.wiz-actions-inner {
+  gap: 16px;
+  padding: 16px clamp(8px, 2vw, 24px);
+}
+
+.wiz-actions .button {
+  height: 50px;
+  padding: 0 26px;
+  border-radius: 14px;
+  font-size: 1.02rem;
+  font-weight: 700;
+}
+
+.wiz-actions-right {
+  gap: 12px;
+}
+
+/* Next: accent color, large, with an arrow */
+.wiz-actions [data-ref='next'] {
+  min-width: 190px;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--primary) 38%, transparent);
+}
+
+.wiz-actions [data-ref='next']::after {
+  content: '92';
+  margin-left: 12px;
+  font-size: 1.2em;
+  line-height: 1;
+}
+
+.wiz-actions [data-ref='next']:disabled {
+  box-shadow: none;
+}
+
+/* Back: outlined, with an arrow */
+.wiz-actions [data-ref='previous'] {
+  min-width: 120px;
+  border: 2px solid var(--border);
+  background: var(--bg-card);
+}
+
+.wiz-actions [data-ref='previous']::before {
+  content: '90';
+  margin-right: 10px;
+  font-size: 1.2em;
+  line-height: 1;
+}
+
+/* Abort and log stay quiet on the left */
+.wiz-actions [data-ref='skip'] {
+  height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+@media screen and (max-width: 640px) {
+  .wiz-actions-inner {
+    flex-wrap: wrap-reverse;
+    gap: 10px;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .wiz-actions-right {
+    flex: 1 1 100%;
+  }
+
+  .wiz-actions-right .button {
+    flex: 1;
+    padding: 0 14px;
+  }
+
+  .wiz-actions [data-ref='next'] {
+    flex: 2;
+    min-width: 0;
+  }
+
+  .wiz-actions-left {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}
