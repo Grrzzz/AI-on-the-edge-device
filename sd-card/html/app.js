@@ -8391,37 +8391,16 @@ const App = (() => {
       delta = mergeParam(delta, f.name, el.value, !!f.int);
     }
 
-    const CAM_ADV_KEY = 'camAdvanced';
-    function setCamAdvanced(on, remember) {
+    /** The Advanced rows are closed whenever the page is opened (not remembered). */
+    function setCamAdvanced(on) {
       R.camAdv.checked = on;
       root.dataset.camAdv = on ? '1' : '0';
-      if (!remember) return;
-      try {
-        localStorage.setItem(CAM_ADV_KEY, on ? '1' : '0');
-      } catch (e) {
-        /* storage not available: the switch simply starts closed next time */
-      }
-    }
-    /** Advanced rows stay visible when one of their values is not the default, so nothing hidden has an effect. */
-    function camAdvancedInUse() {
-      return CAM_FIELDS.filter((f) => !CAM_BASIC.includes(f.name)).some((f) => {
-          const el = camInput[f.name];
-          const def = f.value !== undefined ? String(f.value) : f.options ? f.options[0][0] : '';
-        return !!el && !f.gate && String(el.value) !== def; // dependent values only count through their switch
-      });
     }
     function parseCamParams() {
       CAM_FIELDS.forEach((f) => setControlValue(camInput[f.name], getPath(cfg, f.name)));
       CAM_FIELDS.filter((f) => f.type === 'range').forEach((f) => updateParamOutput(camInput[f.name]));
       setVariableInputLimits(false);
       applyCamGates();
-      let stored = false;
-      try {
-        stored = localStorage.getItem(CAM_ADV_KEY) === '1';
-      } catch (e) {
-        stored = false;
-      }
-      setCamAdvanced(stored || camAdvancedInUse(), false);
     }
 
     let taking = false; // a picture is being taken
@@ -9657,6 +9636,7 @@ const App = (() => {
       });
     }
     camBuildUI();
+    setCamAdvanced(false);
 
     /* ---------------------------------------------------------- events */
     const CLICKS = {
@@ -9680,7 +9660,7 @@ const App = (() => {
     };
     const CHANGES = {
       redraw: () => refreshDraw(),
-      camAdvanced: () => setCamAdvanced(R.camAdv.checked, true),
+      camAdvanced: () => setCamAdvanced(R.camAdv.checked),
       zoomRoi: () => refreshDraw(),
       markerSelect: () => markerSelectionChanged(),
       markerValue: (t) => {
