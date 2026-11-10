@@ -7836,54 +7836,102 @@ a.nav-sub-item {
   padding-top: 0;
 }
 
-/* wizard start: from scratch or restore a backup */
-.wiz-choices {
+/* wizard start screen: the welcome card and two big choices next to it */
+.wiz-welcome {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px;
-  padding: 4px 16px 16px;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: var(--card-gap);
+  align-items: stretch;
+}
+
+.wiz-start {
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap);
 }
 
 .wiz-choice {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: 4px;
-  padding: 16px 18px;
-  border: 1.5px solid var(--border);
-  border-radius: 14px;
+  justify-content: center;
+  gap: 6px;
+  padding: 22px 24px;
+  border: 2px solid var(--border);
+  border-radius: var(--card-radius);
   background: var(--bg-card);
+  box-shadow: var(--shadow);
   color: var(--text-main);
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+
+.wiz-choice svg {
+  width: 34px;
+  height: 34px;
+  margin-bottom: 6px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .wiz-choice b {
-  font-size: 1.02rem;
+  font-size: 1.3rem;
+  letter-spacing: -0.01em;
 }
 
 .wiz-choice span {
   color: var(--text-secondary);
-  font-size: 0.84rem;
-  line-height: 1.4;
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
-.wiz-choice:hover,
+.wiz-choice:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary);
+}
+
+.wiz-choice-main {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+.wiz-choice-main span {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.wiz-choice-main:hover {
+  background: color-mix(in srgb, var(--primary) 90%, #000);
+}
+
 .wiz-choice.active {
   border-color: var(--primary);
   background: var(--primary-soft);
-}
-
-.wiz-restore {
-  padding: 0 16px 16px;
 }
 
 .wiz-restore[hidden] {
   display: none;
 }
 
-.wiz-restore > .card {
-  box-shadow: none;
-  border: 1px solid var(--border);
+.wiz-actions[hidden] {
+  display: none;
+}
+
+@media screen and (max-width: 900px) {
+  .wiz-welcome {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wiz-start {
+    order: -1; /* the choices come first on narrow screens */
+  }
+
+  .wiz-choice {
+    padding: 18px 20px;
+  }
 }

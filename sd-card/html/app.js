@@ -9916,31 +9916,33 @@ const App = (() => {
 
       <main class="wiz-content">
         <div class="wiz-step hidden" data-panel="0">
-          <div class="card">
-            <div class="card-header"><span>Welcome</span></div>
-            <div class="wiz-card-pad">
-              <p class="wiz-lead">
-                This wizard configures your device for first use. When you are done, the device restarts into the operational web interface.
-                All wizard settings stay available there. Use <b>Next</b> and <b>Back</b> to move between the steps, or <b>Abort</b> to skip the wizard.
-              </p>
-              <img class="wiz-welcome-img" src="flow_overview.jpg" alt="" />
+          <div class="wiz-welcome">
+            <div class="card wiz-welcome-card">
+              <div class="card-header"><span>Welcome</span></div>
+              <div class="wiz-card-pad">
+                <p class="wiz-lead">
+                  This wizard configures your device for first use. When you are done, the device restarts into the operational web interface.
+                  All wizard settings stay available there.
+                </p>
+                <img class="wiz-welcome-img" src="flow_overview.jpg" alt="" />
+              </div>
             </div>
-          </div>
 
-          <div class="card">
-            <div class="card-header"><span>How do you want to start?</span></div>
-            <div class="wiz-choices">
-              <button type="button" class="wiz-choice" data-click="startScratch">
+            <div class="wiz-start" role="group" aria-label="How do you want to start?">
+              <button type="button" class="wiz-choice wiz-choice-big wiz-choice-main" data-click="startScratch">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z" /></svg>
                 <b>Start from scratch</b>
                 <span>Set up flashlight, camera, markers and regions step by step</span>
               </button>
-              <button type="button" class="wiz-choice" data-click="startRestore" data-ref="choiceRestore" aria-expanded="false">
+              <button type="button" class="wiz-choice wiz-choice-big" data-click="startRestore" data-ref="choiceRestore" aria-expanded="false">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5M4 14v5a1 1 0 001 1h14a1 1 0 001-1v-5" /></svg>
                 <b>Restore a backup</b>
                 <span>Bring back the configuration of a backup of this application (or of firmware v16)</span>
               </button>
             </div>
-            <div class="wiz-restore" data-ref="restoreHost" hidden></div>
           </div>
+
+          <div class="wiz-restore" data-ref="restoreHost" hidden></div>
 
           <div class="card">
             <div class="card-header"><span>What you will set up</span></div>
@@ -10355,6 +10357,7 @@ const App = (() => {
       unmountEditor();
       R.autoToggle.checked = false;
       all('[data-panel]').forEach((p) => show(p, parseInt(p.dataset.panel, 10) === step));
+      root.querySelector('.wiz-actions').hidden = step === 0; // the start screen has its own big choices: no bar
       updateStepper();
       setNavDisabled(step === 0 || step === WIZARD_ABORT_STEP, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP);
 
@@ -10564,6 +10567,7 @@ const App = (() => {
         R.restoreHost.hidden = !open;
         R.choiceRestore.classList.toggle('active', open);
         R.choiceRestore.setAttribute('aria-expanded', String(open));
+        if (open) R.restoreHost.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
         if (open && !restorePanel) {
           restorePanel = App.mountRestore(R.restoreHost, {
             onImported: () => {
