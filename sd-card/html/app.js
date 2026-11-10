@@ -9903,6 +9903,13 @@ const App = (() => {
 
   const tip = (key) => `<td><div class="tooltip-trigger" data-help="${key}"></div></td>`;
 
+  /** A row in the style of the setup page (label with help, control, unit). */
+  const cfgRow = (label, help, control, cls = 'cfg-l0', attrs = '') => `
+    <div class="cfg-row ${cls}"${attrs}>
+      <div class="cfg-label"><span>${label}</span>${help ? `<div class="tooltip-trigger" data-help="${help}"></div>` : ''}</div>
+      <div class="cfg-ctl">${control}</div>
+    </div>`;
+
   function wizardMarkup() {
     return `
       <header class="wiz-bar">
@@ -9951,132 +9958,72 @@ const App = (() => {
         </div>
 
         <div class="wiz-step hidden" data-panel="1">
+          <div class="cfg wiz-cfg">
+            <div class="card cfg-card">
+              <div class="card-header"><span class="cfg-card-title">Meter type</span></div>
+              <div class="card-body cfg-body">
+                ${cfgRow('Meter Type', 'mqtt_homeassistant_metertype', '<select data-field="mqtt.homeassistant.metertype" data-int="1" data-ref="meterType" data-change="field" hidden></select><span data-ref="meterCombo"></span>')}
+              </div>
+            </div>
+          </div>
+
           <div class="wiz-step-content">
-            <strong>Step 1: Basic Flashlight Setup &amp; Lens Focus Adjustment</strong>
+            <strong>Step 1: Meter Type, Flashlight &amp; Lens Focus</strong>
             <p>
-              Configure flashlight basic setup and save flashlight basic configuration before proceeding. Usually default setup / mapping is sufficient.
+              Choose the type of your meter, it sets the units and the look of the interface. Usually the default flashlight setup is sufficient.
               Reconfiguration is only required if a customization is needed, e.g. drive additional external LEDs, use specific pin or use of specific LED type, ...<br />
-              After image is visible in preview, adjust lens focus until image is as sharp as possible. Detailed instructions are available in the
+              Press <b>Refresh</b> to take a picture. When the image is visible, adjust the lens focus until it is as sharp as possible. Detailed instructions are available in the
               <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/Reference-Image/#focus" target="_blank" rel="noopener noreferrer">focus adjustment guide</a><br />
               Verify that the flashlight does not create glare in critical processing areas. If the internal LED is insufficient or glare cannot be avoided,
               refer to <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/External-LED/" target="_blank" rel="noopener noreferrer">Installation of external LEDs</a> or
               to discussion <a href="https://github.com/jomjol/AI-on-the-edge-device/discussions/1949" target="_blank" rel="noopener noreferrer">Ways to avoid reflections</a>.
             </p>
             <p>
-              Note 1: Any pending image refresh is blocking saving or step change.<br />
-              Note 2: Camera parametrization and flashlight fine-tuning is performed in next step.
+              Note 1: Your changes are saved with <b>Next</b>. <b>Refresh</b> saves them first, so the picture shows the new setup.<br />
+              Note 2: <b>Next</b> is available after the preview image was refreshed at least once.<br />
+              Note 3: Camera parametrization and flashlight fine-tuning is performed in the next step.
             </p>
           </div>
 
-          <div class="card">
-            <div class="card-header"><span>Flashlight setup</span></div>
-            <div class="card-body">
-              <table class="wiz-table">
-                <colgroup><col class="wiz-col-label" /><col /><col class="wiz-col-tip" /></colgroup>
-                <tbody>
-                  <tr>
-                    <td class="wiz-indent1"><span>Actual GPIO Mapping</span></td>
-                    <td><span data-ref="mapping"></span></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td class="wiz-indent1"><span>GPIO Customization</span></td>
-                    <td>
-                      <select class="wiz-bold" data-field="gpio.customizationenabled" data-ref="gpioCustom" data-change="field">
-                        <option value="false" selected>Disabled</option>
-                        <option value="true">Enabled</option>
-                      </select>
-                    </td>
-                    ${tip('gpio_customizationenabled')}
-                  </tr>
-                  <tr data-gpio-row="pin">
-                    <td class="wiz-indent2"><span class="wiz-bold">Pin Selection</span></td>
-                    <td><select class="wiz-bold" data-field="gpio.gpiopin.#.gpionumber" data-int="1" data-ref="gpioPin" data-change="gpioPin"></select></td>
-                    ${tip('gpio_gpiopin_gpionumber')}
-                  </tr>
-                  <tr data-gpio-row="pin">
-                    <td class="wiz-indent2"><span>Pin Status</span></td>
-                    <td>
-                      <select data-field="gpio.gpiopin.#.pinenabled" data-pin="1" data-ref="gpioPinEnabled" data-change="field">
-                        <option value="false" selected>Disabled</option>
-                        <option value="true">Enabled</option>
-                      </select>
-                    </td>
-                    ${tip('gpio_gpiopin_pinenabled')}
-                  </tr>
-                  <tr data-gpio-row="mode">
-                    <td class="wiz-indent2">
-                      <span>Pin Mode</span>
-                      <span class="wiz-restricted hidden" data-ref="restricted"></span>
-                    </td>
-                    <td>
-                      <select data-field="gpio.gpiopin.#.pinmode" data-pin="1" data-ref="gpioPinMode" data-change="field">
-                        <option value="flashlight-default">Flashlight Default</option>
-                        <option value="flashlight-pwm">Flashlight PWM</option>
-                        <option value="flashlight-smartled">Flashlight Smartled</option>
-                        <option value="flashlight-digital">Flashlight Digital</option>
-                      </select>
-                    </td>
-                    ${tip('gpio_gpiopin_pinmode')}
-                  </tr>
-                  <tr data-gpio-row="logic">
-                    <td class="wiz-indent2"><span>Pin Logic Level</span></td>
-                    <td>
-                      <select data-field="gpio.gpiopin.#.logicactivelow" data-pin="1" data-change="field">
-                        <option value="false" selected>Active High</option>
-                        <option value="true">Active Low</option>
-                      </select>
-                    </td>
-                    ${tip('gpio_gpiopin_logicactivelow')}
-                  </tr>
-                  <tr data-gpio-row="smartled">
-                    <td class="wiz-indent2"><span>LED Type</span></td>
-                    <td>
-                      <select data-field="gpio.gpiopin.#.smartled.type" data-pin="1" data-int="1" data-change="field">
-                        <option value="0" selected>WS2812</option>
-                        <option value="1">WS2812B (universal)</option>
-                        <option value="2">WS2812B (newer variant)</option>
-                        <option value="3">WS2812B (older variant)</option>
-                        <option value="4">SK6812</option>
-                        <option value="5">WS2813</option>
-                      </select>
-                    </td>
-                    ${tip('gpio_gpiopin_smartled_type')}
-                  </tr>
-                  <tr data-gpio-row="smartled">
-                    <td class="wiz-indent2"><span>LED Color (RGB)</span></td>
-                    <td>
-                      R <input class="wiz-rgb" required type="number" min="0" max="255" value="255" data-field="gpio.gpiopin.#.smartled.colorredchannel" data-pin="1" data-int="1" data-change="field" />
-                      G <input class="wiz-rgb" required type="number" min="0" max="255" value="255" data-field="gpio.gpiopin.#.smartled.colorgreenchannel" data-pin="1" data-int="1" data-change="field" />
-                      B <input class="wiz-rgb" required type="number" min="0" max="255" value="255" data-field="gpio.gpiopin.#.smartled.colorbluechannel" data-pin="1" data-int="1" data-change="field" />
-                    </td>
-                    ${tip('gpio_gpiopin_smartled_color')}
-                  </tr>
-                  <tr data-gpio-row="intensity">
-                    <td class="wiz-indent2"><span>LED Intensity Correction</span></td>
-                    <td>
-                      <input required type="number" min="1" max="100" value="100" data-field="gpio.gpiopin.#.intensitycorrectionfactor" data-pin="1" data-int="1" data-change="field" /> %
-                    </td>
-                    ${tip('gpio_gpiopin_intensitycorrectionfactor')}
-                  </tr>
-                  <tr>
-                    <td class="wiz-indent1"><span>Flash Time</span></td>
-                    <td>
-                      <input required type="number" min="100" step="100" value="2000" data-field="takeimage.flashlight.flashtime" data-int="1" data-change="field" /> Milliseconds
-                    </td>
-                    ${tip('takeimage_flashlight_flashtime')}
-                  </tr>
-                  <tr>
-                    <td class="wiz-indent1"><span>Flash Intensity</span></td>
-                    <td>
-                      <input required type="number" min="0" max="100" value="50" data-field="takeimage.flashlight.flashintensity" data-int="1" data-change="field" /> %
-                    </td>
-                    ${tip('takeimage_flashlight_flashintensity')}
-                  </tr>
-                </tbody>
-              </table>
-              <div class="wiz-card-pad">
-                <button type="button" class="button btn-action btn-wide" data-click="saveFlashlight" data-ref="saveFlash">Save flashlight setup</button>
+          <div class="cfg wiz-cfg">
+            <div class="card cfg-card">
+              <div class="card-header"><span class="cfg-card-title">Flashlight setup</span></div>
+              <div class="card-body cfg-body">
+                ${cfgRow('Actual GPIO Mapping', '', '<span class="cfg-info" data-ref="mapping"></span>')}
+                ${cfgRow('GPIO Customization', 'gpio_customizationenabled', `<select data-field="gpio.customizationenabled" data-ref="gpioCustom" data-change="field">
+                  <option value="false" selected>Disabled</option>
+                  <option value="true">Enabled</option>
+                </select>`)}
+                ${cfgRow('Pin Selection', 'gpio_gpiopin_gpionumber', '<select class="cfg-strong" data-field="gpio.gpiopin.#.gpionumber" data-int="1" data-ref="gpioPin" data-change="gpioPin"></select>', 'cfg-l1', ' data-gpio-row="pin"')}
+                ${cfgRow('Pin Status', 'gpio_gpiopin_pinenabled', `<select data-field="gpio.gpiopin.#.pinenabled" data-pin="1" data-ref="gpioPinEnabled" data-change="field">
+                  <option value="false" selected>Disabled</option>
+                  <option value="true">Enabled</option>
+                </select>`, 'cfg-l1', ' data-gpio-row="pin"')}
+                ${cfgRow('Pin Mode <span class="wiz-restricted hidden" data-ref="restricted"></span>', 'gpio_gpiopin_pinmode', `<select data-field="gpio.gpiopin.#.pinmode" data-pin="1" data-ref="gpioPinMode" data-change="field">
+                  <option value="flashlight-default">Flashlight Default</option>
+                  <option value="flashlight-pwm">Flashlight PWM</option>
+                  <option value="flashlight-smartled">Flashlight Smartled</option>
+                  <option value="flashlight-digital">Flashlight Digital</option>
+                </select>`, 'cfg-l1', ' data-gpio-row="mode"')}
+                ${cfgRow('Pin Logic Level', 'gpio_gpiopin_logicactivelow', `<select data-field="gpio.gpiopin.#.logicactivelow" data-pin="1" data-change="field">
+                  <option value="false" selected>Active High</option>
+                  <option value="true">Active Low</option>
+                </select>`, 'cfg-l1', ' data-gpio-row="logic"')}
+                ${cfgRow('LED Type', 'gpio_gpiopin_smartled_type', `<select data-field="gpio.gpiopin.#.smartled.type" data-pin="1" data-int="1" data-change="field">
+                  <option value="0" selected>WS2812</option>
+                  <option value="1">WS2812B (universal)</option>
+                  <option value="2">WS2812B (newer variant)</option>
+                  <option value="3">WS2812B (older variant)</option>
+                  <option value="4">SK6812</option>
+                  <option value="5">WS2813</option>
+                </select>`, 'cfg-l1', ' data-gpio-row="smartled"')}
+                ${cfgRow('LED Color (RGB)', 'gpio_gpiopin_smartled_color', `
+                  <span class="cfg-pre">R</span><input class="cfg-num-sm" required type="number" min="0" max="255" value="255" data-field="gpio.gpiopin.#.smartled.colorredchannel" data-pin="1" data-int="1" data-change="field" />
+                  <span class="cfg-pre">G</span><input class="cfg-num-sm" required type="number" min="0" max="255" value="255" data-field="gpio.gpiopin.#.smartled.colorgreenchannel" data-pin="1" data-int="1" data-change="field" />
+                  <span class="cfg-pre">B</span><input class="cfg-num-sm" required type="number" min="0" max="255" value="255" data-field="gpio.gpiopin.#.smartled.colorbluechannel" data-pin="1" data-int="1" data-change="field" />`, 'cfg-l1', ' data-gpio-row="smartled"')}
+                ${cfgRow('LED Intensity Correction', 'gpio_gpiopin_intensitycorrectionfactor', '<input class="cfg-num" required type="number" min="1" max="100" value="100" data-field="gpio.gpiopin.#.intensitycorrectionfactor" data-pin="1" data-int="1" data-change="field" /><span class="cfg-unit">%</span>', 'cfg-l1', ' data-gpio-row="intensity"')}
+                ${cfgRow('Flash Time', 'takeimage_flashlight_flashtime', '<input class="cfg-num" required type="number" min="100" step="100" value="2000" data-field="takeimage.flashlight.flashtime" data-int="1" data-change="field" /><span class="cfg-unit">Milliseconds</span>')}
+                ${cfgRow('Flash Intensity', 'takeimage_flashlight_flashintensity', '<input class="cfg-num" required type="number" min="0" max="100" value="50" data-field="takeimage.flashlight.flashintensity" data-int="1" data-change="field" /><span class="cfg-unit">%</span>')}
               </div>
             </div>
           </div>
@@ -10089,7 +10036,10 @@ const App = (() => {
                 <button type="button" class="button btn-action" data-click="refresh" data-ref="refreshBtn">Refresh</button>
               </div>
             </div>
-            <div class="card-body wiz-preview-body"><img class="wiz-preview" data-ref="preview" alt="Image Preview" /></div>
+            <div class="card-body wiz-preview-body">
+              <p class="wiz-preview-hint" data-ref="previewHint">Press Refresh to take the first picture. You can continue after that.</p>
+              <img class="wiz-preview" data-ref="preview" alt="Image Preview" hidden />
+            </div>
           </div>
         </div>
 
@@ -10210,6 +10160,8 @@ const App = (() => {
     let busy = false;
     let autoRefreshRunning = false;
     let logDialog = null;
+    let previewTaken = false; // the preview image was refreshed at least once: only then the wizard goes on
+    let meterCombo = null;
 
     /* ------------------------------------------------------------ fields */
     const pinIdx = () => R.gpioPin.selectedIndex;
@@ -10322,6 +10274,7 @@ const App = (() => {
       cfg = Api.setup.getConfig() || cfg;
       if (step === 1) initGpioSection();
       loadFields(cfg);
+      meterCombo?.sync();
       updateGpioUi();
       updateAuthUi();
       delta = {};
@@ -10353,10 +10306,10 @@ const App = (() => {
       all('[data-panel]').forEach((p) => show(p, parseInt(p.dataset.panel, 10) === step));
       root.querySelector('.wiz-actions').hidden = step === 0; // the start screen has its own big choices: no bar
       updateStepper();
-      setNavDisabled(step === 0 || step === WIZARD_ABORT_STEP, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP);
+      setNavDisabled(step === 0 || step === WIZARD_ABORT_STEP, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP || (step === 1 && !previewTaken), step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP);
 
       if (step === 1) {
-        manualRefreshImage();
+        showPreviewHint(); // the first picture is taken by the user with Refresh
       } else if (WIZARD_EDITOR_TABS[step]) {
         const host = root.querySelector(`[data-panel="${step}"] [data-editor]`);
         editor = App.setup.mountEditor(host, WIZARD_EDITOR_TABS[step], {
@@ -10381,6 +10334,13 @@ const App = (() => {
       }
       if (target < 0) target = 0;
       if (target > WIZARD_LAST_STEP && target < WIZARD_ABORT_STEP) target = WIZARD_LAST_STEP;
+      if (step === 1 && target > 1 && target < WIZARD_ABORT_STEP && !previewTaken) return; // refresh the preview first
+      if (step === 1 && target !== 1 && Object.keys(delta).length) {
+        stepFlashCfgBusy(true);
+        const saved = await savePendingChanges();
+        if (!destroyed) stepFlashCfgBusy(false);
+        if (!saved || destroyed) return;
+      }
       step = target;
       try {
         sessionStorage.setItem(WIZARD_STEP_KEY, String(step));
@@ -10395,15 +10355,40 @@ const App = (() => {
     /** Disables navigation and the flashlight buttons while the camera is busy. */
     function stepFlashCfgBusy(flag) {
       busy = flag;
-      R.saveFlash.disabled = flag;
       R.refreshBtn.disabled = flag;
       R.previous.disabled = flag;
-      R.next.disabled = flag;
+      R.next.disabled = flag || !previewTaken;
       R.skip.disabled = flag;
+    }
+
+    /** Shows the hint until a picture exists, the preview image only after that. */
+    function showPreviewHint() {
+      R.previewHint.hidden = previewTaken;
+      R.preview.hidden = !previewTaken;
+    }
+
+    /** Saves the changes of the step (meter type, flashlight) and reloads the stored configuration. */
+    async function savePendingChanges() {
+      try {
+        await Api.setup.saveConfig(delta, true);
+        syncConfigToUI();
+        return true;
+      } catch (error) {
+        console.error('Failed to save the configuration:', error);
+        return false;
+      }
     }
 
     async function manualRefreshImage(showSpinner = true) {
       stepFlashCfgBusy(true);
+      if (Object.keys(delta).length && !(await savePendingChanges())) {
+        // not saved: the picture would not show the new setup
+        if (!destroyed) stepFlashCfgBusy(false);
+        return false;
+      }
+      if (destroyed) return false;
+      R.preview.hidden = false;
+      R.previewHint.hidden = true;
       const img = R.preview;
       const previousBlobUrl = img.src && img.src.startsWith('blob:') ? img.src : null;
       const releasePrevious = () => {
@@ -10424,6 +10409,7 @@ const App = (() => {
       if (destroyed) return false;
 
       if (showSpinner) img.classList.remove('is-loading');
+      if (blob) previewTaken = true;
       stepFlashCfgBusy(false);
       if (!blob) {
         img.src = noImageAvailable;
@@ -10451,19 +10437,6 @@ const App = (() => {
       if (R.autoToggle.checked) {
         if (!ok) await sleep(2000);
         if (!destroyed) autoRefreshImage(true);
-      }
-    }
-
-    async function saveFlashlightSetup() {
-      R.autoToggle.checked = false;
-      stepFlashCfgBusy(true);
-      try {
-        await Api.setup.saveConfig(delta, true);
-        syncConfigToUI();
-      } catch (error) {
-        console.error('Failed to save flashlight configuration:', error);
-      } finally {
-        if (!destroyed) stepFlashCfgBusy(false);
       }
     }
 
@@ -10579,7 +10552,6 @@ const App = (() => {
       restart: () => navigate(0),
       complete: () => finalizeSetup(false),
       abort: () => finalizeSetup(true),
-      saveFlashlight: () => saveFlashlightSetup(),
       refresh: () => manualRefreshImage(),
       togglePw: (e, t) => {
         const hidden = R.password.type === 'password';
@@ -10605,6 +10577,19 @@ const App = (() => {
     root.addEventListener('change', onChange);
 
     /* --------------------------------------------------------- lifecycle */
+    (function buildMeterTypeCombo() {
+      const sel = R.meterType;
+      App.meterTypeOptions().forEach(([value, label]) => sel.add(new Option(label, value)));
+      const items = Array.from(sel.options).map((o) => ({ value: o.value, label: o.textContent, lead: logoSvg(METER_TYPE_THEME[Number(o.value)] || 'generic', 24) }));
+      meterCombo = App.createCombo(items, () => sel.value, (value) => {
+        sel.value = value;
+        sel.dispatchEvent(new Event('change', { bubbles: true })); // recorded like every other field, saved with Next
+        meterCombo.sync();
+        MeterTheme.apply(Number(value)); // icons and colors follow right away
+      });
+      meterCombo.el.classList.add('is-wide');
+      R.meterCombo.replaceWith(meterCombo.el);
+    })();
     (async () => {
       try {
         cfg = await Api.setup.loadConfig();
@@ -12388,6 +12373,15 @@ const App = (() => {
     api.sync();
     return api;
   }
+
+  // the wizard builds the same meter type combo as Setup > General
+  App.createCombo = createCombo;
+  App.meterTypeOptions = () => {
+    for (const def of SCHEMA.cards) {
+      for (const row of def.rows) if (row.id === 'mqtt_homeassistant_metertype') return row.opts || [];
+    }
+    return [];
+  };
 
   // Meter Type: custom combo (icon of the meter type in front) in place of the native select, which stays as the form field
   function addMeterTypeCombo(s) {

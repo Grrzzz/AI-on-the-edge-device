@@ -7930,3 +7930,29 @@ a.nav-sub-item {
     padding: 18px 20px;
   }
 }
+
+/* wizard step 1: rows like on the setup page */
+.wiz-cfg .cfg-label .wiz-restricted {
+  margin-left: 6px;
+}
+
+.wiz-cfg .cfg-label .tooltip-trigger {
+  display: inline-block;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.wiz-preview-hint {
+  margin: 0;
+  padding: 32px 16px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.wiz-preview-hint[hidden] {
+  display: none;
+}
+
+.wiz-preview[hidden] {
+  display: none;
+}
