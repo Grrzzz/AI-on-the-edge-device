@@ -1587,6 +1587,7 @@ const App = (() => {
     current = { key: ctx.key, view, ctx };
     setTitle(view.title);
     updateNav(ctx.key);
+    document.getElementById('app')?.classList.toggle('wizard-mode', ctx.key === 'wizard'); // the wizard has the whole screen: no menu
 
     try {
       view.mount(section, ctx);
@@ -1596,8 +1597,23 @@ const App = (() => {
     }
   }
 
+  // A device in operation mode "Setup" shows the wizard only: every other route leads back to it until the setup is left
+  let setupLeft = false;
+  const inSetupMode = () => {
+    if (setupLeft) return false;
+    try {
+      return Number(getConfigFromStorage()?.operationmode?.opmode) === -1;
+    } catch (e) {
+      return false;
+    }
+  };
+
   function onRoute() {
-    const ctx = parseHash();
+    let ctx = parseHash();
+    if (ctx.key !== 'wizard' && inSetupMode()) {
+      history.replaceState(null, '', '#/wizard');
+      ctx = parseHash();
+    }
     if (current && current.key === ctx.key && typeof current.view.route === 'function') {
       current.ctx = ctx; // same view, only the sub route changed
       current.view.route(ctx);
@@ -1711,8 +1727,8 @@ const App = (() => {
     try { storedTheme = localStorage.getItem('meterTheme') || 'generic'; } catch (e) { }
     MeterTheme.apply(storedTheme); // last known theme, no flash while the config loads
     const configLoaded = loadConfig().then(() => MeterTheme.applyFromConfig()).catch((e) => console.error('Failed to load config', e));
+    await configLoaded; // the route decides with the operation mode (setup: wizard only)
     if (!location.hash) {
-      await configLoaded;
       let setupMode = false;
       try { setupMode = Number(getConfigFromStorage()?.operationmode?.opmode) === -1; } catch (e) { }
       history.replaceState(null, '', setupMode ? '#/wizard' : '#/dashboard');
@@ -1720,7 +1736,7 @@ const App = (() => {
     onRoute();
   }
 
-  return { register, navigate, go: navigate, theme: { mode: themeMode, set: setTheme }, onThemeChange, el, h, esc, start };
+  return { register, navigate, go: navigate, leaveSetup() { setupLeft = true; }, theme: { mode: themeMode, set: setTheme }, onThemeChange, el, h, esc, start };
 })();
 
 
@@ -1889,6 +1905,7 @@ const App = (() => {
 
   // After a reboot or an update the app is reloaded from scratch and opens the dashboard
   function reloadApp() {
+    App.leaveSetup();
     window.location.hash = '#/dashboard';
     window.location.reload();
   }
@@ -3509,26 +3526,7 @@ const App = (() => {
               </div>
             </div>
 
-            <div class="card">
-              <div class="card-header"><span>Restore</span></div>
-              <div class="card-pad">
-                <div class="lead">
-                  Restores a backup created here. The existing configuration is replaced and the device restarts.
-                  Backups of firmware v16 (with a config.ini) are converted and imported.
-                </div>
-                ${pickerHtml({
-                  title: 'Drop a backup here',
-                  sub: 'or <b>browse</b> your computer &middot; *.zip, max. 16 MB',
-                  label: 'Choose a backup file or drop it here',
-                  accept: '.zip',
-                })}
-                <button class="button btn-wide btn-action" type="button" data-r="startRestore" data-action="restore" disabled>Restore</button>
-                <div class="prog sys-prog-flat">
-                  <progress data-r="restoreBar" value="0" max="100"></progress>
-                  <div class="prog-meta"><span data-r="status">Status: Idle</span><span data-r="loadedBytes"></span></div>
-                </div>
-              </div>
-            </div>
+            <div data-r="restoreHost"></div>
           </div>
 
           <div class="note-row">
@@ -3538,6 +3536,221 @@ const App = (() => {
         </div>
       </div>`;
   }
+
+  /** The restore card (backup of this application or of firmware v16). `onImported` runs after a v16 import, a normal restore reloads the app. */
+  function mountRestore(host, { onImported } = {}) {
+    host.innerHTML = `
+    <div class="card">
+      <div class="card-header"><span>Restore</span></div>
+      <div class="card-pad">
+        <div class="lead">
+          Restores a backup created here. The existing configuration is replaced and the device restarts.
+          Backups of firmware v16 (with a config.ini) are converted and imported.
+        </div>
+        ${pickerHtml({
+          title: 'Drop a backup here',
+          sub: 'or <b>browse</b> your computer &middot; *.zip, max. 16 MB',
+          label: 'Choose a backup file or drop it here',
+          accept: '.zip',
+        })}
+        <button class="button btn-wide btn-action" type="button" data-r="startRestore" data-action="restore" disabled>Restore</button>
+        <div class="prog sys-prog-flat">
+          <progress data-r="restoreBar" value="0" max="100"></progress>
+          <div class="prog-meta"><span data-r="status">Status: Idle</span><span data-r="loadedBytes"></span></div>
+        </div>
+      </div>
+    </div>`;
+    const r = collectRefs(host);
+    let alive = true;
+    const picker = setupPicker(r, () => validateFile());
+
+    // ---------------------------------------------------------------- restore
+    let legacy = null; // unzipped v16 backup (config.ini), imported instead of restored
+
+    const validateFile = async () => {
+      r.startRestore.disabled = true;
+      legacy = null;
+
+      const file = picker.file();
+      if (!file) {
+        picker.show(null);
+        return;
+      }
+      const filename = file.name;
+      const bad = (msg) => picker.show(file, msg, 'badge-error');
+
+      if (file.size > BACKUP_MAX_FILE_SIZE) return bad('Larger than 16 MB');
+      if (filename.length > 255) return bad('File name too long');
+      if (filename.includes(' ')) return bad('Name contains spaces');
+      if (!filename.toLowerCase().endsWith('.zip')) return bad('Not a ZIP file');
+
+      picker.show(file, 'Checking ...');
+      try {
+        await loadScript('/fflate.min.js');
+        const zip = fflate.unzipSync(new Uint8Array(await file.arrayBuffer()));
+
+        legacy = LegacyImport.detect(zip);
+        if (legacy) {
+          picker.show(file, 'v16 backup, will be converted', 'badge-warning');
+          r.startRestore.disabled = false;
+          return;
+        }
+        if (!zip['meta.json']) return bad('Not a backup (meta.json missing)');
+        const meta = JSON.parse(new TextDecoder().decode(zip['meta.json']));
+        if (!meta.app || meta.app.toLowerCase() !== BACKUP_APP_NAME.toLowerCase()) return bad('Backup of another application');
+
+        const when = String(meta.timestamp || '').replace('_', ' ').replace(/-(\d\d)-(\d\d)$/, ':$1:$2');
+        picker.show(file, 'Valid backup', 'badge-success');
+        if (when) r.fileSize.textContent = pickSize(file.size) + ' · created ' + when;
+        r.startRestore.disabled = false;
+      } catch (err) {
+        console.error('ZIP validation error:', err);
+        bad('Damaged ZIP file');
+      }
+    };
+
+    const restoreFailed = (message) => {
+      console.error('OTA upload failed:', message);
+      r.status.textContent = 'Status: Upload failed. Status: ' + message;
+      firework.launch('Upload failed. Status: ' + message, 'danger', 30000);
+      r.startRestore.disabled = false;
+      picker.setBusy(false);
+      r.loadedBytes.textContent = '';
+    };
+
+    const runLegacyImport = async () => {
+      const c = LegacyImport.convert(legacy.ini, legacy.prevalue);
+      const notes = [...c.notes];
+      const setStatus = (text) => { r.status.textContent = 'Status: ' + text; };
+
+      // 1. images and models
+      const uploads = [];
+      const add = (path, name) => {
+        const data = legacy.file(name);
+        if (data) uploads.push([path, data]);
+        else notes.push(`File ${name} is missing in the backup.`);
+      };
+      add('/config/reference.jpg', 'reference.jpg');
+      add('/config/marker1.jpg', 'ref0.jpg');
+      add('/config/marker2.jpg', 'ref1.jpg');
+      c.models.forEach((m) => add('/config/models/' + m, m));
+
+      for (let i = 0; i < uploads.length; i++) {
+        const [path, data] = uploads[i];
+        setStatus(`Uploading ${path.split('/').pop()} (${i + 1}/${uploads.length}) ...`);
+        r.restoreBar.value = Math.round((i / (uploads.length + 2)) * 100);
+        const res = await Api.files.upload(path, data);
+        if (!res.ok) return restoreFailed(`${path}: ${res.message}`);
+      }
+
+      // 2. configuration
+      setStatus('Saving the configuration ...');
+      r.restoreBar.value = Math.round((uploads.length / (uploads.length + 2)) * 100);
+      try {
+        await Api.config.save(c.delta, true);
+      } catch (e) {
+        return restoreFailed('Configuration could not be saved: ' + e.message);
+      }
+
+      // 3. last valid value, once the process is initialized
+      if (c.fallback) {
+        setStatus('Setting the last valid value ...');
+        let done = false;
+        for (let attempt = 0; attempt < 24 && alive && !done; attempt++) {
+          await new Promise((resolve) => setTimeout(resolve, 5000));
+          const res = await apiCall('/api/fallback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sequence: c.fallback.sequence, value: c.fallback.value }),
+          });
+          done = res.ok;
+        }
+        if (!done) notes.push(`The last valid value (${c.fallback.value}) could not be set. Set it on the dashboard.`);
+      }
+
+      r.restoreBar.value = 100;
+      setStatus('Import completed');
+      picker.setBusy(false);
+      firework.launch('Backup of firmware v16 imported', 'success', 5000);
+      notes.push('Check the result under Configuration (markers, regions) and System > Setup.');
+      await confirmDialog({ title: 'Import finished', text: notes.join('\n'), okLabel: 'OK', cancelLabel: 'Close' });
+      onImported?.();
+    };
+
+    const startRestore = async () => {
+      const file = picker.file();
+      if (file && legacy) {
+        if (!(await confirmDialog({
+          title: 'Import this v16 backup?',
+          text: 'The settings of config.ini are converted and written to the device. Images and models are copied, network settings stay as they are.',
+          okLabel: 'Import',
+        }))) return;
+        r.startRestore.disabled = true;
+        picker.setBusy(true);
+        await runLegacyImport();
+        return;
+      }
+      if (!file || !(await confirmDialog({
+        title: 'Restore this backup?',
+        text: 'The existing configuration is overwritten by the selected backup and the device restarts.',
+        okLabel: 'Restore',
+        danger: true,
+      }))) return;
+
+      firework.launch('Do not reload this page or switch to another page while the restore is in progress', 'warning', 90000);
+
+      r.startRestore.disabled = true;
+      picker.setBusy(true);
+      r.status.textContent = 'Status: Uploading...';
+
+      const res = await Api.ota.upload(file, (loaded, total) => {
+        const percent = Math.round((loaded / total) * 100);
+        r.restoreBar.value = percent;
+        r.status.textContent = 'Status: ' + percent + '% uploaded. Please wait...';
+        r.loadedBytes.textContent = 'Uploaded ' + (loaded / 1024 / 1024).toFixed(2) + ' MB of ' + (total / 1024 / 1024).toFixed(2) + ' MB';
+      });
+
+      r.status.textContent = 'Status: Upload completed';
+      r.restoreBar.value = 0;
+      r.loadedBytes.textContent = '';
+      if (!res.ok) return restoreFailed(res.message);
+
+      r.status.textContent = 'Status: Restoring...';
+      firework.launch('Package staged. The device will restart and restore the configuration', 'success', 5000);
+
+      const result = await Api.ota.rebootAndWait({
+        onTick: (elapsed) => { r.restoreBar.value = Math.min(Math.round(elapsed / 1250), 100); },
+        cancelled: () => !alive,
+      });
+      if (result === 'online') {
+        r.restoreBar.value = 100;
+        reloadApp();
+      } else if (result === 'timeout') {
+        firework.launch('Restore takes unusually long. Reload this page or power cycle the device', 'danger', 30000);
+      }
+    };
+
+    const onClick = (e) => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      if (btn.dataset.action === 'restore') {
+        if (!btn.disabled) startRestore();
+      } else if (btn.dataset.action === 'clear-file') {
+        picker.clear();
+        r.startRestore.disabled = true;
+      }
+    };
+    host.addEventListener('click', onClick);
+    return {
+      destroy() {
+        alive = false;
+        host.removeEventListener('click', onClick);
+        host.textContent = '';
+      },
+    };
+  }
+
+  App.mountRestore = mountRestore; // the wizard offers the same restore at its start
 
   App.register('system-backup', {
     title: 'Backup / Restore',
@@ -3549,7 +3762,8 @@ const App = (() => {
       let alive = true;
       this._stop = () => { alive = false; };
 
-      const picker = setupPicker(r, () => validateFile());
+      const restore = mountRestore(r.restoreHost);
+      this._restore = restore;
 
       const log = (text, cls = '') => {
         const line = App.el('div', cls ? `sys-log-${cls}` : '', String(text));
@@ -3650,181 +3864,11 @@ const App = (() => {
         }
       };
 
-      // ---------------------------------------------------------------- restore
-      let legacy = null; // unzipped v16 backup (config.ini), imported instead of restored
-
-      const validateFile = async () => {
-        r.startRestore.disabled = true;
-        legacy = null;
-
-        const file = picker.file();
-        if (!file) {
-          picker.show(null);
-          return;
-        }
-        const filename = file.name;
-        const bad = (msg) => picker.show(file, msg, 'badge-error');
-
-        if (file.size > BACKUP_MAX_FILE_SIZE) return bad('Larger than 16 MB');
-        if (filename.length > 255) return bad('File name too long');
-        if (filename.includes(' ')) return bad('Name contains spaces');
-        if (!filename.toLowerCase().endsWith('.zip')) return bad('Not a ZIP file');
-
-        picker.show(file, 'Checking ...');
-        try {
-          await loadScript('/fflate.min.js');
-          const zip = fflate.unzipSync(new Uint8Array(await file.arrayBuffer()));
-
-          legacy = LegacyImport.detect(zip);
-          if (legacy) {
-            picker.show(file, 'v16 backup, will be converted', 'badge-warning');
-            r.startRestore.disabled = false;
-            return;
-          }
-          if (!zip['meta.json']) return bad('Not a backup (meta.json missing)');
-          const meta = JSON.parse(new TextDecoder().decode(zip['meta.json']));
-          if (!meta.app || meta.app.toLowerCase() !== BACKUP_APP_NAME.toLowerCase()) return bad('Backup of another application');
-
-          const when = String(meta.timestamp || '').replace('_', ' ').replace(/-(\d\d)-(\d\d)$/, ':$1:$2');
-          picker.show(file, 'Valid backup', 'badge-success');
-          if (when) r.fileSize.textContent = pickSize(file.size) + ' · created ' + when;
-          r.startRestore.disabled = false;
-        } catch (err) {
-          console.error('ZIP validation error:', err);
-          bad('Damaged ZIP file');
-        }
-      };
-
-      const restoreFailed = (message) => {
-        console.error('OTA upload failed:', message);
-        r.status.textContent = 'Status: Upload failed. Status: ' + message;
-        firework.launch('Upload failed. Status: ' + message, 'danger', 30000);
-        r.startRestore.disabled = false;
-        picker.setBusy(false);
-        r.loadedBytes.textContent = '';
-      };
-
-      const runLegacyImport = async () => {
-        const c = LegacyImport.convert(legacy.ini, legacy.prevalue);
-        const notes = [...c.notes];
-        const setStatus = (text) => { r.status.textContent = 'Status: ' + text; };
-
-        // 1. images and models
-        const uploads = [];
-        const add = (path, name) => {
-          const data = legacy.file(name);
-          if (data) uploads.push([path, data]);
-          else notes.push(`File ${name} is missing in the backup.`);
-        };
-        add('/config/reference.jpg', 'reference.jpg');
-        add('/config/marker1.jpg', 'ref0.jpg');
-        add('/config/marker2.jpg', 'ref1.jpg');
-        c.models.forEach((m) => add('/config/models/' + m, m));
-
-        for (let i = 0; i < uploads.length; i++) {
-          const [path, data] = uploads[i];
-          setStatus(`Uploading ${path.split('/').pop()} (${i + 1}/${uploads.length}) ...`);
-          r.restoreBar.value = Math.round((i / (uploads.length + 2)) * 100);
-          const res = await Api.files.upload(path, data);
-          if (!res.ok) return restoreFailed(`${path}: ${res.message}`);
-        }
-
-        // 2. configuration
-        setStatus('Saving the configuration ...');
-        r.restoreBar.value = Math.round((uploads.length / (uploads.length + 2)) * 100);
-        try {
-          await Api.config.save(c.delta, true);
-        } catch (e) {
-          return restoreFailed('Configuration could not be saved: ' + e.message);
-        }
-
-        // 3. last valid value, once the process is initialized
-        if (c.fallback) {
-          setStatus('Setting the last valid value ...');
-          let done = false;
-          for (let attempt = 0; attempt < 24 && alive && !done; attempt++) {
-            await new Promise((resolve) => setTimeout(resolve, 5000));
-            const res = await apiCall('/api/fallback', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ sequence: c.fallback.sequence, value: c.fallback.value }),
-            });
-            done = res.ok;
-          }
-          if (!done) notes.push(`The last valid value (${c.fallback.value}) could not be set. Set it on the dashboard.`);
-        }
-
-        r.restoreBar.value = 100;
-        setStatus('Import completed');
-        picker.setBusy(false);
-        firework.launch('Backup of firmware v16 imported', 'success', 5000);
-        notes.push('Check the result under Configuration (markers, regions) and System > Setup.');
-        await confirmDialog({ title: 'Import finished', text: notes.join('\n'), okLabel: 'OK', cancelLabel: 'Close' });
-      };
-
-      const startRestore = async () => {
-        const file = picker.file();
-        if (file && legacy) {
-          if (!(await confirmDialog({
-            title: 'Import this v16 backup?',
-            text: 'The settings of config.ini are converted and written to the device. Images and models are copied, network settings stay as they are.',
-            okLabel: 'Import',
-          }))) return;
-          r.startRestore.disabled = true;
-          picker.setBusy(true);
-          await runLegacyImport();
-          return;
-        }
-        if (!file || !(await confirmDialog({
-          title: 'Restore this backup?',
-          text: 'The existing configuration is overwritten by the selected backup and the device restarts.',
-          okLabel: 'Restore',
-          danger: true,
-        }))) return;
-
-        firework.launch('Do not reload this page or switch to another page while the restore is in progress', 'warning', 90000);
-
-        r.startRestore.disabled = true;
-        picker.setBusy(true);
-        r.status.textContent = 'Status: Uploading...';
-
-        const res = await Api.ota.upload(file, (loaded, total) => {
-          const percent = Math.round((loaded / total) * 100);
-          r.restoreBar.value = percent;
-          r.status.textContent = 'Status: ' + percent + '% uploaded. Please wait...';
-          r.loadedBytes.textContent = 'Uploaded ' + (loaded / 1024 / 1024).toFixed(2) + ' MB of ' + (total / 1024 / 1024).toFixed(2) + ' MB';
-        });
-
-        r.status.textContent = 'Status: Upload completed';
-        r.restoreBar.value = 0;
-        r.loadedBytes.textContent = '';
-        if (!res.ok) return restoreFailed(res.message);
-
-        r.status.textContent = 'Status: Restoring...';
-        firework.launch('Package staged. The device will restart and restore the configuration', 'success', 5000);
-
-        const result = await Api.ota.rebootAndWait({
-          onTick: (elapsed) => { r.restoreBar.value = Math.min(Math.round(elapsed / 1250), 100); },
-          cancelled: () => !alive,
-        });
-        if (result === 'online') {
-          r.restoreBar.value = 100;
-          reloadApp();
-        } else if (result === 'timeout') {
-          firework.launch('Restore takes unusually long. Reload this page or power cycle the device', 'danger', 30000);
-        }
-      };
-
       root.addEventListener('click', (e) => {
         const btn = e.target.closest('[data-action]');
         if (!btn) return;
         switch (btn.dataset.action) {
           case 'backup': if (!btn.disabled) startBackup(); break;
-          case 'restore': if (!btn.disabled) startRestore(); break;
-          case 'clear-file':
-            picker.clear();
-            r.startRestore.disabled = true;
-            break;
           case 'open-files':
             e.preventDefault();
             App.navigate('#/system/files?path=' + BACKUP_BASE_PATH);
@@ -3835,6 +3879,7 @@ const App = (() => {
 
     unmount() {
       this._stop?.();
+      this._restore?.destroy();
     },
   });
 
@@ -9883,6 +9928,21 @@ const App = (() => {
           </div>
 
           <div class="card">
+            <div class="card-header"><span>How do you want to start?</span></div>
+            <div class="wiz-choices">
+              <button type="button" class="wiz-choice" data-click="startScratch">
+                <b>Start from scratch</b>
+                <span>Set up flashlight, camera, markers and regions step by step</span>
+              </button>
+              <button type="button" class="wiz-choice" data-click="startRestore" data-ref="choiceRestore" aria-expanded="false">
+                <b>Restore a backup</b>
+                <span>Bring back the configuration of a backup of this application (or of firmware v16)</span>
+              </button>
+            </div>
+            <div class="wiz-restore" data-ref="restoreHost" hidden></div>
+          </div>
+
+          <div class="card">
             <div class="card-header"><span>What you will set up</span></div>
             <ol class="wiz-overview">
               <li><div><strong>Flashlight and lens focus</strong><span>Basic flashlight setup and sharp focus</span></div></li>
@@ -9891,20 +9951,6 @@ const App = (() => {
               <li><div><strong>Number sequences</strong><span>Group digit and analog ROIs into your reading</span></div></li>
               <li><div><strong>Security and completion</strong><span>Protect the web interface and finish</span></div></li>
             </ol>
-          </div>
-
-          <div class="card">
-            <div class="card-header"><span>Further actions</span></div>
-            <div class="card-body">
-              <div class="wiz-button-group">
-                <button type="button" class="button" data-click="go" data-href="#/system/backup">Restore config</button>
-                <button type="button" class="button" data-click="go" data-href="#/system/update">Update</button>
-                <button type="button" class="button" data-click="go" data-href="#/system/files">File explorer</button>
-                <button type="button" class="button" data-click="go" data-href="#/system/info">System info</button>
-                <button type="button" class="button" data-click="log">Log</button>
-                <button type="button" class="button" data-click="go" data-href="#/system/reboot">Reboot</button>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -10134,7 +10180,6 @@ const App = (() => {
           <div class="wiz-actions-left">
             <button type="button" class="button" data-click="skip" data-ref="skip">Abort wizard</button>
             <button type="button" class="wiz-link-btn" data-click="log">Log</button>
-            <button type="button" class="wiz-link-btn" data-click="go" data-href="#/system/reboot">Reboot</button>
           </div>
           <div class="wiz-actions-right">
             <button type="button" class="button" data-click="previous" data-ref="previous">Back</button>
@@ -10466,6 +10511,7 @@ const App = (() => {
 
       // Load the operational web interface in any case. Intentionally not cancelled when the view is left:
       // the device switches its operation mode, the page has to be reloaded.
+      App.leaveSetup();
       setTimeout(() => {
         const target = getDomainname();
         if (target !== window.location.origin) {
@@ -10509,9 +10555,26 @@ const App = (() => {
     }
 
     /* ------------------------------------------------------------ events */
+    let restorePanel = null;
     const CLICKS = {
-      go: (e, t) => App.navigate(t.dataset.href),
       log: () => openLog(),
+      startScratch: () => navigate(1),
+      startRestore: () => {
+        const open = R.restoreHost.hidden;
+        R.restoreHost.hidden = !open;
+        R.choiceRestore.classList.toggle('active', open);
+        R.choiceRestore.setAttribute('aria-expanded', String(open));
+        if (open && !restorePanel) {
+          restorePanel = App.mountRestore(R.restoreHost, {
+            onImported: () => {
+              // a v16 import has switched the device to automatic mode: continue in the operational web interface
+              App.leaveSetup();
+              window.location.hash = '#/dashboard';
+              window.location.reload();
+            },
+          });
+        }
+      },
       next: () => navigate(step + 1),
       previous: () => navigate(step - 1),
       skip: () => navigate(WIZARD_ABORT_STEP),
@@ -10561,6 +10624,7 @@ const App = (() => {
         destroyed = true;
         unmountEditor();
         if (logDialog) logDialog.close();
+        restorePanel?.destroy();
         root.removeEventListener('click', onClick);
         root.removeEventListener('change', onChange);
         if (R.preview.src && R.preview.src.startsWith('blob:')) URL.revokeObjectURL(R.preview.src);

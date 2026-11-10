@@ -25,7 +25,7 @@ def build_config():
     s = open(_CFG_SRC, encoding="utf-8").read()
     cfg = _json.loads(s[s.index("\n{\n") + 1:])
     cfg["webui"]["autorefresh"] = {"dashboard": {"enabled": True, "refreshtime": 5}}
-    cfg["operationmode"]["opmode"] = -1 if SETUP_MODE else 1  # -1: operation mode "Setup" opens the first installation wizard
+    cfg["operationmode"]["opmode"] = STATE.get("opmode", -1 if SETUP_MODE else 1)  # -1: operation mode "Setup" opens the first installation wizard
     cfg["mqtt"]["enabled"] = True
     cfg["mqtt"]["homeassistant"]["discoveryenabled"] = True
     cfg["imagealignment"]["marker"] = [{"x": 390, "y": 172}, {"x": 486, "y": 200}]
@@ -495,6 +495,7 @@ class H(SimpleHTTPRequestHandler):
         body = self.rfile.read(n) if n else b""
         if u.path.startswith("/ota/"):
             time.sleep(1.5)
+            STATE["opmode"] = 1  # a restored backup brings its own configuration: the device leaves setup mode
             return self._send("success: package staged", "text/plain")
         if u.path == "/mcp":
             code, payload = mcp_rpc(body, self.headers)
@@ -512,6 +513,12 @@ class H(SimpleHTTPRequestHandler):
             return self._send(payload, code=code)
         if u.path == "/config":
             STATE.setdefault("posts", []).append(body.decode("utf-8", "replace")[:4000])
+            try:
+                mode = json.loads(body.decode("utf-8")).get("operationmode", {}).get("opmode")
+                if mode is not None:
+                    STATE["opmode"] = int(mode)  # the wizard switches the device to automatic mode when it is completed
+            except Exception:
+                pass
             return self._send(build_config())
         if u.path.startswith("/upload"):
             STATE.setdefault("uploads", []).append((u.path, len(body)))

@@ -7820,3 +7820,70 @@ a.nav-sub-item {
   text-transform: uppercase;
   vertical-align: middle;
 }
+
+/* initial setup: the wizard has the whole screen, no menu and no way into the other areas */
+.app.wizard-mode {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app.wizard-mode .sidebar,
+.app.wizard-mode .topbar,
+.app.wizard-mode .scrim {
+  display: none !important;
+}
+
+.app.wizard-mode .content {
+  padding-top: 0;
+}
+
+/* wizard start: from scratch or restore a backup */
+.wiz-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  padding: 4px 16px 16px;
+}
+
+.wiz-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 18px;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-card);
+  color: var(--text-main);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.wiz-choice b {
+  font-size: 1.02rem;
+}
+
+.wiz-choice span {
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.wiz-choice:hover,
+.wiz-choice.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.wiz-restore {
+  padding: 0 16px 16px;
+}
+
+.wiz-restore[hidden] {
+  display: none;
+}
+
+.wiz-restore > .card {
+  box-shadow: none;
+  border: 1px solid var(--border);
+}
