@@ -1,6 +1,7 @@
-"""Mock of the device HTTP API to try the WebUI without a device (data of a gas meter, blurred images).
+"""Mock of the device HTTP API to try the WebUI without a device (data and pictures of a real water meter: 4 digits and 4 analog dials).
 
 Usage: python tools/webui/mock/mock_server.py [html_dir] [port] [host]   (default: sd-card/html, port 8099, host 0.0.0.0 = also reachable in the LAN)
+MOCK_SETUP=1 starts it in setup mode: the first installation wizard opens.
 Open http://127.0.0.1:8099/ (or http://<IPv4 of this computer>:8099/ from a phone in the same network) - "Start cycle" simulates a cycle of about 12 s incl. /api/live.
 """
 import json, sys, os, time
@@ -13,7 +14,8 @@ ROOT = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1] else os
 PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 8099
 HOST = sys.argv[3] if len(sys.argv) > 3 else os.environ.get('MOCK_HOST', '0.0.0.0')  # 127.0.0.1: this computer only
 START = time.time()
-STATE = {"fallback": "46107.499"}
+SETUP_MODE = os.environ.get('MOCK_SETUP') == '1'  # MOCK_SETUP=1: the mock starts like a device in setup mode (first installation wizard)
+STATE = {"fallback": "100.7406"}
 import json as _json
 
 _CFG_SRC = os.path.join(REPO, "code", "test", "components", "config_handling", "config_json_default_expected.txt")
@@ -23,18 +25,23 @@ def build_config():
     s = open(_CFG_SRC, encoding="utf-8").read()
     cfg = _json.loads(s[s.index("\n{\n") + 1:])
     cfg["webui"]["autorefresh"] = {"dashboard": {"enabled": True, "refreshtime": 5}}
-    cfg["operationmode"]["opmode"] = 1
+    cfg["operationmode"]["opmode"] = -1 if SETUP_MODE else 1  # -1: operation mode "Setup" opens the first installation wizard
     cfg["mqtt"]["enabled"] = True
     cfg["mqtt"]["homeassistant"]["discoveryenabled"] = True
-    cfg["imagealignment"]["marker"] = [{"x": 240, "y": 312}, {"x": 440, "y": 193}]
-    cfg["imagealignment"]["imagerotation"] = "0.0"
-    cfg["mqtt"]["homeassistant"]["metertype"] = 5
-    cfg["mqtt"]["maintopic"] = "gasmeter"
+    cfg["imagealignment"]["marker"] = [{"x": 390, "y": 172}, {"x": 486, "y": 200}]
+    cfg["imagealignment"]["imagerotation"] = "90.0"  # the camera sits sideways: the picture is turned by 90 degrees
+    cfg["mqtt"]["homeassistant"]["metertype"] = 1  # water, m3
+    cfg["mqtt"]["maintopic"] = "watermeter"
     cfg["mqtt"]["uri"] = "mqtt://mqtt.local:1883"
-    cfg["network"]["hostname"] = "gasmeter"
-    cfg["digit"]["sequence"][0]["roi"] = [{"x": a, "y": b, "dx": c, "dy": d} for a, b, c, d in [(93, 183, 30, 54), (137, 183, 30, 54), (179, 183, 30, 54), (221, 183, 30, 54), (261, 183, 30, 54), (303, 183, 30, 54), (341, 183, 30, 54), (387, 183, 30, 54)]]
-    cfg["analog"]["sequence"][0]["roi"] = []
-    cfg["analog"]["enabled"] = False
+    cfg["network"]["hostname"] = "watermeter"
+    cfg["digit"]["model"] = "dig-class100_0182_s2_q.tflite"
+    cfg["digit"]["sequence"][0]["roi"] = [{"x": x, "y": 173, "dx": 26, "dy": 46} for x in (254, 284, 315, 345)]
+    cfg["analog"]["enabled"] = True
+    cfg["analog"]["model"] = "ana-class100_0171_s1_q.tflite"
+    cfg["analog"]["sequence"][0]["roi"] = [{"x": x, "y": y, "dx": 76, "dy": 76, "ccw": False} for x, y in ((411, 234), (379, 319), (296, 356), (203, 321))]
+    cam = cfg["takeimage"]["camera"]
+    cam.update({"brightness": -2, "contrast": 2, "saturation": -2, "exposurecontrolmode": 0, "manualexposurevalue": 600})
+    cfg["takeimage"]["flashlight"].update({"flashtime": 100, "flashintensity": 10})
     return cfg
 
 
@@ -58,20 +65,21 @@ IMG = b"""<svg xmlns='http://www.w3.org/2000/svg' width='800' height='560' viewB
 <circle cx='250' cy='380' r='80'/><circle cx='400' cy='430' r='80'/><circle cx='550' cy='380' r='80'/></g></svg>"""
 
 INFO = {
-    "hostname": "gasmeter", "board_type": "esp32cam", "firmware_version": "v2.4.1-Grrzzz Mock", "html_version": "v2.4.1-Grrzzz Mock",
+    "hostname": "watermeter", "board_type": "esp32cam", "firmware_version": "v2.4.1-Grrzzz Mock", "html_version": "v2.4.1-Grrzzz Mock",
     "mqtt_status": "Connected",  # dashboard badge (the full /info list below has the same service states)
 }
 CONFIG = {"webui": {"autorefresh": {"dashboard": {"enabled": True, "refreshtime": 5}}}, "mqtt": {"enabled": True, "homeassistant": {"discoveryenabled": True}}}
 
 
-DIGITS = ["4", "6", "1", "0", "7", "4", "9", "9"]
-ANALOG = []
+DIGITS = ["0", "1", "0", "0"]
+ANALOG = [("main_ana1", "7.2"), ("main_ana2", "3.9"), ("main_ana3", "0.8"), ("main_ana4", "6.4")]
+DIGIT_NAMES = [f"main_dig{i + 1}" for i in range(len(DIGITS))]
 
 
 def roi_svg(name):
     """ROI crop: digit tile or analog dial"""
-    if name.startswith("d"):
-        d = DIGITS[int(name[1:]) % len(DIGITS)]
+    if name.startswith("main_dig"):
+        d = DIGITS[(int(name[8:]) - 1) % len(DIGITS)]
         return (f"<svg xmlns='http://www.w3.org/2000/svg' width='60' height='96' viewBox='0 0 60 96'><rect width='60' height='96' fill='#dcdcd6'/>"
                 f"<text x='30' y='70' font-size='72' text-anchor='middle' font-family='monospace' fill='#222'>{d}</text></svg>").encode()
     val = dict(ANALOG).get(name, "0")
@@ -102,9 +110,9 @@ def recognition_page():
 <div class="page-sub">Result of the last completed recognition cycle.</div></div><div class="container-content">"""
     seq = '<div class="card"><div class="card-header">Sequence &middot; main</div><div class="card-body recog-body">'
     seq += ('<div class="recog-values">'
-            '<div class="stat"><div class="stat-label">Raw value</div><div class="stat-value">00530.0080</div></div>'
+            '<div class="stat"><div class="stat-label">Raw value</div><div class="stat-value">0100.7406</div></div>'
             f'<div class="stat"><div class="stat-label">Actual value</div><div class="stat-value">{STATE["fallback"]}</div></div></div>')
-    seq += roi_section("Digit ROIs", [(f"d{i}", d) for i, d in enumerate(DIGITS)])
+    seq += roi_section("Digit ROIs", list(zip(DIGIT_NAMES, DIGITS)))
     seq += roi_section("Analog ROIs", [(n, v) for n, v in ANALOG])
     seq += "</div></div>"
     img = '<div class="card"><div class="card-header">Processed image</div><div class="card-body image-body"><img class="recog-img" src="/img_tmp/alg_roi.jpg"></div></div>'
@@ -128,13 +136,13 @@ def _make_data():
     now = _dt.datetime.now().replace(microsecond=0)
     files = {}
     t = now - _dt.timedelta(days=35)
-    val = 46107.499 - 35 * 12.0
+    val = 100.7406 - 35 * 0.46
     while t <= now:
         files.setdefault("data_%s.csv" % t.strftime("%Y-%m-%d"), []).append(
-            "%s,main,%.3f,%.3f,%.3f,0.0,0.0,%s" % (t.strftime("%Y-%m-%dT%H:%M:%S+0100"), val, val, val, _status(now - t)))
+            "%s,main,%.4f,%.4f,%.4f,0.0,0.0,%s" % (t.strftime("%Y-%m-%dT%H:%M:%S+0100"), val, val, val, _status(now - t)))
         step = _dt.timedelta(minutes=5)
         h = t.hour
-        val += (0.18 if 6 <= h < 9 or 17 <= h < 22 else 0.03) * (0.6 + 0.8 * ((t.minute * 7 + t.day) % 10) / 10)
+        val += (0.0042 if 6 <= h < 9 or 17 <= h < 22 else 0.0004) * (0.6 + 0.8 * ((t.minute * 7 + t.day) % 10) / 10)
         t += step
     return files
 DATA_FILES = _make_data()
@@ -241,26 +249,23 @@ def api_post(path, body):
 
 
 def api_recognition():
-    RECTS = [(93, 183, 30, 54), (137, 183, 30, 54), (179, 183, 30, 54), (221, 183, 30, 54), (261, 183, 30, 54), (303, 183, 30, 54), (341, 183, 30, 54), (387, 183, 30, 54)]
-    CONF = [99, 99, 98, 99, 71, 97, 99, 38]
+    D_RECTS = [(254, 173, 26, 46), (284, 173, 26, 46), (315, 173, 26, 46), (345, 173, 26, 46)]
+    A_RECTS = [(411, 234, 76, 76), (379, 319, 76, 76), (296, 356, 76, 76), (203, 321, 76, 76)]
+    D_CONF = [100, 100, 100, 100]
+    A_CONF = [100, 100, 78, 100]  # one uncertain dial: shows the orange state
 
-    def group(rois):
+    def group(rois, rects, conf):
         out = []
         for i, (n, v) in enumerate(rois):
-            r = {"name": n, "valid": True, "value": str(v), "image": f"/img_tmp/{n}_org.jpg"}
-            if n.startswith("d") and i < len(RECTS):
-                r["confidence"] = CONF[i]
-                r["rect"] = {"x": RECTS[i][0], "y": RECTS[i][1], "w": RECTS[i][2], "h": RECTS[i][3]}
-            elif n.startswith("a"):
-                r["confidence"] = [95, 55][i] if i < 2 else 90
-                r["rect"] = {"x": 470 + 70 * i, "y": 300, "w": 56, "h": 56}
+            r = {"name": n, "valid": True, "value": str(v), "image": f"/img_tmp/{n}_org.jpg",
+                 "confidence": conf[i], "rect": {"x": rects[i][0], "y": rects[i][1], "w": rects[i][2], "h": rects[i][3]}}
             out.append(r)
         return {"enabled": True, "rois": out}
     return {"api_name": "recognition:v3", "state": "Idle - Waiting For Autostart", "ready": True, "image": "/img_tmp/alg_roi.jpg",
-            "alignment": {"rawImage": "/img_tmp/raw.jpg", "ok": True, "rotation": -3.2, "scale": 1, "dx": 22, "dy": -16,
-                          "markers": [{"x": 240, "y": 312, "w": 56, "h": 34}, {"x": 440, "y": 193, "w": 55, "h": 44}]},
-            "sequences": [{"name": "main", "rawValue": "46107.499", "actualValue": STATE["fallback"],
-                           "digit": group([(f"d{i}", d) for i, d in enumerate(DIGITS)]), "analog": group([(n, v) for n, v in ANALOG])}]}
+            "alignment": {"rawImage": "/img_tmp/raw.jpg", "ok": True, "rotation": 90, "scale": 1, "dx": 0, "dy": 0,
+                          "markers": [{"x": 390, "y": 172, "w": 35, "h": 43}, {"x": 486, "y": 200, "w": 46, "h": 46}]},
+            "sequences": [{"name": "main", "rawValue": "0100.7406", "actualValue": STATE["fallback"],
+                           "digit": group(list(zip(DIGIT_NAMES, DIGITS)), D_RECTS, D_CONF), "analog": group(ANALOG, A_RECTS, A_CONF)}]}
 
 
 def fs_json(dirpath):
@@ -272,8 +277,8 @@ def fs_json(dirpath):
 
 FS = {
     "/": [("config", True, 0), ("html", True, 0), ("log", True, 0)],
-    "/config": [("models", True, 0), ("certs", True, 0), ("config.json", False, 9800), ("reference.jpg", False, 54200),
-                ("marker1.jpg", False, 1100), ("marker2.jpg", False, 1000)],
+    "/config": [("models", True, 0), ("certs", True, 0), ("config.json", False, 7028), ("reference.jpg", False, 42107),
+                ("marker1.jpg", False, 2848), ("marker2.jpg", False, 2596)],
     "/config/models": [("ana-class100_0171_s1_q.tflite", False, 133784), ("ana-class100_0201_s1_q.tflite", False, 133504),
                        ("ana-cont_1901_s0_q.tflite", False, 187792), ("dig-class100_0182_s2_q.tflite", False, 226656),
                        ("dig-class11_2000_s2_q.tflite", False, 97192), ("dig-cont_0900_s3_q.tflite", False, 315544),
@@ -552,7 +557,7 @@ class H(SimpleHTTPRequestHandler):
                 "device_starttime": now, "current_time": now, "device_uptime": up,
                 "network_opmode": "WLAN Station", "connection_status": "Connected", "wlan_ssid": "HomeNet", "wlan_rssi": -52,
                 "wlan_channel": 6, "mac_address": "A4:CF:12:9B:7E:10", "network_config": "DHCP", "ipv4_address": "192.168.1.50",
-                "netmask_address": "255.255.255.0", "gateway_address": "192.168.1.1", "dns_address": "192.168.1.1", "hostname": "gasmeter",
+                "netmask_address": "255.255.255.0", "gateway_address": "192.168.1.1", "dns_address": "192.168.1.1", "hostname": "watermeter",
                 "board_type": "esp32cam", "chip_model": "ESP32", "chip_cores": 2, "chip_revision": "0.2",
                 "chip_frequency": 240, "chip_temp": 41.5, "camera_type": "OV2640", "camera_frequency": 20,
                 "sd_name": "SD32G", "sd_manufacturer": "SanDisk", "sd_capacity": 29.7, "sd_sector_size": 512,
@@ -591,7 +596,7 @@ class H(SimpleHTTPRequestHandler):
             # the reading advances with every cycle that was started here (shows the rolling counter in the dashboard)
             # while a cycle runs, the new value only appears after it has finished
             done = CYCLE["n"] - 842 - (1 if CYCLE["t0"] else 0)
-            val = "%.3f" % (46107.499 + 0.017 * max(0, done))
+            val = "%.4f" % (100.7406 + 0.0008 * max(0, done))
             return self._send({
                 "actual_value": {"main": val}, "fallback_value": {"main": STATE["fallback"]},
                 "raw_value": {"main": val}, "value_status": {"main": "000 Valid"},
@@ -599,6 +604,9 @@ class H(SimpleHTTPRequestHandler):
                 "process_state": "[" + time.strftime("%H:%M:%S") + "] " + api_status()["state"], "process_error": 0,
                 "device_uptime": int(time.time() - START) + 35, "cycle_counter": 2, "wlan_rssi": -36})
         if p.startswith("/camera"):
+            _raw = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "raw.jpg")  # a new camera picture: the sideways raw image
+            if os.path.exists(_raw):
+                return self._send(open(_raw, "rb").read(), "image/jpeg")
             return self._send(REF_SVG, "image/svg+xml")
         if False:
             return self._send(MARKER_SVG, "image/svg+xml")
@@ -632,10 +640,8 @@ class H(SimpleHTTPRequestHandler):
                 "/fileserver/config/marker1.jpg": "marker1.jpg", "/fileserver/config/marker2.jpg": "marker2.jpg",
                 "/fileserver/img_tmp/marker1.jpg": "marker1.jpg", "/fileserver/img_tmp/marker2.jpg": "marker2.jpg"}
         _name = _map.get(p)
-        if _name is None and p.startswith("/img_tmp/d") and p.endswith("_org.jpg"):
+        if _name is None and p.startswith("/img_tmp/") and p.endswith("_org.jpg"):
             _name = p.rsplit("/", 1)[-1]
-        if _name is None and p.startswith("/img_tmp/a") and p.endswith("_org.jpg"):
-            _name = "d4_org.jpg"
         if _name and os.path.exists(os.path.join(_assets, _name)):
             return self._send(open(os.path.join(_assets, _name), "rb").read(), "image/jpeg")
         if p == "/api/status":
