@@ -7987,7 +7987,7 @@ a.nav-sub-item {
 }
 
 .wiz-actions [data-ref='next']::after {
-  content: '92';
+  content: '\2192';
   margin-left: 12px;
   font-size: 1.2em;
   line-height: 1;
@@ -8005,7 +8005,7 @@ a.nav-sub-item {
 }
 
 .wiz-actions [data-ref='previous']::before {
-  content: '90';
+  content: '\2190';
   margin-right: 10px;
   font-size: 1.2em;
   line-height: 1;
