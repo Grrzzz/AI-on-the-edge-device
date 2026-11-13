@@ -9296,7 +9296,7 @@ const App = (() => {
         update() {
           const c = mCurrent(t);
           for (const key of ['w', 'h']) {
-            if (document.activeElement !== inputs[key]) inputs[key].value = c ? c[key] : '';
+            if (document.activeElement !== inputs[key]) inputs[key].value = c && Number.isFinite(c[key]) ? c[key] : '';
             inputs[key].disabled = !c;
           }
         },
