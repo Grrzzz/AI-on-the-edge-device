@@ -8127,17 +8127,19 @@ a.nav-sub-item {
 .setup-bubble {
   position: absolute;
   left: 50%;
-  bottom: 20px;
+  bottom: 28px;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 12px;
-  max-width: calc(100% - 32px);
-  padding: 8px 8px 8px 14px;
+  gap: 20px;
+  width: max-content;
+  max-width: calc(100% - 48px);
+  padding: 14px 14px 14px 26px;
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.88);
+  background: rgba(15, 23, 42, 0.9);
   color: #f8fafc;
-  font-size: 0.85rem;
+  font-size: 1rem;
+  line-height: 1.35;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 }
 .setup-bubble[hidden] {
@@ -8146,4 +8148,20 @@ a.nav-sub-item {
 .setup-bubble .button {
   flex: none;
   white-space: nowrap;
+}
+
+.setup-bubble .button {
+  padding: 10px 20px;
+  font-size: 0.95rem;
+}
+@media screen and (max-width: 600px) {
+  .setup-bubble {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 16px 18px;
+    border-radius: 1.2rem;
+    bottom: 20px;
+    text-align: center;
+  }
 }
