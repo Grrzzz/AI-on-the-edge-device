@@ -7071,6 +7071,7 @@ const App = (() => {
    *          onNavigate?:(tab:string)=>void, onTabChange?:(tab:string)=>void, onDirtyChange?:(dirty:boolean)=>void}} [opts]
    *   tabs      show the tab bar (default true)
    *   header    show title + subtitle (default true)
+   *   sequenceBar  show the number sequence selector with the digit / analog switches (default true)
    *   helpOpen  "How it works" expanded
    *   saveBar   'global' = core SaveBar (default), 'inline' = bar inside the editor (wizard), 'none'
    *   onNavigate(tab)  tab bar click: the host routes (and calls setTab); without it the editor switches itself
@@ -7079,7 +7080,7 @@ const App = (() => {
    */
   function mountEditor(root, tab, opts = {}) {
     const uid = ++uidCounter;
-    const o = { tabs: true, header: true, helpOpen: false, saveBar: 'global', ...opts };
+    const o = { tabs: true, header: true, helpOpen: false, saveBar: 'global', sequenceBar: true, ...opts };
     const toInt = (v) => parseInt(v, 10);
 
     /* -------------------------------------------------------------- state */
@@ -7131,7 +7132,7 @@ const App = (() => {
           <summary>How it works</summary>
           <div class="help-panel">${EDITOR_HELP}</div>
         </details>
-        <div class="card setup-seqcard">
+        <div class="card setup-seqcard"${o.sequenceBar ? '' : ' hidden'}>
         <div class="m-only setup-seqglobal" data-ref="mSeqBar">
           <div class="m-seqrow">
             <div class="m-combo" data-ref="mSeqCombo"></div>
@@ -10277,6 +10278,8 @@ const App = (() => {
         const host = root.querySelector(`[data-panel="${step}"] [data-editor]`);
         editor = App.setup.mountEditor(host, WIZARD_EDITOR_TABS[step], {
           header: false,
+          tabs: step > 2,
+          sequenceBar: step > 2,
           helpOpen: true,
           saveBar: 'inline',
         });
@@ -10298,6 +10301,11 @@ const App = (() => {
       if (target < 0) target = 0;
       if (target > WIZARD_LAST_STEP && target < WIZARD_ABORT_STEP) target = WIZARD_LAST_STEP;
       if (step === 1 && target > 1 && target < WIZARD_ABORT_STEP && !meterChosen) return; // pick the meter type first
+      if (step === 1 && target === 2) {
+        // processing starts switched off, the sequences step turns it on
+        delta.digit = { ...delta.digit, enabled: false };
+        delta.analog = { ...delta.analog, enabled: false };
+      }
       if (step === 1 && target !== step && Object.keys(delta).length) {
         stepFlashCfgBusy(true);
         const saved = await savePendingChanges();
