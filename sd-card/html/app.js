@@ -10420,7 +10420,7 @@ const App = (() => {
           introHint: step === 2,
           onImageState: ({ exists, pending, stale }) => {
             // Next needs a picture that matches the current settings
-            if (step === 2 && !busy) R.next.disabled = pending ? stale : !exists;
+            if (step === 2 && !busy) R.next.disabled = stale || (!pending && !exists);
           },
           helpOpen: true,
           saveBar: step === 2 ? 'none' : 'inline',
