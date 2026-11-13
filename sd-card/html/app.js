@@ -10241,7 +10241,10 @@ const App = (() => {
           <div class="wiz-editor" data-editor></div>
         </div>
         <div class="wiz-step hidden" data-panel="5">
-          <div class="wiz-step-content"><strong>Step 5: WebUI security and finish</strong></div>
+          <details class="setup-desc" open>
+            <summary>How it works</summary>
+            <div class="help-panel wiz-help" data-ref="finishHelp"></div>
+          </details>
           <div class="cfg wiz-cfg">
             <div class="card cfg-card">
               <div class="card-header"><span class="cfg-card-title">WebUI security</span></div>
@@ -10472,6 +10475,10 @@ const App = (() => {
 
     function renderStep() {
       unmountEditor();
+      if (step === WIZARD_LAST_STEP && !R.finishHelp.firstElementChild) {
+        R.finishHelp.innerHTML = App.setup.wizardHelpHtml();
+        R.finishHelp.querySelector('[data-help="finish"]').classList.add('current');
+      }
       all('[data-panel]').forEach((p) => show(p, parseInt(p.dataset.panel, 10) === step));
       R.next.hidden = step === WIZARD_LAST_STEP;
       R.finish.hidden = step !== WIZARD_LAST_STEP;
@@ -10782,7 +10789,7 @@ const App = (() => {
   /* ======================================================================== */
   /* Public component API                                                     */
   /* ======================================================================== */
-  App.setup = { mountEditor };
+  App.setup = { mountEditor, wizardHelpHtml: () => WIZARD_HELP };
 })();
 
 /* ========================================================================== */
