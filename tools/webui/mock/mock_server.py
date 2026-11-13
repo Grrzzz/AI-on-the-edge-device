@@ -2,6 +2,8 @@
 
 Usage: python tools/webui/mock/mock_server.py [html_dir] [port] [host]   (default: sd-card/html, port 8099, host 0.0.0.0 = also reachable in the LAN)
 MOCK_SETUP=1 starts it in setup mode: the first installation wizard opens.
+MOCK_FRESH=1 (with MOCK_SETUP=1) simulates a device that has never been configured: factory default configuration (no ROIs, markers at 1/1,
+rotation 0) and the wizard keeps what it saves until the mock restarts.
 Open http://127.0.0.1:8099/ (or http://<IPv4 of this computer>:8099/ from a phone in the same network) - "Start cycle" simulates a cycle of about 12 s incl. /api/live.
 """
 import json, sys, os, time
@@ -15,15 +17,28 @@ PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 8099
 HOST = sys.argv[3] if len(sys.argv) > 3 else os.environ.get('MOCK_HOST', '0.0.0.0')  # 127.0.0.1: this computer only
 START = time.time()
 SETUP_MODE = os.environ.get('MOCK_SETUP') == '1'  # MOCK_SETUP=1: the mock starts like a device in setup mode (first installation wizard)
+FRESH = SETUP_MODE and os.environ.get('MOCK_FRESH') == '1'  # factory defaults instead of the data of the water meter
 STATE = {"fallback": "100.7406"}
 import json as _json
 
 _CFG_SRC = os.path.join(REPO, "code", "test", "components", "config_handling", "config_json_default_expected.txt")
 
 
+def _merge(base, delta):
+    for k, v in delta.items():
+        if isinstance(v, dict) and isinstance(base.get(k), dict):
+            _merge(base[k], v)
+        else:
+            base[k] = v  # lists (ROIs, markers, pins) are replaced as a whole
+    return base
+
+
 def build_config():
     s = open(_CFG_SRC, encoding="utf-8").read()
     cfg = _json.loads(s[s.index("\n{\n") + 1:])
+    if FRESH:
+        cfg["operationmode"]["opmode"] = STATE.get("opmode", -1)
+        return _merge(cfg, STATE.get("saved", {}))
     cfg["webui"]["autorefresh"] = {"dashboard": {"enabled": True, "refreshtime": 5}}
     cfg["operationmode"]["opmode"] = STATE.get("opmode", -1 if SETUP_MODE else 1)  # -1: operation mode "Setup" opens the first installation wizard
     cfg["mqtt"]["enabled"] = True
@@ -514,7 +529,10 @@ class H(SimpleHTTPRequestHandler):
         if u.path == "/config":
             STATE.setdefault("posts", []).append(body.decode("utf-8", "replace")[:4000])
             try:
-                mode = json.loads(body.decode("utf-8")).get("operationmode", {}).get("opmode")
+                posted = json.loads(body.decode("utf-8"))
+                if FRESH:
+                    _merge(STATE.setdefault("saved", {}), posted)
+                mode = posted.get("operationmode", {}).get("opmode")
                 if mode is not None:
                     STATE["opmode"] = int(mode)  # the wizard switches the device to automatic mode when it is completed
             except Exception:
