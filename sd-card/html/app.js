@@ -6857,6 +6857,8 @@ const App = (() => {
     if (input.validity.rangeUnderflow) input.value = min;
   }
 
+  /** Last real camera picture of the wizard (raw, before the calculated preview) so the camera step can come back to it. */
+  let wizardLastTake = null;
   const KEY_CAM = 'takeimage.camera.';
   /** Camera / flashlight parameter table of the image tab: two parameter columns per row (same layout as before). */
   const CAM_ROWS = [
@@ -8531,6 +8533,7 @@ const App = (() => {
       refLoadCanvas(currentBlobUrl, true);
       isActReference = false;
       capParams = sentParams;
+      if (o.introHint) wizardLastTake = { blob, params: sentParams };
       imagePending = true;
       refMissing = false;
       updateIntro();
@@ -8696,7 +8699,17 @@ const App = (() => {
               const v = camInput[name].value;
               capParams[key] = v === '' ? def : v;
             });
-            camEnable(true);
+            const last = wizardLastTake;
+            const same = last && Object.keys(last.params).every((k) => String(last.params[k]) === String(capParams[k]));
+            if (same) {
+              // the raw picture of the last real shot is still here: the calculated preview works on it again
+              currentBlobUrl = URL.createObjectURL(last.blob);
+              isActReference = false;
+              capParams = { ...last.params };
+              refLoadCanvas(currentBlobUrl, true);
+              camEnable(true);
+            }
+            // otherwise only the stored picture exists: the controls stay locked until a new picture is taken
           }
         }
         updateIntro();
