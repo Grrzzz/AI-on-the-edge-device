@@ -6950,8 +6950,8 @@ const App = (() => {
     [KEY_CAM + 'flipimage']: { kind: 'switch' },
   };
   const CAM_FIELDS = CAM_ROWS.flat();
-  /** Settings the result of which is already visible on the taken picture (rotation); all others show only on a new camera picture. */
-  const CAM_PREVIEW = new Set(['imagealignment.imagerotation']);
+  /** Settings shown calculated on the taken picture (rotation, mirror, flip); all others show only on a new camera picture. */
+  const CAM_PREVIEW = new Set(['imagealignment.imagerotation', KEY_CAM + 'mirrorimage', KEY_CAM + 'flipimage']);
   /** Text of the value shown next to a slider. */
   function camFormat(f, v) {
     switch (f.fmt) {
@@ -7215,7 +7215,7 @@ const App = (() => {
                   </label>
                 </div>
                 <ul class="cam-note">
-                  <li><span class="cam-tag cam-tag-live">Preview</span> the picture turns along at once.</li>
+                  <li><span class="cam-tag cam-tag-live">Preview</span> shows at once on the picture (calculated).</li>
                   <li><span class="cam-tag">Camera</span> needs a new picture. A hint appears after every change.</li>
                 </ul>
                 <div class="cam-wrap">
@@ -8460,6 +8460,7 @@ const App = (() => {
       applyCamGates();
       updateParamOutput(el);
       delta = mergeParam(delta, f.name, el.value, !!f.int);
+      if (!isActReference && imageOk && (f.name === KEY_CAM + 'mirrorimage' || f.name === KEY_CAM + 'flipimage')) drawRotated();
       updateTakeState();
     }
 
@@ -8547,6 +8548,10 @@ const App = (() => {
       } else {
         g.translate(R.canvas.width / 2, R.canvas.height / 2);
         g.rotate((degrees * Math.PI) / 180);
+        // mirror / flip differing from the real picture are shown calculated; the hint asks for a new picture
+        const cap = capParams || {};
+        const flipped = (name, key) => (camInput[name].value === 'true') !== ((cap[key] ?? 'false') === 'true');
+        g.scale(flipped(KEY_CAM + 'mirrorimage', 'mirror') ? -1 : 1, flipped(KEY_CAM + 'flipimage', 'flip') ? -1 : 1);
         // Special effect 7 (grayscale + negative): both together do not work on the camera.
         // Workaround: grayscale on the camera + negative on the MCU (processing) / in the browser (preview)
         if (specialeffect === '7') g.filter = 'invert(1)';
