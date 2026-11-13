@@ -6950,6 +6950,8 @@ const App = (() => {
     [KEY_CAM + 'flipimage']: { kind: 'switch' },
   };
   const CAM_FIELDS = CAM_ROWS.flat();
+  /** Changes the browser can show at once on the taken picture (calculated); everything else needs a new picture from the camera. */
+  const CAM_PREVIEW = new Set([KEY_CAM + 'brightness', KEY_CAM + 'contrast', KEY_CAM + 'saturation', KEY_CAM + 'mirrorimage', KEY_CAM + 'flipimage', KEY_CAM + 'specialeffect', 'imagealignment.imagerotation']);
   /** Text of the value shown next to a slider. */
   function camFormat(f, v) {
     switch (f.fmt) {
@@ -6997,7 +6999,8 @@ const App = (() => {
       const adv = CAM_BASIC.includes(name) ? '' : ' setup-cam-adv';
       const cls = `cam-ctl setup-cam-cell${adv}${gate}`;
       const label = App.esc(f.label);
-      const head = (extra) => `<div class="cam-head"><div class="tooltip-trigger" data-help="${help}"></div><span class="cam-label">${label}</span>${extra}</div>`;
+      const tag = CAM_PREVIEW.has(name) ? '<span class="cam-tag cam-tag-live" title="Shown right away on the picture, calculated">Preview</span>' : '<span class="cam-tag" title="Needs a new camera picture">Camera</span>';
+      const head = (extra) => `<div class="cam-head"><div class="tooltip-trigger" data-help="${help}"></div><span class="cam-label">${label}</span>${tag}${extra}</div>`;
       const btn = (dir, sign) => `<button type="button" class="cam-step" data-dir="${dir}" aria-label="${dir < 0 ? 'Decrease' : 'Increase'} ${label}">${sign}</button>`;
       if (f.type === 'range') {
         return `<div class="${cls} cam-range" data-cam="${name}">${head(`<output data-out="${name}">${camFormat(f, f.value)}</output>`)}
@@ -7071,7 +7074,7 @@ const App = (() => {
    *          onNavigate?:(tab:string)=>void, onTabChange?:(tab:string)=>void, onDirtyChange?:(dirty:boolean)=>void}} [opts]
    *   tabs      show the tab bar (default true)
    *   header    show title + subtitle (default true)
-   *   introHint  first run: while no reference image exists show a hint instead of the picture, the button reads Take camera image
+   *   introHint  (default true) while no reference image exists show a hint instead of the picture, the button reads Take camera image
    *   onReferenceState(exists)  called whenever the stored reference image was (re)loaded
    *   sequenceBar  show the number sequence selector with the digit / analog switches (default true)
    *   helpOpen  "How it works" expanded
@@ -7082,7 +7085,7 @@ const App = (() => {
    */
   function mountEditor(root, tab, opts = {}) {
     const uid = ++uidCounter;
-    const o = { tabs: true, header: true, helpOpen: false, saveBar: 'global', sequenceBar: true, introHint: false, ...opts };
+    const o = { tabs: true, header: true, helpOpen: false, saveBar: 'global', sequenceBar: true, introHint: true, ...opts };
     const toInt = (v) => parseInt(v, 10);
 
     /* -------------------------------------------------------------- state */
@@ -7107,6 +7110,7 @@ const App = (() => {
     let isActReference = false;
     let specialeffect = '0';
     let currentBlobUrl = null;
+    let capParams = null; // camera values of the picture that was really taken
     let refMissing = false; // introHint: the device has no reference image yet
     let imagePending = false; // a new camera image exists that is not saved yet
     let camUnlocked = false;
@@ -7173,6 +7177,10 @@ const App = (() => {
               <div class="canvas-wrap">
                 <img data-ref="loading" alt="Loading..." />
                 <canvas data-ref="canvas" style="display: none"></canvas>
+                <div class="setup-bubble" data-ref="bubble" role="status" hidden>
+                  <span>Preview only, not yet checked with the camera. Take a new picture before saving.</span>
+                  <button type="button" class="button" data-click="take">Update image</button>
+                </div>
                 <div class="setup-intro" data-ref="intro" hidden>
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
                   <b>Let's set up the camera image</b>
@@ -7206,6 +7214,7 @@ const App = (() => {
                     <input type="checkbox" data-change="camAdvanced" data-ref="camAdv" />Advanced
                   </label>
                 </div>
+                <p class="cam-note"><span class="cam-tag cam-tag-live">Preview</span> shows at once, calculated on the picture. <span class="cam-tag">Camera</span> needs a new picture.</p>
                 <div class="cam-wrap">
                   <div class="cam-grid" data-ref="camGrid">${camPanelMarkup()}</div>
                   <div class="cam-lock" data-ref="camLock"><span>Update the image first, then you can change the settings.</span></div>
@@ -8448,6 +8457,7 @@ const App = (() => {
       applyCamGates();
       updateParamOutput(el);
       delta = mergeParam(delta, f.name, el.value, !!f.int);
+      if (!isActReference && imageOk) updatePreview();
     }
 
     /** The Advanced rows are closed whenever the page is opened (not remembered). */
@@ -8470,6 +8480,7 @@ const App = (() => {
         params[key] = v === '' ? def : v;
       });
       specialeffect = params.specialeffect;
+      const sentParams = { ...params };
 
       if (taking) return;
       taking = true;
@@ -8491,12 +8502,55 @@ const App = (() => {
       currentBlobUrl = URL.createObjectURL(blob);
       refLoadCanvas(currentBlobUrl, true);
       isActReference = false;
+      capParams = sentParams;
       imagePending = true;
       refMissing = false;
       updateIntro();
       R.canvas.style.display = 'block';
       camEnable(true); // now the settings can be changed; "Update image" again takes the next picture
       refreshSaveBar();
+    }
+
+    /** Calculated changes between the real picture and the current inputs (what the preview adds on top). */
+    function previewDiff() {
+      const val = (name) => camInput[name].value;
+      const cap = capParams || {};
+      const num = (key, name) => Number(val(name)) - Number(cap[key] ?? 0);
+      const eff = (e) => ({ '0': [0, 0], '1': [0, 1], '2': [1, 0], '7': [1, 0] })[String(e)] || [0, 0];
+      const want = ({ '0': [0, 0], '1': [0, 1], '2': [1, 0], '7': [1, 1] })[String(val(KEY_CAM + 'specialeffect'))] || [0, 0];
+      const have = eff(cap.specialeffect ?? 0);
+      const parts = [];
+      const b = num('brightness', KEY_CAM + 'brightness');
+      const c = num('contrast', KEY_CAM + 'contrast');
+      const s = num('saturation', KEY_CAM + 'saturation');
+      if (b) parts.push(`brightness(${Math.max(0.2, 1 + 0.25 * b)})`);
+      if (c) parts.push(`contrast(${Math.max(0.2, 1 + 0.25 * c)})`);
+      if (s) parts.push(`saturate(${Math.max(0, 1 + 0.5 * s)})`);
+      if (want[0] && !have[0]) parts.push('grayscale(1)');
+      if (want[1] !== have[1]) parts.push('invert(1)');
+      return {
+        filter: parts.filter(Boolean).join(' ') || 'none',
+        mirror: (val(KEY_CAM + 'mirrorimage') === 'true') !== ((cap.mirror ?? 'false') === 'true'),
+        flip: (val(KEY_CAM + 'flipimage') === 'true') !== ((cap.flip ?? 'false') === 'true'),
+      };
+    }
+
+    /** True while an input differs from the real picture (rotation is calculated on the device as well and does not count). */
+    function previewOnly() {
+      if (!capParams || isActReference) return false;
+      return CAPTURE_PARAMS.some(([key, name, def]) => {
+        const v = camInput[name].value;
+        return String(v === '' ? def : v) !== String(capParams[key]);
+      });
+    }
+
+    function updatePreview() {
+      if (destroyed) return;
+      const on = previewOnly();
+      R.bubble.hidden = !on;
+      R.inlineSave.title = on ? 'Take a new picture first' : '';
+      R.inlineSave.disabled = saving || on;
+      drawRotated(!isActReference);
     }
 
     function drawRotated(grid = true) {
@@ -8509,9 +8563,11 @@ const App = (() => {
       } else {
         g.translate(R.canvas.width / 2, R.canvas.height / 2);
         g.rotate((degrees * Math.PI) / 180);
+        const pv = previewDiff();
+        if (pv.mirror || pv.flip) g.scale(pv.mirror ? -1 : 1, pv.flip ? -1 : 1);
         // Special effect 7 (grayscale + negative): both together do not work on the camera.
         // Workaround: grayscale on the camera + negative on the MCU (processing) / in the browser (preview)
-        if (specialeffect === '7') g.filter = 'invert(1)';
+        g.filter = pv.filter;
         g.drawImage(imageObj, -imageObj.width / 2, -imageObj.height / 2);
       }
       g.restore();
@@ -8579,6 +8635,7 @@ const App = (() => {
     }
 
     function showReference() {
+      capParams = null;
       if (currentBlobUrl) {
         URL.revokeObjectURL(currentBlobUrl);
         currentBlobUrl = null;
@@ -9787,7 +9844,7 @@ const App = (() => {
       const p = e.target.closest('[data-param]');
       if (p && p.type === 'range') {
         updateParamOutput(p); // live value while dragging a slider
-        if (p.dataset.param === 'imagealignment.imagerotation' && !isActReference) drawRotated(); // the preview turns along with the slider
+        if (!isActReference && imageOk) updatePreview(); // the picture follows the slider
       }
     };
     root.addEventListener('click', onRootClick);

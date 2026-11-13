@@ -8102,3 +8102,48 @@ a.nav-sub-item {
 .setup-intro span {
   max-width: 420px;
 }
+
+.cam-tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  background: rgba(100, 116, 139, 0.14);
+  color: var(--text-muted, #64748b);
+  white-space: nowrap;
+}
+.cam-tag-live {
+  background: rgba(37, 99, 235, 0.12);
+  color: #2563eb;
+}
+.cam-note {
+  margin: 0;
+  padding: 0 20px 8px;
+  font-size: 0.8rem;
+  color: var(--text-muted, #64748b);
+}
+.setup-bubble {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100% - 32px);
+  padding: 8px 8px 8px 14px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.88);
+  color: #f8fafc;
+  font-size: 0.85rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+.setup-bubble[hidden] {
+  display: none;
+}
+.setup-bubble .button {
+  flex: none;
+  white-space: nowrap;
+}
