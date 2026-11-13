@@ -9971,8 +9971,8 @@ const App = (() => {
             <strong>Step 1: Meter type</strong>
             <p>Choose the type of your meter. It sets the units and the look of the interface. You can continue after you have made a choice.</p>
           </div>
-          <div class="cfg wiz-cfg" data-card="metertheme">
-            <div class="card cfg-card">
+          <div class="cfg wiz-cfg">
+            <div class="card cfg-card" data-card="metertheme">
               <div class="card-header"><span class="cfg-card-title">Meter type</span></div>
               <div class="card-body cfg-body">
                 ${cfgRow('Meter Type', 'mqtt_homeassistant_metertype', '<select data-field="mqtt.homeassistant.metertype" data-int="1" data-ref="meterType" data-change="field" hidden></select><span data-ref="meterCombo"></span>')}
