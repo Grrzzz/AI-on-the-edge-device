@@ -415,7 +415,7 @@ function plainTextSnippet(data) {
   if (!trimmed || trimmed.startsWith('<')) {
     return '';
   }
-  return trimmed.length > 180 ? trimmed.slice(0, 180) + 'ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦' : trimmed;
+  return trimmed.length > 180 ? trimmed.slice(0, 180) + 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦' : trimmed;
 }
 
 function launchNotifyEntry(entry, fallbackType, fallbackDuration) {
@@ -940,7 +940,7 @@ function formatLastSuccess(status, ageOffset = 0) {
   const age = status.lastSuccessSeconds + ageOffset;
   let when = '';
   if (stamp.length >= 19) when = age < 86400 ? stamp.substring(11, 19) : `${stamp.substring(0, 10)} ${stamp.substring(11, 16)}`;
-  return { text: when ? `${when} Ãƒâ€šÃ‚Â· ${formatAgo(age)}` : formatAgo(age), title: stamp.length >= 19 ? `${stamp.substring(0, 10)} ${stamp.substring(11, 19)}` : '' };
+  return { text: when ? `${when} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${formatAgo(age)}` : formatAgo(age), title: stamp.length >= 19 ? `${stamp.substring(0, 10)} ${stamp.substring(11, 19)}` : '' };
 }
 
 const SCAN_CORNERS = 'M11 21V11h10M43 11h10v10M53 43v10H43M21 53H11V43';
@@ -2685,7 +2685,7 @@ const App = (() => {
         set('chip_cores', d.chip_cores);
         set('chip_revision', d.chip_revision);
         set('chip_frequency', d.chip_frequency + ' Mhz');
-        set('chip_temp', d.chip_temp + ' Ãƒâ€šÃ‚Â°C');
+        set('chip_temp', d.chip_temp + ' ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°C');
 
         set('camera_type', d.camera_type);
         set('camera_frequency', d.camera_frequency + '  Mhz');
@@ -2898,7 +2898,7 @@ const App = (() => {
         refs.bar.hidden = true;
         refs.steps.textContent = '';
         refs.steps.hidden = !stepLabels;
-        (stepLabels || []).forEach((label, i) => refs.steps.append(App.el('li', '', `${i + 1} Ãƒâ€šÃ‚Â· ${label}`)));
+        (stepLabels || []).forEach((label, i) => refs.steps.append(App.el('li', '', `${i + 1} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${label}`)));
         t0 = Date.now();
         clearInterval(timer);
         const tick = () => {
@@ -3603,7 +3603,7 @@ const App = (() => {
 
         const when = String(meta.timestamp || '').replace('_', ' ').replace(/-(\d\d)-(\d\d)$/, ':$1:$2');
         picker.show(file, 'Valid backup', 'badge-success');
-        if (when) r.fileSize.textContent = pickSize(file.size) + ' Ãƒâ€šÃ‚Â· created ' + when;
+        if (when) r.fileSize.textContent = pickSize(file.size) + ' ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· created ' + when;
         r.startRestore.disabled = false;
       } catch (err) {
         console.error('ZIP validation error:', err);
@@ -4028,7 +4028,7 @@ const App = (() => {
           const head = table.createTHead().insertRow();
           [['name', 'Name'], ['type', 'Type'], ['size', 'Size']].forEach(([key, label]) => {
             const th = document.createElement('th');
-            th.textContent = label + (sort.key === key ? (sort.dir > 0 ? ' ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â´' : ' ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¾') : '');
+            th.textContent = label + (sort.key === key ? (sort.dir > 0 ? ' ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â´' : ' ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¾') : '');
             th.dataset.action = 'sort';
             th.dataset.key = key;
             head.append(th);
@@ -4919,7 +4919,7 @@ const App = (() => {
         pos++;
       }
     };
-    if (m[1]) meter.append(el('span', 'dash-meter-sign', 'ÃƒÂ¢Ã‹â€ Ã¢â‚¬â„¢'));
+    if (m[1]) meter.append(el('span', 'dash-meter-sign', 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¹ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢'));
     wheels(m[2], '');
     if (m[3]) {
       meter.append(el('span', 'dash-meter-dot'));
@@ -6083,7 +6083,7 @@ const App = (() => {
       const renderProcessError = (value, processState) => {
         const state = String(processState ?? '').toLowerCase();
         const isErrorState = ERROR_STATES.some((s) => state.includes(s));
-        ref.error.textContent = isErrorState && value < 0 ? 'ÃƒÂ¢Ã…Â¡Ã‚Â  Process error detected. Check logs' : '';
+        ref.error.textContent = isErrorState && value < 0 ? 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â  Process error detected. Check logs' : '';
       };
 
       // ---- loading -------------------------------------------------------
@@ -6675,16 +6675,16 @@ const App = (() => {
   const EDITOR_TABS = ['image', 'markers', 'digit', 'analog'];
   const TAB_TITLE = {
     image: 'Reference image',
-    markers: 'Reference image Ãƒâ€šÃ‚Â· alignment markers',
-    digit: 'Reference image Ãƒâ€šÃ‚Â· digit ROIs',
-    analog: 'Reference image Ãƒâ€šÃ‚Â· analog ROIs',
+    markers: 'Reference image ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· alignment markers',
+    digit: 'Reference image ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· digit ROIs',
+    analog: 'Reference image ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· analog ROIs',
   };
   const TAB_LABEL = { image: 'Image', markers: 'Markers', digit: 'Digits', analog: 'Analog' };
   // route part <-> internal tab id
   const ROUTE_TO_TAB = { image: 'image', markers: 'markers', digit: 'digit', digits: 'digit', analog: 'analog' };
   const TAB_TO_ROUTE = { image: 'image', markers: 'markers', digit: 'digits', analog: 'analog' };
   const WIZARD_STEP_KEY = 'setupStep'; // sessionStorage, same key as the former setup.html
-  const WIZARD_LAST_STEP = 6;
+  const WIZARD_LAST_STEP = 5;
   const WIZARD_ABORT_STEP = 99;
 
   let uidCounter = 0;
@@ -6961,7 +6961,7 @@ const App = (() => {
       case 'zoom':
         return `x`;
       case 'deg':
-        return `Ãƒâ€šÃ‚Â°`;
+        return `ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°`;
       case 'ms':
         return ` ms`;
       case 'pct':
@@ -7081,6 +7081,8 @@ const App = (() => {
    *   onImageState({exists, pending, stale})  the picture state changed (stale: settings differ from the picture)
    *   sequenceBar  show the number sequence selector with the digit / analog switches (default true)
    *   seqCombo  show the number sequence combo inside that bar (default true)
+   *   tabList  tabs to show (default all)
+   *   autoDigit  switch the digits on when neither digits nor analog is on
    *   centerMarkers  markers that were never placed start in the middle of the picture
    *   onAlignState({ready, procs})  both markers placed (cut once) and at least one of digit / analog selected
    *   helpOpen  "How it works" expanded
@@ -7091,7 +7093,7 @@ const App = (() => {
    */
   function mountEditor(root, tab, opts = {}) {
     const uid = ++uidCounter;
-    const o = { tabs: true, header: true, helpOpen: false, saveBar: 'global', sequenceBar: true, seqCombo: true, procSwitches: true, centerMarkers: false, introHint: true, ...opts };
+    const o = { tabs: true, header: true, helpOpen: false, saveBar: 'global', sequenceBar: true, seqCombo: true, procSwitches: true, centerMarkers: false, tabList: null, autoDigit: false, introHint: true, ...opts };
     const toInt = (v) => parseInt(v, 10);
 
     /* -------------------------------------------------------------- state */
@@ -7129,7 +7131,7 @@ const App = (() => {
     const imageObj = new Image();
 
     /* ------------------------------------------------------------- markup */
-    const tabButtons = EDITOR_TABS.map(
+    const tabButtons = EDITOR_TABS.filter((t) => !o.tabList || o.tabList.includes(t)).map(
       (t) =>
         `<button type="button" class="setup-tab" role="tab" data-click="tab" data-tab="${t}">${TAB_LABEL[t]}` +
         (t === 'markers' || t === 'digit' || t === 'analog' ? ` <span class="setup-tab-count" data-count="${t}"></span>` : '') +
@@ -8836,7 +8838,7 @@ const App = (() => {
     function renderMarkerRecognition() {
       if (destroyed || !R.recBody) return;
       const kind = mode === 'analog' ? 'analog' : 'digit';
-      R.recTitle.textContent = `Last cycle Ãƒâ€šÃ‚Â· ${kind === 'analog' ? 'analog' : 'digits'}`;
+      R.recTitle.textContent = `Last cycle ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${kind === 'analog' ? 'analog' : 'digits'}`;
       const body = R.recBody;
       body.textContent = '';
       const note = (text) => {
@@ -9055,6 +9057,11 @@ const App = (() => {
       } finally {
         initializing = false;
       }
+      if (o.autoDigit && !delta.digit.enabled && !delta.analog.enabled) {
+        R.digitProcessing.checked = true; // first visit: start with the digits
+        digitProcessingChanged();
+      }
+      reportAlign();
       editorSnapshot = editorState();
       R.updateMarker.disabled = false;
       updateCounts();
@@ -10084,16 +10091,15 @@ const App = (() => {
   /* ======================================================================== */
   /* View: wizard (#/wizard), the initial setup wizard                         */
   /* ======================================================================== */
-  const WIZARD_STEPS = ['Meter type', 'Camera', 'Alignment', 'Digits', 'Analog', 'Finish'];
+  const WIZARD_STEPS = ['Meter type', 'Camera', 'Alignment', 'Regions', 'Finish'];
   const WIZARD_FLOW = [
     { name: 'Meter type', text: 'Choose the type of your meter. It sets the units and the look of the interface. The flashlight pin can be customized here as well.' },
     { name: 'Camera', text: 'Take a live picture, adjust the lens focus, the flashlight and the image settings until the meter is sharp, upright and free of glare.' },
     { name: 'Alignment', text: 'Place two alignment markers on fixed structures of the meter, so the device finds the dials again in every picture.' },
-    { name: 'Digits', text: 'Mark the digits of the reading. Skipped when only analog dials are used.' },
-    { name: 'Analog', text: 'Mark the analog dials of the reading. Skipped when only digits are used.' },
+    { name: 'Regions', text: 'Mark the digits and the analog dials that make up the reading. Switch digits and analog on or off and use the tabs to move between them.' },
     { name: 'Finish', text: 'Optionally protect the web interface with a password, then switch to the operational web interface.' },
   ];
-  const WIZARD_EDITOR_TABS = { 2: 'image', 3: 'markers', 4: 'digit', 5: 'analog' };
+  const WIZARD_EDITOR_TABS = { 2: 'image', 3: 'markers', 4: 'digit' };
 
   /** A row in the style of the setup page (label with help, control, unit). */
   const cfgRow = (label, help, control, cls = 'cfg-l0', attrs = '') => `
@@ -10223,16 +10229,11 @@ const App = (() => {
           <div class="wiz-editor" data-editor></div>
         </div>
         <div class="wiz-step hidden" data-panel="4">
-          <div class="wiz-step-content"><strong>Step 4: Digit regions</strong></div>
+          <div class="wiz-step-content"><strong>Step 4: Regions of interest</strong></div>
           <div class="wiz-editor" data-editor></div>
         </div>
         <div class="wiz-step hidden" data-panel="5">
-          <div class="wiz-step-content"><strong>Step 5: Analog regions</strong></div>
-          <div class="wiz-editor" data-editor></div>
-        </div>
-
-        <div class="wiz-step hidden" data-panel="6">
-          <div class="wiz-step-content"><strong>Step 6: Configure WebUI Security &amp; Complete Initial Setup</strong></div>
+          <div class="wiz-step-content"><strong>Step 5: Configure WebUI Security &amp; Complete Initial Setup</strong></div>
           <div class="cfg wiz-cfg">
             <div class="card cfg-card">
               <div class="card-header"><span class="cfg-card-title">WebUI security</span></div>
@@ -10391,7 +10392,7 @@ const App = (() => {
       if (usage.substring(0, 10) === 'flashlight') defaultOption.removeAttribute('hidden');
       else defaultOption.setAttribute('hidden', 'true');
       if (usage.substring(0, 10) === 'restricted') {
-        R.restricted.textContent = '(ÃƒÂ¢Ã…Â¡Ã‚Â  DEFAULT: ' + usage.substring(12).replace(/-/g, ' ').toUpperCase() + ')';
+        R.restricted.textContent = '(ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â  DEFAULT: ' + usage.substring(12).replace(/-/g, ' ').toUpperCase() + ')';
         show(R.restricted, true);
       } else {
         show(R.restricted, false);
@@ -10462,19 +10463,23 @@ const App = (() => {
       all('[data-panel]').forEach((p) => show(p, parseInt(p.dataset.panel, 10) === step));
       root.querySelector('.wiz-actions').hidden = step === 0; // the start screen has its own big choices: no bar
       updateStepper();
-      setNavDisabled(step === 0 || step === WIZARD_ABORT_STEP, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP || (step === 1 && !meterChosen) || step === 2 || step === 3, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP);
+      setNavDisabled(step === 0 || step === WIZARD_ABORT_STEP, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP || (step === 1 && !meterChosen) || step === 2 || step === 3 || step === 4, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP);
 
       if (WIZARD_EDITOR_TABS[step]) {
         const host = root.querySelector(`[data-panel="${step}"] [data-editor]`);
         editor = App.setup.mountEditor(host, WIZARD_EDITOR_TABS[step], {
           header: false,
-          tabs: step > 3,
-          sequenceBar: step > 2,
-          seqCombo: step > 3,
-          procSwitches: step === 3,
+          tabs: step === 4,
+          sequenceBar: step > 3,
+          seqCombo: true,
+          procSwitches: true,
+          tabList: step === 4 ? ['digit', 'analog'] : null,
+          autoDigit: step === 4,
           centerMarkers: step === 3,
           onAlignState: ({ ready, procs }) => {
-            if (step === 3 && !busy) R.next.disabled = !(ready && procs);
+            if (busy) return;
+            if (step === 3) R.next.disabled = !ready;
+            if (step === 4) R.next.disabled = !procs;
           },
           introHint: step === 2,
           onImageState: ({ exists, pending, stale }) => {
@@ -10511,13 +10516,6 @@ const App = (() => {
       if (target < 0) target = 0;
       if (target > WIZARD_LAST_STEP && target < WIZARD_ABORT_STEP) target = WIZARD_LAST_STEP;
       if (step === 1 && target > 1 && target < WIZARD_ABORT_STEP && !meterChosen) return; // pick the meter type first
-      if (target > 3 && target < WIZARD_LAST_STEP && step >= 2) {
-        // digits / analog steps only exist for the processing chosen in the alignment step
-        const dir = target > step ? 1 : -1;
-        const c = Api.setup.getConfig() || cfg;
-        const on = { 4: !!c.digit?.enabled, 5: !!c.analog?.enabled };
-        while (target > 3 && target < WIZARD_LAST_STEP && !on[target]) target += dir;
-      }
       if (step === 1 && target === 2) {
         // processing starts switched off, the sequences step turns it on
         delta.digit = { ...delta.digit, enabled: false };
@@ -11069,7 +11067,7 @@ const App = (() => {
       {
         "id": "metertheme", "title": "Meter Type & Theme",
         "rows": [
-          {"label": "Meter Type", "lvl": 0, "id": "mqtt_homeassistant_metertype", "name": "mqtt.homeassistant.metertype", "t": "select", "opts": [["0", "Generic (No Units)"], ["1", "Water (Value: mÃƒâ€šÃ‚Â³, Rate: mÃƒâ€šÃ‚Â³/h)"], ["2", "Water (Value: L, Rate: L/h*)"], ["15", "Water (Value: L, Rate: L/min)"], ["3", "Water (Value: gal, Rate: gal/h*)"], ["16", "Water (Value: gal, Rate: gal/min)"], ["4", "Water (Value: ftÃƒâ€šÃ‚Â³, Rate: ftÃƒâ€šÃ‚Â³/min)"], ["5", "Gas (Value: mÃƒâ€šÃ‚Â³, Rate: mÃƒâ€šÃ‚Â³/h)"], ["6", "Gas (Value: ftÃƒâ€šÃ‚Â³, Rate: ftÃƒâ€šÃ‚Â³/min)"], ["7", "Energy (Value: Wh, Rate: W)"], ["8", "Energy (Value: kWh, Rate: kW)"], ["9", "Energy (Value: MWh, Rate: MW)"], ["10", "Energy (Value: GJ, Rate: GJ/h*)"], ["11", "Temperature (Value: Ãƒâ€šÃ‚Â°C, Rate: Ãƒâ€šÃ‚Â°C/min)"], ["12", "Temperature (Value: Ãƒâ€šÃ‚Â°F, Rate: Ãƒâ€šÃ‚Â°F/min)"], ["13", "Pressure (Value: bar, Rate: bar/min)"], ["14", "Pressure (Value: psi, Rate: psi/min)"]], "def": "1", "wide": true, "int": true},
+          {"label": "Meter Type", "lvl": 0, "id": "mqtt_homeassistant_metertype", "name": "mqtt.homeassistant.metertype", "t": "select", "opts": [["0", "Generic (No Units)"], ["1", "Water (Value: mÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³, Rate: mÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³/h)"], ["2", "Water (Value: L, Rate: L/h*)"], ["15", "Water (Value: L, Rate: L/min)"], ["3", "Water (Value: gal, Rate: gal/h*)"], ["16", "Water (Value: gal, Rate: gal/min)"], ["4", "Water (Value: ftÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³, Rate: ftÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³/min)"], ["5", "Gas (Value: mÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³, Rate: mÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³/h)"], ["6", "Gas (Value: ftÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³, Rate: ftÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³/min)"], ["7", "Energy (Value: Wh, Rate: W)"], ["8", "Energy (Value: kWh, Rate: kW)"], ["9", "Energy (Value: MWh, Rate: MW)"], ["10", "Energy (Value: GJ, Rate: GJ/h*)"], ["11", "Temperature (Value: ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°C, Rate: ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°C/min)"], ["12", "Temperature (Value: ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°F, Rate: ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°F/min)"], ["13", "Pressure (Value: bar, Rate: bar/min)"], ["14", "Pressure (Value: psi, Rate: psi/min)"]], "def": "1", "wide": true, "int": true},
         ],
       },
       {
@@ -11317,7 +11315,7 @@ const App = (() => {
     if (released) facts.push(`${released} (${age})`);
     if (cat?.kb) facts.push(`${cat.kb} KB`);
     if (cat?.input) facts.push(`input ${cat.input}`);
-    return { name, type, t, cat, version, released, age, quantized, chip: t ? t.chip : '?', sub: facts.join(' Ãƒâ€šÃ‚Â· ') };
+    return { name, type, t, cat, version, released, age, quantized, chip: t ? t.chip : '?', sub: facts.join(' ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ') };
   }
 
   function describeModel(file) {
@@ -11551,7 +11549,7 @@ const App = (() => {
     SaveBar.set({
       dirty,
       saveLabel: s.reboot ? 'Save and restart' : 'Save',
-      text: s.reboot ? 'Unsaved changes ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ a restart is required' : 'Unsaved changes',
+      text: s.reboot ? 'Unsaved changes ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ a restart is required' : 'Unsaved changes',
       onSave: () => save(s),
       onDiscard: () => discard(s),
     });
@@ -12226,7 +12224,7 @@ const App = (() => {
     if (mode.warn) {
       const restricted = usage.startsWith('restricted');
       mode.warn.hidden = !restricted;
-      mode.warn.textContent = restricted ? '(ÃƒÂ¢Ã…Â¡Ã‚Â  DEFAULT: ' + usage.substring(12).replace(/-/g, ' ').toUpperCase() + ')' : '';
+      mode.warn.textContent = restricted ? '(ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â  DEFAULT: ' + usage.substring(12).replace(/-/g, ' ').toUpperCase() + ')' : '';
     }
   }
 
@@ -13293,16 +13291,16 @@ const CycleMonitor = (() => {
       const elapsed = status.cycleSeconds + drift;
       const left = status.processTime - elapsed;
       timer = `running for ${formatSeconds(elapsed)}`;
-      if (status.processTime > 0) timer += left > 0 ? ` Ãƒâ€šÃ‚Â· about ${formatSeconds(Math.ceil(left))} left` : ' Ãƒâ€šÃ‚Â· finishing ...';
+      if (status.processTime > 0) timer += left > 0 ? ` ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· about ${formatSeconds(Math.ceil(left))} left` : ' ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· finishing ...';
     } else if (waiting) {
       // Automatic mode: countdown to the next run instead of the idle time
       timer = paused
-        ? `no automatic cycles Ãƒâ€šÃ‚Â· ${formatCountdown(status.nextRunSeconds)} left`
+        ? `no automatic cycles ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${formatCountdown(status.nextRunSeconds)} left`
         : `next run in ${formatCountdown(status.nextRunSeconds - drift)}`;
     } else {
       timer = `${status.running ? 'running for' : 'in this state for'} ${formatSeconds(status.stateSeconds + drift)}`;
     }
-    if (status.running && paused) timer += ' Ãƒâ€šÃ‚Â· paused afterwards';
+    if (status.running && paused) timer += ' ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· paused afterwards';
     return timer;
   }
 
@@ -13324,7 +13322,7 @@ const CycleMonitor = (() => {
       panel.dataset.phase = '';
       $('cycle-state').textContent = 'Device not reachable';
       $('cycle-count').textContent = '#-';
-      $('cycle-timer').textContent = 'Ãƒâ€šÃ‚Â ';
+      $('cycle-timer').textContent = 'ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ';
       btn.disabled = true;
       btn.classList.remove('queue');
       btn.textContent = 'Start cycle';
@@ -13349,7 +13347,7 @@ const CycleMonitor = (() => {
 
     const drift = (performance.now() - fetchedAt) / 1000;
     const timer = timerText();
-    $('cycle-timer').textContent = stale ? `${timer} Ãƒâ€šÃ‚Â· device is busy` : timer;
+    $('cycle-timer').textContent = stale ? `${timer} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· device is busy` : timer;
 
     pauseBtn.hidden = !status.autoStart;
     pauseBtn.disabled = false; // also usable while a cycle runs or the device is busy
@@ -13417,7 +13415,7 @@ const CycleMonitor = (() => {
 
   return {
     last: () => status,
-    timerText: () => (stale && status ? `${timerText()} Ãƒâ€šÃ‚Â· device is busy` : timerText()),
+    timerText: () => (stale && status ? `${timerText()} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· device is busy` : timerText()),
     start() {
       $('cycle-start')?.addEventListener('click', start);
       $('cycle-pause')?.addEventListener('click', togglePause);
