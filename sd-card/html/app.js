@@ -7072,7 +7072,7 @@ const App = (() => {
    *   tabs      show the tab bar (default true)
    *   header    show title + subtitle (default true)
    *   introHint  (default true) while no reference image exists show a hint instead of the picture, the button reads Take camera image
-   *   onReferenceState(exists)  called whenever the stored reference image was (re)loaded
+   *   onImageState({exists, pending, stale})  the picture state changed (stale: settings differ from the picture)
    *   sequenceBar  show the number sequence selector with the digit / analog switches (default true)
    *   helpOpen  "How it works" expanded
    *   saveBar   'global' = core SaveBar (default), 'inline' = bar inside the editor (wizard), 'none'
@@ -7108,6 +7108,7 @@ const App = (() => {
     let specialeffect = '0';
     let currentBlobUrl = null;
     let refMissing = false; // introHint: the device has no reference image yet
+    let capParams = null; // camera values of the picture that was really taken
     let imagePending = false; // a new camera image exists that is not saved yet
     let camUnlocked = false;
     let editorSnapshot = '';
@@ -7173,6 +7174,10 @@ const App = (() => {
               <div class="canvas-wrap">
                 <img data-ref="loading" alt="Loading..." />
                 <canvas data-ref="canvas" style="display: none"></canvas>
+                <div class="setup-bubble" data-ref="bubble" role="status" hidden>
+                  <span>The settings changed. Update the image to check the result with the camera.</span>
+                  <button type="button" class="button btn-action" data-click="take">Update image</button>
+                </div>
                 <div class="setup-intro" data-ref="intro" hidden>
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
                   <b>Let's set up the camera image</b>
@@ -8448,6 +8453,28 @@ const App = (() => {
       applyCamGates();
       updateParamOutput(el);
       delta = mergeParam(delta, f.name, el.value, !!f.int);
+      updateTakeState();
+    }
+
+    /** The picture is outdated as soon as a camera value differs from the one the picture was taken with. */
+    function imageStale() {
+      if (!imagePending || !capParams) return false;
+      return CAPTURE_PARAMS.some(([key, name, def]) => {
+        const v = camInput[name].value;
+        return String(v === '' ? def : v) !== String(capParams[key]);
+      });
+    }
+
+    function updateTakeState() {
+      if (destroyed) return;
+      const stale = imageStale();
+      R.bubble.hidden = !stale;
+      // Update image is only needed while there is no current picture
+      const needed = !imagePending || stale;
+      R.take.classList.toggle('btn-action', needed);
+      R.take.classList.toggle('ghost', !needed);
+      R.take.disabled = taking || !needed;
+      o.onImageState?.({ exists: !refMissing, pending: imagePending, stale });
     }
 
     /** The Advanced rows are closed whenever the page is opened (not remembered). */
@@ -8474,12 +8501,13 @@ const App = (() => {
       if (taking) return;
       taking = true;
       R.take.disabled = true;
+      const sentParams = { ...params };
       let result;
       try {
         result = await Api.setup.capture(params);
       } finally {
         taking = false;
-        if (!destroyed) R.take.disabled = false;
+        if (!destroyed) updateTakeState();
       }
       const { ok, blob } = result;
       if (destroyed) return;
@@ -8491,9 +8519,11 @@ const App = (() => {
       currentBlobUrl = URL.createObjectURL(blob);
       refLoadCanvas(currentBlobUrl, true);
       isActReference = false;
+      capParams = sentParams;
       imagePending = true;
       refMissing = false;
       updateIntro();
+      updateTakeState();
       R.canvas.style.display = 'block';
       camEnable(true); // now the settings can be changed; "Update image" again takes the next picture
       refreshSaveBar();
@@ -8579,6 +8609,7 @@ const App = (() => {
     }
 
     function showReference() {
+      capParams = null;
       if (currentBlobUrl) {
         URL.revokeObjectURL(currentBlobUrl);
         currentBlobUrl = null;
@@ -8592,7 +8623,7 @@ const App = (() => {
           R.canvas.height = 480;
         } else drawRotated(false);
         updateIntro();
-        o.onReferenceState?.(imageOk);
+        updateTakeState();
       });
       imagePending = false;
       // a discarded picture takes its camera settings with it: the inputs show the stored values again
@@ -9787,6 +9818,7 @@ const App = (() => {
       const p = e.target.closest('[data-param]');
       if (p && p.type === 'range') {
         updateParamOutput(p); // live value while dragging a slider
+        updateTakeState();
         if (p.dataset.param === 'imagealignment.imagerotation' && !isActReference) drawRotated(); // the preview turns along with the slider
       }
     };
@@ -10310,14 +10342,12 @@ const App = (() => {
           tabs: step > 2,
           sequenceBar: step > 2,
           introHint: step === 2,
-          onReferenceState: (exists) => {
-            if (step === 2 && !busy) R.next.disabled = !exists;
+          onImageState: ({ exists, pending, stale }) => {
+            // Next needs a picture that matches the current settings
+            if (step === 2 && !busy) R.next.disabled = pending ? stale : !exists;
           },
           helpOpen: true,
           saveBar: step === 2 ? 'none' : 'inline',
-          onDirtyChange: (dirty) => {
-            if (step === 2 && !busy && dirty) R.next.disabled = false;
-          },
         });
       }
       root.scrollIntoView?.({ block: 'start' });
