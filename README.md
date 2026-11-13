@@ -15,6 +15,12 @@ backend and a one-click update from GitHub, and trims the firmware to the `esp32
   <img src="docs/images/ui-dashboard.png" width="800" alt="Dashboard">
 </p>
 
+## What is new in 2.5
+
+- **New: setup wizard (beta)** - a first start now opens a full-screen wizard: meter type and GPIO, camera, alignment markers, digit and analog regions, then WebUI security and finish. Each step has a "How it works" card, the steps are saved automatically when you move on, and you can restore a backup or import a v16 configuration at the start
+- **Improved: configuration editor** - live preview of camera settings on the taken picture, markers are cut automatically, size steppers stay empty for new regions
+- **Fix: configuration** - markers stored as an object are read as a list, and a later change no longer turns lists into objects
+
 ## What is new in 2.4.1
 
 - **Fix: MCP server** - the first request of an assistant could get a "Parse error" and crash the device (a race when the request was handed
