@@ -415,7 +415,7 @@ function plainTextSnippet(data) {
   if (!trimmed || trimmed.startsWith('<')) {
     return '';
   }
-  return trimmed.length > 180 ? trimmed.slice(0, 180) + 'Ã¢â‚¬Â¦' : trimmed;
+  return trimmed.length > 180 ? trimmed.slice(0, 180) + 'ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦' : trimmed;
 }
 
 function launchNotifyEntry(entry, fallbackType, fallbackDuration) {
@@ -940,7 +940,7 @@ function formatLastSuccess(status, ageOffset = 0) {
   const age = status.lastSuccessSeconds + ageOffset;
   let when = '';
   if (stamp.length >= 19) when = age < 86400 ? stamp.substring(11, 19) : `${stamp.substring(0, 10)} ${stamp.substring(11, 16)}`;
-  return { text: when ? `${when} Ã‚Â· ${formatAgo(age)}` : formatAgo(age), title: stamp.length >= 19 ? `${stamp.substring(0, 10)} ${stamp.substring(11, 19)}` : '' };
+  return { text: when ? `${when} Ãƒâ€šÃ‚Â· ${formatAgo(age)}` : formatAgo(age), title: stamp.length >= 19 ? `${stamp.substring(0, 10)} ${stamp.substring(11, 19)}` : '' };
 }
 
 const SCAN_CORNERS = 'M11 21V11h10M43 11h10v10M53 43v10H43M21 53H11V43';
@@ -2685,7 +2685,7 @@ const App = (() => {
         set('chip_cores', d.chip_cores);
         set('chip_revision', d.chip_revision);
         set('chip_frequency', d.chip_frequency + ' Mhz');
-        set('chip_temp', d.chip_temp + ' Ã‚Â°C');
+        set('chip_temp', d.chip_temp + ' Ãƒâ€šÃ‚Â°C');
 
         set('camera_type', d.camera_type);
         set('camera_frequency', d.camera_frequency + '  Mhz');
@@ -2898,7 +2898,7 @@ const App = (() => {
         refs.bar.hidden = true;
         refs.steps.textContent = '';
         refs.steps.hidden = !stepLabels;
-        (stepLabels || []).forEach((label, i) => refs.steps.append(App.el('li', '', `${i + 1} Ã‚Â· ${label}`)));
+        (stepLabels || []).forEach((label, i) => refs.steps.append(App.el('li', '', `${i + 1} Ãƒâ€šÃ‚Â· ${label}`)));
         t0 = Date.now();
         clearInterval(timer);
         const tick = () => {
@@ -3603,7 +3603,7 @@ const App = (() => {
 
         const when = String(meta.timestamp || '').replace('_', ' ').replace(/-(\d\d)-(\d\d)$/, ':$1:$2');
         picker.show(file, 'Valid backup', 'badge-success');
-        if (when) r.fileSize.textContent = pickSize(file.size) + ' Ã‚Â· created ' + when;
+        if (when) r.fileSize.textContent = pickSize(file.size) + ' Ãƒâ€šÃ‚Â· created ' + when;
         r.startRestore.disabled = false;
       } catch (err) {
         console.error('ZIP validation error:', err);
@@ -4029,7 +4029,7 @@ const App = (() => {
           const head = table.createTHead().insertRow();
           [['name', 'Name'], ['type', 'Type'], ['size', 'Size']].forEach(([key, label]) => {
             const th = document.createElement('th');
-            th.textContent = label + (sort.key === key ? (sort.dir > 0 ? ' Ã¢â€“Â´' : ' Ã¢â€“Â¾') : '');
+            th.textContent = label + (sort.key === key ? (sort.dir > 0 ? ' ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â´' : ' ÃƒÂ¢Ã¢â‚¬â€œÃ‚Â¾') : '');
             th.dataset.action = 'sort';
             th.dataset.key = key;
             head.append(th);
@@ -4920,7 +4920,7 @@ const App = (() => {
         pos++;
       }
     };
-    if (m[1]) meter.append(el('span', 'dash-meter-sign', 'Ã¢Ë†â€™'));
+    if (m[1]) meter.append(el('span', 'dash-meter-sign', 'ÃƒÂ¢Ã‹â€ Ã¢â‚¬â„¢'));
     wheels(m[2], '');
     if (m[3]) {
       meter.append(el('span', 'dash-meter-dot'));
@@ -6084,7 +6084,7 @@ const App = (() => {
       const renderProcessError = (value, processState) => {
         const state = String(processState ?? '').toLowerCase();
         const isErrorState = ERROR_STATES.some((s) => state.includes(s));
-        ref.error.textContent = isErrorState && value < 0 ? 'Ã¢Å¡Â  Process error detected. Check logs' : '';
+        ref.error.textContent = isErrorState && value < 0 ? 'ÃƒÂ¢Ã…Â¡Ã‚Â  Process error detected. Check logs' : '';
       };
 
       // ---- loading -------------------------------------------------------
@@ -6676,9 +6676,9 @@ const App = (() => {
   const EDITOR_TABS = ['image', 'markers', 'digit', 'analog'];
   const TAB_TITLE = {
     image: 'Reference image',
-    markers: 'Reference image Ã‚Â· alignment markers',
-    digit: 'Reference image Ã‚Â· digit ROIs',
-    analog: 'Reference image Ã‚Â· analog ROIs',
+    markers: 'Reference image Ãƒâ€šÃ‚Â· alignment markers',
+    digit: 'Reference image Ãƒâ€šÃ‚Â· digit ROIs',
+    analog: 'Reference image Ãƒâ€šÃ‚Â· analog ROIs',
   };
   const TAB_LABEL = { image: 'Image', markers: 'Markers', digit: 'Digits', analog: 'Analog' };
   // route part <-> internal tab id
@@ -6962,7 +6962,7 @@ const App = (() => {
       case 'zoom':
         return `x`;
       case 'deg':
-        return `Ã‚Â°`;
+        return `Ãƒâ€šÃ‚Â°`;
       case 'ms':
         return ` ms`;
       case 'pct':
@@ -7067,6 +7067,24 @@ const App = (() => {
     <div class="help-item">
       <h4>Saving</h4>
       <p>Markers, digits and analog share one save bar at the bottom. A new image is saved separately on the Image tab.</p>
+    </div>`;
+
+  const WIZARD_HELP = `
+    <div class="help-item" data-help="image">
+      <h4>Step 2 · Camera</h4>
+      <p>Press <b>Update image</b> to take a new picture; then the camera values can be changed. Press it again after every change. Make sure it is level (use <i>Image Rotation</i>). Markers and ROIs are placed on this image.</p>
+    </div>
+    <div class="help-item" data-help="markers">
+      <h4>Step 3 · Alignment</h4>
+      <p>Two markers let the device correct small shifts and rotations. Pick a marker, drag its area on the image or enter coordinates, then click <b>Update Marker</b>. Keep markers small, sharp and high-contrast.</p>
+    </div>
+    <div class="help-item" data-help="digit">
+      <h4>Step 4 · ROIs</h4>
+      <p>Group ROIs (<b>R</b>egions <b>O</b>f <b>I</b>nterest) into number sequences. Drag them or enter coordinates; their order defines the decimal place, <b>Move higher / lower</b> changes it. See the <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/ROI-Configuration/" target="_blank" rel="noopener noreferrer">ROI documentation</a>.</p>
+    </div>
+    <div class="help-item">
+      <h4>Saving</h4>
+      <p>Each step is saved automatically when you continue.</p>
     </div>`;
 
   /**
@@ -8839,7 +8857,7 @@ const App = (() => {
     function renderMarkerRecognition() {
       if (destroyed || !R.recBody) return;
       const kind = mode === 'analog' ? 'analog' : 'digit';
-      R.recTitle.textContent = `Last cycle Ã‚Â· ${kind === 'analog' ? 'analog' : 'digits'}`;
+      R.recTitle.textContent = `Last cycle Ãƒâ€šÃ‚Â· ${kind === 'analog' ? 'analog' : 'digits'}`;
       const body = R.recBody;
       body.textContent = '';
       const note = (text) => {
@@ -8897,6 +8915,7 @@ const App = (() => {
 
     function updateTabsUI() {
       all('.setup-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === mode));
+      all('.wiz-help .help-item[data-help]').forEach((it) => it.classList.toggle('current', it.dataset.help === (mode === 'analog' ? 'digit' : mode)));
       const isRoi = isRoiMode();
       R.panelImage.hidden = mode !== 'image';
       R.panelMarkers.hidden = mode !== 'markers';
@@ -10381,7 +10400,7 @@ const App = (() => {
       if (usage.substring(0, 10) === 'flashlight') defaultOption.removeAttribute('hidden');
       else defaultOption.setAttribute('hidden', 'true');
       if (usage.substring(0, 10) === 'restricted') {
-        R.restricted.textContent = '(Ã¢Å¡Â  DEFAULT: ' + usage.substring(12).replace(/-/g, ' ').toUpperCase() + ')';
+        R.restricted.textContent = '(ÃƒÂ¢Ã…Â¡Ã‚Â  DEFAULT: ' + usage.substring(12).replace(/-/g, ' ').toUpperCase() + ')';
         show(R.restricted, true);
       } else {
         show(R.restricted, false);
@@ -11069,7 +11088,7 @@ const App = (() => {
       {
         "id": "metertheme", "title": "Meter Type & Theme",
         "rows": [
-          {"label": "Meter Type", "lvl": 0, "id": "mqtt_homeassistant_metertype", "name": "mqtt.homeassistant.metertype", "t": "select", "opts": [["0", "Generic (No Units)"], ["1", "Water (Value: mÃ‚Â³, Rate: mÃ‚Â³/h)"], ["2", "Water (Value: L, Rate: L/h*)"], ["15", "Water (Value: L, Rate: L/min)"], ["3", "Water (Value: gal, Rate: gal/h*)"], ["16", "Water (Value: gal, Rate: gal/min)"], ["4", "Water (Value: ftÃ‚Â³, Rate: ftÃ‚Â³/min)"], ["5", "Gas (Value: mÃ‚Â³, Rate: mÃ‚Â³/h)"], ["6", "Gas (Value: ftÃ‚Â³, Rate: ftÃ‚Â³/min)"], ["7", "Energy (Value: Wh, Rate: W)"], ["8", "Energy (Value: kWh, Rate: kW)"], ["9", "Energy (Value: MWh, Rate: MW)"], ["10", "Energy (Value: GJ, Rate: GJ/h*)"], ["11", "Temperature (Value: Ã‚Â°C, Rate: Ã‚Â°C/min)"], ["12", "Temperature (Value: Ã‚Â°F, Rate: Ã‚Â°F/min)"], ["13", "Pressure (Value: bar, Rate: bar/min)"], ["14", "Pressure (Value: psi, Rate: psi/min)"]], "def": "1", "wide": true, "int": true},
+          {"label": "Meter Type", "lvl": 0, "id": "mqtt_homeassistant_metertype", "name": "mqtt.homeassistant.metertype", "t": "select", "opts": [["0", "Generic (No Units)"], ["1", "Water (Value: mÃƒâ€šÃ‚Â³, Rate: mÃƒâ€šÃ‚Â³/h)"], ["2", "Water (Value: L, Rate: L/h*)"], ["15", "Water (Value: L, Rate: L/min)"], ["3", "Water (Value: gal, Rate: gal/h*)"], ["16", "Water (Value: gal, Rate: gal/min)"], ["4", "Water (Value: ftÃƒâ€šÃ‚Â³, Rate: ftÃƒâ€šÃ‚Â³/min)"], ["5", "Gas (Value: mÃƒâ€šÃ‚Â³, Rate: mÃƒâ€šÃ‚Â³/h)"], ["6", "Gas (Value: ftÃƒâ€šÃ‚Â³, Rate: ftÃƒâ€šÃ‚Â³/min)"], ["7", "Energy (Value: Wh, Rate: W)"], ["8", "Energy (Value: kWh, Rate: kW)"], ["9", "Energy (Value: MWh, Rate: MW)"], ["10", "Energy (Value: GJ, Rate: GJ/h*)"], ["11", "Temperature (Value: Ãƒâ€šÃ‚Â°C, Rate: Ãƒâ€šÃ‚Â°C/min)"], ["12", "Temperature (Value: Ãƒâ€šÃ‚Â°F, Rate: Ãƒâ€šÃ‚Â°F/min)"], ["13", "Pressure (Value: bar, Rate: bar/min)"], ["14", "Pressure (Value: psi, Rate: psi/min)"]], "def": "1", "wide": true, "int": true},
         ],
       },
       {
@@ -11317,7 +11336,7 @@ const App = (() => {
     if (released) facts.push(`${released} (${age})`);
     if (cat?.kb) facts.push(`${cat.kb} KB`);
     if (cat?.input) facts.push(`input ${cat.input}`);
-    return { name, type, t, cat, version, released, age, quantized, chip: t ? t.chip : '?', sub: facts.join(' Ã‚Â· ') };
+    return { name, type, t, cat, version, released, age, quantized, chip: t ? t.chip : '?', sub: facts.join(' Ãƒâ€šÃ‚Â· ') };
   }
 
   function describeModel(file) {
@@ -11551,7 +11570,7 @@ const App = (() => {
     SaveBar.set({
       dirty,
       saveLabel: s.reboot ? 'Save and restart' : 'Save',
-      text: s.reboot ? 'Unsaved changes Ã¢â‚¬â€œ a restart is required' : 'Unsaved changes',
+      text: s.reboot ? 'Unsaved changes ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ a restart is required' : 'Unsaved changes',
       onSave: () => save(s),
       onDiscard: () => discard(s),
     });
@@ -12226,7 +12245,7 @@ const App = (() => {
     if (mode.warn) {
       const restricted = usage.startsWith('restricted');
       mode.warn.hidden = !restricted;
-      mode.warn.textContent = restricted ? '(Ã¢Å¡Â  DEFAULT: ' + usage.substring(12).replace(/-/g, ' ').toUpperCase() + ')' : '';
+      mode.warn.textContent = restricted ? '(ÃƒÂ¢Ã…Â¡Ã‚Â  DEFAULT: ' + usage.substring(12).replace(/-/g, ' ').toUpperCase() + ')' : '';
     }
   }
 
@@ -13293,16 +13312,16 @@ const CycleMonitor = (() => {
       const elapsed = status.cycleSeconds + drift;
       const left = status.processTime - elapsed;
       timer = `running for ${formatSeconds(elapsed)}`;
-      if (status.processTime > 0) timer += left > 0 ? ` Ã‚Â· about ${formatSeconds(Math.ceil(left))} left` : ' Ã‚Â· finishing ...';
+      if (status.processTime > 0) timer += left > 0 ? ` Ãƒâ€šÃ‚Â· about ${formatSeconds(Math.ceil(left))} left` : ' Ãƒâ€šÃ‚Â· finishing ...';
     } else if (waiting) {
       // Automatic mode: countdown to the next run instead of the idle time
       timer = paused
-        ? `no automatic cycles Ã‚Â· ${formatCountdown(status.nextRunSeconds)} left`
+        ? `no automatic cycles Ãƒâ€šÃ‚Â· ${formatCountdown(status.nextRunSeconds)} left`
         : `next run in ${formatCountdown(status.nextRunSeconds - drift)}`;
     } else {
       timer = `${status.running ? 'running for' : 'in this state for'} ${formatSeconds(status.stateSeconds + drift)}`;
     }
-    if (status.running && paused) timer += ' Ã‚Â· paused afterwards';
+    if (status.running && paused) timer += ' Ãƒâ€šÃ‚Â· paused afterwards';
     return timer;
   }
 
@@ -13324,7 +13343,7 @@ const CycleMonitor = (() => {
       panel.dataset.phase = '';
       $('cycle-state').textContent = 'Device not reachable';
       $('cycle-count').textContent = '#-';
-      $('cycle-timer').textContent = 'Ã‚Â ';
+      $('cycle-timer').textContent = 'Ãƒâ€šÃ‚Â ';
       btn.disabled = true;
       btn.classList.remove('queue');
       btn.textContent = 'Start cycle';
@@ -13349,7 +13368,7 @@ const CycleMonitor = (() => {
 
     const drift = (performance.now() - fetchedAt) / 1000;
     const timer = timerText();
-    $('cycle-timer').textContent = stale ? `${timer} Ã‚Â· device is busy` : timer;
+    $('cycle-timer').textContent = stale ? `${timer} Ãƒâ€šÃ‚Â· device is busy` : timer;
 
     pauseBtn.hidden = !status.autoStart;
     pauseBtn.disabled = false; // also usable while a cycle runs or the device is busy
@@ -13417,7 +13436,7 @@ const CycleMonitor = (() => {
 
   return {
     last: () => status,
-    timerText: () => (stale && status ? `${timerText()} Ã‚Â· device is busy` : timerText()),
+    timerText: () => (stale && status ? `${timerText()} Ãƒâ€šÃ‚Â· device is busy` : timerText()),
     start() {
       $('cycle-start')?.addEventListener('click', start);
       $('cycle-pause')?.addEventListener('click', togglePause);
