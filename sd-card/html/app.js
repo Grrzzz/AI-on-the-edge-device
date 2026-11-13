@@ -6683,7 +6683,7 @@ const App = (() => {
   const ROUTE_TO_TAB = { image: 'image', markers: 'markers', digit: 'digit', digits: 'digit', analog: 'analog' };
   const TAB_TO_ROUTE = { image: 'image', markers: 'markers', digit: 'digits', analog: 'analog' };
   const WIZARD_STEP_KEY = 'setupStep'; // sessionStorage, same key as the former setup.html
-  const WIZARD_LAST_STEP = 6;
+  const WIZARD_LAST_STEP = 5;
   const WIZARD_ABORT_STEP = 99;
 
   let uidCounter = 0;
@@ -9898,16 +9898,15 @@ const App = (() => {
   /* ======================================================================== */
   /* View: wizard (#/wizard), the initial setup wizard                         */
   /* ======================================================================== */
-  const WIZARD_STEPS = ['Meter type', 'Camera', 'Image', 'Alignment', 'Sequences', 'Finish'];
+  const WIZARD_STEPS = ['Meter type', 'Camera', 'Alignment', 'Sequences', 'Finish'];
   const WIZARD_FLOW = [
-    { name: 'Meter type', text: 'Choose the type of your meter. It sets the units and the look of the interface.' },
-    { name: 'Camera', text: 'Take a live picture, adjust the lens focus and the flashlight until the dials are sharp and free of glare.' },
-    { name: 'Image', text: 'Rotate, mirror or flip the picture and fine-tune brightness so the meter is upright and readable.' },
+    { name: 'Meter type', text: 'Choose the type of your meter. It sets the units and the look of the interface. The flashlight pin can be customized here as well.' },
+    { name: 'Camera', text: 'Take a live picture, adjust the lens focus, the flashlight and the image settings until the meter is sharp, upright and free of glare.' },
     { name: 'Alignment', text: 'Place two alignment markers on fixed structures of the meter, so the device finds the dials again in every picture.' },
     { name: 'Sequences', text: 'Mark the digits and the analog dials that make up the reading.' },
     { name: 'Finish', text: 'Optionally protect the web interface with a password, then switch to the operational web interface.' },
   ];
-  const WIZARD_EDITOR_TABS = { 3: 'image', 4: 'markers', 5: 'digit' };
+  const WIZARD_EDITOR_TABS = { 2: 'image', 3: 'markers', 4: 'digit' };
 
   /** A row in the style of the setup page (label with help, control, unit). */
   const cfgRow = (label, help, control, cls = 'cfg-l0', attrs = '') => `
@@ -9978,41 +9977,8 @@ const App = (() => {
                 ${cfgRow('Meter Type', 'mqtt_homeassistant_metertype', '<select data-field="mqtt.homeassistant.metertype" data-int="1" data-ref="meterType" data-change="field" hidden></select><span data-ref="meterCombo"></span>')}
               </div>
             </div>
-          </div>
-        </div>
-
-        <div class="wiz-step hidden" data-panel="2">
-          <div class="wiz-step-content">
-            <strong>Step 2: Camera initialization</strong>
-            <p>
-              Usually the default flashlight setup is sufficient. Reconfiguration is only required if a customization is needed, e.g. drive additional external LEDs, use a specific pin or a specific LED type.<br />
-              Take a live image and adjust the lens focus until it is as sharp as possible. Detailed instructions are available in the
-              <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/Reference-Image/#focus" target="_blank" rel="noopener noreferrer">focus adjustment guide</a>.<br />
-              Verify that the flashlight does not create glare in critical processing areas. If the internal LED is insufficient or glare cannot be avoided,
-              refer to <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/External-LED/" target="_blank" rel="noopener noreferrer">Installation of external LEDs</a> or
-              to discussion <a href="https://github.com/jomjol/AI-on-the-edge-device/discussions/1949" target="_blank" rel="noopener noreferrer">Ways to avoid reflections</a>.
-            </p>
-            <p>
-              Your changes are saved with <b>Next</b>; the preview saves them first, so the picture shows the new setup. <b>Next</b> is available after the first live image.
-            </p>
-          </div>
-
-          <div class="wiz-cam">
-            <div class="card wiz-cam-live">
-              <div class="card-header">
-                <span>Live camera image</span>
-                <label class="check wiz-preview-tools"><input type="checkbox" data-change="autoRefresh" data-ref="autoToggle" />Auto refresh</label>
-              </div>
-              <div class="card-body wiz-preview-body">
-                <p class="wiz-preview-hint" data-ref="previewHint">No picture yet.</p>
-                <img class="wiz-preview" data-ref="preview" alt="Image Preview" hidden />
-                <button type="button" class="button btn-action wiz-preview-btn" data-click="refresh" data-ref="refreshBtn">Show live camera image</button>
-              </div>
-            </div>
-            <div class="wiz-cam-settings">
-              <div class="cfg wiz-cfg">
             <div class="card cfg-card">
-              <div class="card-header"><span class="cfg-card-title">Flashlight setup</span></div>
+              <div class="card-header"><span class="cfg-card-title">GPIO mapping</span></div>
               <div class="card-body cfg-body">
                 ${cfgRow('Actual GPIO Mapping', '', '<span class="cfg-info" data-ref="mapping"></span>')}
                 ${cfgRow('GPIO Customization', 'gpio_customizationenabled', `<select data-field="gpio.customizationenabled" data-ref="gpioCustom" data-change="field">
@@ -10047,30 +10013,35 @@ const App = (() => {
                   <span class="cfg-pre">G</span><input class="cfg-num-sm" required type="number" min="0" max="255" value="255" data-field="gpio.gpiopin.#.smartled.colorgreenchannel" data-pin="1" data-int="1" data-change="field" />
                   <span class="cfg-pre">B</span><input class="cfg-num-sm" required type="number" min="0" max="255" value="255" data-field="gpio.gpiopin.#.smartled.colorbluechannel" data-pin="1" data-int="1" data-change="field" />`, 'cfg-l1', ' data-gpio-row="smartled"')}
                 ${cfgRow('LED Intensity Correction', 'gpio_gpiopin_intensitycorrectionfactor', '<input class="cfg-num" required type="number" min="1" max="100" value="100" data-field="gpio.gpiopin.#.intensitycorrectionfactor" data-pin="1" data-int="1" data-change="field" /><span class="cfg-unit">%</span>', 'cfg-l1', ' data-gpio-row="intensity"')}
-                ${cfgRow('Flash Time', 'takeimage_flashlight_flashtime', '<input class="cfg-num" required type="number" min="100" step="100" value="2000" data-field="takeimage.flashlight.flashtime" data-int="1" data-change="field" /><span class="cfg-unit">Milliseconds</span>')}
-                ${cfgRow('Flash Intensity', 'takeimage_flashlight_flashintensity', '<input class="cfg-num" required type="number" min="0" max="100" value="50" data-field="takeimage.flashlight.flashintensity" data-int="1" data-change="field" /><span class="cfg-unit">%</span>')}
               </div>
             </div>
           </div>
-            </div>
-          </div>
         </div>
 
+        <div class="wiz-step hidden" data-panel="2">
+          <div class="wiz-step-content">
+            <strong>Step 2: Camera and image</strong>
+            <p>
+              Take a live image with <b>Update image</b> and adjust the lens focus until it is as sharp as possible. Detailed instructions are available in the
+              <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/Reference-Image/#focus" target="_blank" rel="noopener noreferrer">focus adjustment guide</a>.<br />
+              Verify that the flashlight does not create glare in critical processing areas. If the internal LED is insufficient or glare cannot be avoided,
+              refer to <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/External-LED/" target="_blank" rel="noopener noreferrer">Installation of external LEDs</a> or
+              to discussion <a href="https://github.com/jomjol/AI-on-the-edge-device/discussions/1949" target="_blank" rel="noopener noreferrer">Ways to avoid reflections</a>.
+            </p>
+          </div>
+          <div class="wiz-editor" data-editor></div>
+        </div>
         <div class="wiz-step hidden" data-panel="3">
-          <div class="wiz-step-content"><strong>Step 3: Image Configuration</strong></div>
+          <div class="wiz-step-content"><strong>Step 3: Alignment Marker Configuration</strong></div>
           <div class="wiz-editor" data-editor></div>
         </div>
         <div class="wiz-step hidden" data-panel="4">
-          <div class="wiz-step-content"><strong>Step 4: Alignment Marker Configuration</strong></div>
-          <div class="wiz-editor" data-editor></div>
-        </div>
-        <div class="wiz-step hidden" data-panel="5">
-          <div class="wiz-step-content"><strong>Step 5: Number Sequences And ROIs Configuration</strong></div>
+          <div class="wiz-step-content"><strong>Step 4: Number Sequences And ROIs Configuration</strong></div>
           <div class="wiz-editor" data-editor></div>
         </div>
 
-        <div class="wiz-step hidden" data-panel="6">
-          <div class="wiz-step-content"><strong>Step 6: Configure WebUI Security &amp; Complete Initial Setup</strong></div>
+        <div class="wiz-step hidden" data-panel="5">
+          <div class="wiz-step-content"><strong>Step 5: Configure WebUI Security &amp; Complete Initial Setup</strong></div>
           <div class="cfg wiz-cfg">
             <div class="card cfg-card">
               <div class="card-header"><span class="cfg-card-title">WebUI security</span></div>
@@ -10154,9 +10125,7 @@ const App = (() => {
     let delta = {}; // modified parameters of the current step (flashlight, security, operation mode)
     let editor = null;
     let busy = false;
-    let autoRefreshRunning = false;
     let logDialog = null;
-    let previewTaken = false; // the preview image was refreshed at least once: only then the wizard goes on
     let meterChosen = stepFromStorage() > 1; // the meter type has to be picked once before the wizard goes on
     let meterCombo = null;
 
@@ -10269,7 +10238,7 @@ const App = (() => {
     /** Re-reads the stored configuration into all inputs, drops pending changes. */
     function syncConfigToUI() {
       cfg = Api.setup.getConfig() || cfg;
-      if (step === 2) initGpioSection();
+      if (step === 1) initGpioSection();
       loadFields(cfg);
       meterCombo?.sync();
       updateGpioUi();
@@ -10299,15 +10268,12 @@ const App = (() => {
 
     function renderStep() {
       unmountEditor();
-      R.autoToggle.checked = false;
       all('[data-panel]').forEach((p) => show(p, parseInt(p.dataset.panel, 10) === step));
       root.querySelector('.wiz-actions').hidden = step === 0; // the start screen has its own big choices: no bar
       updateStepper();
-      setNavDisabled(step === 0 || step === WIZARD_ABORT_STEP, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP || (step === 1 && !meterChosen) || (step === 2 && !previewTaken), step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP);
+      setNavDisabled(step === 0 || step === WIZARD_ABORT_STEP, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP || (step === 1 && !meterChosen), step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP);
 
-      if (step === 2) {
-        showPreviewHint(); // the first picture is taken by the user with Refresh
-      } else if (WIZARD_EDITOR_TABS[step]) {
+      if (WIZARD_EDITOR_TABS[step]) {
         const host = root.querySelector(`[data-panel="${step}"] [data-editor]`);
         editor = App.setup.mountEditor(host, WIZARD_EDITOR_TABS[step], {
           header: false,
@@ -10332,8 +10298,7 @@ const App = (() => {
       if (target < 0) target = 0;
       if (target > WIZARD_LAST_STEP && target < WIZARD_ABORT_STEP) target = WIZARD_LAST_STEP;
       if (step === 1 && target > 1 && target < WIZARD_ABORT_STEP && !meterChosen) return; // pick the meter type first
-      if (step === 2 && target > 2 && target < WIZARD_ABORT_STEP && !previewTaken) return; // take the live image first
-      if ((step === 1 || step === 2) && target !== step && Object.keys(delta).length) {
+      if (step === 1 && target !== step && Object.keys(delta).length) {
         stepFlashCfgBusy(true);
         const saved = await savePendingChanges();
         if (!destroyed) stepFlashCfgBusy(false);
@@ -10349,21 +10314,11 @@ const App = (() => {
       renderStep();
     }
 
-    /* -------------------------------------------------- preview image */
-    /** Disables navigation and the flashlight buttons while the camera is busy. */
     function stepFlashCfgBusy(flag) {
       busy = flag;
-      R.refreshBtn.disabled = flag;
       R.previous.disabled = flag;
-      R.next.disabled = flag || (step === 1 ? !meterChosen : !previewTaken);
-      R.refreshBtn.textContent = previewTaken ? 'Update preview image' : 'Show live camera image';
+      R.next.disabled = flag || !meterChosen;
       R.skip.disabled = flag;
-    }
-
-    /** Shows the hint until a picture exists, the preview image only after that. */
-    function showPreviewHint() {
-      R.previewHint.hidden = previewTaken;
-      R.preview.hidden = !previewTaken;
     }
 
     /** Saves the changes of the step (meter type, flashlight) and reloads the stored configuration. */
@@ -10375,67 +10330,6 @@ const App = (() => {
       } catch (error) {
         console.error('Failed to save the configuration:', error);
         return false;
-      }
-    }
-
-    async function manualRefreshImage(showSpinner = true) {
-      stepFlashCfgBusy(true);
-      if (Object.keys(delta).length && !(await savePendingChanges())) {
-        // not saved: the picture would not show the new setup
-        if (!destroyed) stepFlashCfgBusy(false);
-        return false;
-      }
-      if (destroyed) return false;
-      R.preview.hidden = false;
-      R.previewHint.hidden = true;
-      const img = R.preview;
-      const previousBlobUrl = img.src && img.src.startsWith('blob:') ? img.src : null;
-      const releasePrevious = () => {
-        if (previousBlobUrl) URL.revokeObjectURL(previousBlobUrl);
-      };
-      if (showSpinner) {
-        img.classList.add('is-loading');
-        img.src = loaderSpinner;
-        releasePrevious();
-      }
-
-      let blob = null;
-      try {
-        blob = await Api.setup.capturePreview(cfg?.takeimage?.flashlight?.flashtime || 0);
-      } catch (error) {
-        blob = null;
-      }
-      if (destroyed) return false;
-
-      if (showSpinner) img.classList.remove('is-loading');
-      if (blob) previewTaken = true;
-      stepFlashCfgBusy(false);
-      if (!blob) {
-        img.src = noImageAvailable;
-        releasePrevious();
-        return false;
-      }
-      if (img.src && img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
-      img.src = URL.createObjectURL(blob);
-      releasePrevious();
-      return true;
-    }
-
-    async function autoRefreshImage(isEnabled) {
-      R.autoToggle.checked = isEnabled;
-      if (!isEnabled || autoRefreshRunning) return;
-
-      let ok = false;
-      try {
-        autoRefreshRunning = true;
-        ok = await manualRefreshImage(false);
-      } finally {
-        autoRefreshRunning = false;
-      }
-      if (destroyed) return;
-      if (R.autoToggle.checked) {
-        if (!ok) await sleep(2000);
-        if (!destroyed) autoRefreshImage(true);
       }
     }
 
@@ -10551,7 +10445,6 @@ const App = (() => {
       restart: () => navigate(0),
       complete: () => finalizeSetup(false),
       abort: () => finalizeSetup(true),
-      refresh: () => manualRefreshImage(),
       flowInfo: (e, t) => {
         const f = WIZARD_FLOW[parseInt(t.dataset.i, 10)];
         all('.wiz-flow-node').forEach((n) => n.classList.toggle('active', n === t));
@@ -10566,7 +10459,6 @@ const App = (() => {
     const CHANGES = {
       field: (el) => onFieldChange(el),
       gpioPin: () => onPinSelected(),
-      autoRefresh: (el) => autoRefreshImage(el.checked),
     };
     const onClick = (e) => {
       const t = e.target.closest('[data-click]');
@@ -10619,7 +10511,6 @@ const App = (() => {
         restorePanel?.destroy();
         root.removeEventListener('click', onClick);
         root.removeEventListener('change', onChange);
-        if (R.preview.src && R.preview.src.startsWith('blob:')) URL.revokeObjectURL(R.preview.src);
         root.classList.remove('wiz');
         root.innerHTML = '';
       },
