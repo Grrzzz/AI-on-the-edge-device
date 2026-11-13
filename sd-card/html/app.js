@@ -10210,7 +10210,7 @@ const App = (() => {
               web interface. Please be aware: The configuration of the device is not or only partly adapted to your needs!
             </p>
             <p>Configuration can still be adapted / completed using operational web interface.</p>
-            <p><button type="button" class="button btn-action btn-wide" data-click="abort">Abort Setup Wizard</button></p>
+            <p><button type="button" class="button danger-solid btn-wide" data-click="abort">Abort Setup Wizard</button></p>
           </div>
         </div>
       </main>
@@ -10218,7 +10218,7 @@ const App = (() => {
       <footer class="wiz-actions">
         <div class="wiz-actions-inner">
           <div class="wiz-actions-left">
-            <button type="button" class="button" data-click="skip" data-ref="skip">Abort wizard</button>
+            <button type="button" class="button danger-solid" data-click="skip" data-ref="skip">Abort wizard</button>
             <button type="button" class="wiz-link-btn" data-click="log">Log</button>
           </div>
           <div class="wiz-actions-right">
@@ -10594,7 +10594,7 @@ const App = (() => {
       },
       next: () => navigate(step + 1),
       previous: () => navigate(step - 1),
-      skip: () => navigate(WIZARD_ABORT_STEP),
+      skip: () => finalizeSetup(true), // asks for confirmation first
       restart: () => navigate(0),
       complete: () => finalizeSetup(false),
       abort: () => finalizeSetup(true),
