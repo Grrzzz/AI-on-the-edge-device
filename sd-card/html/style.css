@@ -8233,3 +8233,20 @@ a.nav-sub-item {
 .setup .setup-procintro .m-procs .m-proc input[type='checkbox']:checked::after {
   transform: translateX(20px);
 }
+
+.wiz-finish-hint {
+  margin: 12px 4px 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.wiz-beta {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
