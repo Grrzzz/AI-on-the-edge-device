@@ -6950,8 +6950,8 @@ const App = (() => {
     [KEY_CAM + 'flipimage']: { kind: 'switch' },
   };
   const CAM_FIELDS = CAM_ROWS.flat();
-  /** Settings shown calculated on the taken picture (rotation, mirror, flip); all others show only on a new camera picture. */
-  const CAM_PREVIEW = new Set(['imagealignment.imagerotation', KEY_CAM + 'mirrorimage', KEY_CAM + 'flipimage']);
+  /** Settings shown calculated on the taken picture (rotation, mirror, flip, brightness, contrast, saturation, sharpness, special effect); all others show only on a new camera picture. */
+  const CAM_PREVIEW = new Set(['imagealignment.imagerotation', KEY_CAM + 'mirrorimage', KEY_CAM + 'flipimage', KEY_CAM + 'brightness', KEY_CAM + 'contrast', KEY_CAM + 'saturation', KEY_CAM + 'sharpness', KEY_CAM + 'specialeffect']);
   /** Text of the value shown next to a slider. */
   function camFormat(f, v) {
     switch (f.fmt) {
@@ -8460,7 +8460,7 @@ const App = (() => {
       applyCamGates();
       updateParamOutput(el);
       delta = mergeParam(delta, f.name, el.value, !!f.int);
-      if (!isActReference && imageOk && (f.name === KEY_CAM + 'mirrorimage' || f.name === KEY_CAM + 'flipimage')) drawRotated();
+      if (!isActReference && imageOk && CAM_PREVIEW.has(f.name)) drawRotated();
       updateTakeState();
     }
 
@@ -8538,6 +8538,56 @@ const App = (() => {
       refreshSaveBar();
     }
 
+    /** CSS filter for the calculated difference between the real picture and the current inputs (estimated strengths, the hint asks for a real picture). */
+    function previewFilter() {
+      const val = (name) => camInput[name].value;
+      const cap = capParams || { specialeffect: specialeffect };
+      const diff = (key, name) => (capParams ? Number(val(name)) - Number(cap[key] ?? 0) : 0);
+      const hw = { '0': [0, 0], '1': [0, 1], '2': [1, 0], '7': [1, 0] }[String(cap.specialeffect ?? 0)] || [0, 0];
+      const want = { '0': [0, 0], '1': [0, 1], '2': [1, 0], '7': [1, 1] }[String(capParams ? val(KEY_CAM + 'specialeffect') : specialeffect)] || [0, 0];
+      const parts = [];
+      const b = diff('brightness', KEY_CAM + 'brightness');
+      const c = diff('contrast', KEY_CAM + 'contrast');
+      const s = diff('saturation', KEY_CAM + 'saturation');
+      const sh = diff('sharpness', KEY_CAM + 'sharpness');
+      if (b) parts.push(`brightness(${Math.max(0.2, 1 + 0.25 * b)})`);
+      if (c) parts.push(`contrast(${Math.max(0.2, 1 + 0.25 * c)})`);
+      if (s) parts.push(`saturate(${Math.max(0, 1 + 0.5 * s)})`);
+      if (sh < 0) parts.push(`blur(${(-sh * 0.5).toFixed(1)}px)`);
+      if (want[0] && !hw[0]) parts.push('grayscale(1)');
+      if (want[1] !== hw[1]) parts.push('invert(1)');
+      return parts.join(' ') || 'none';
+    }
+
+    /** Sharpening that was added after the real picture was taken (3x3 kernel on the canvas). */
+    function previewSharpen() {
+      if (!capParams) return;
+      const sh = Number(camInput[KEY_CAM + 'sharpness'].value) - Number(capParams.sharpness ?? 0);
+      if (sh <= 0) return;
+      const k = 0.4 * sh;
+      const w = R.canvas.width;
+      const h = R.canvas.height;
+      const src = g.getImageData(0, 0, w, h);
+      const out = g.createImageData(w, h);
+      const a = src.data;
+      const d = out.data;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * 4;
+          for (let ch = 0; ch < 3; ch++) {
+            const c0 = a[i + ch];
+            const n = a[(Math.max(0, y - 1) * w + x) * 4 + ch];
+            const s2 = a[(Math.min(h - 1, y + 1) * w + x) * 4 + ch];
+            const wv = a[(y * w + Math.max(0, x - 1)) * 4 + ch];
+            const e = a[(y * w + Math.min(w - 1, x + 1)) * 4 + ch];
+            d[i + ch] = Math.max(0, Math.min(255, c0 * (1 + 4 * k) - k * (n + s2 + wv + e)));
+          }
+          d[i + 3] = 255;
+        }
+      }
+      g.putImageData(out, 0, 0);
+    }
+
     function drawRotated(grid = true) {
       g.fillStyle = 'rgb(250, 250, 250)';
       g.fillRect(0, 0, R.canvas.width, R.canvas.height);
@@ -8554,10 +8604,11 @@ const App = (() => {
         g.scale(flipped(KEY_CAM + 'mirrorimage', 'mirror') ? -1 : 1, flipped(KEY_CAM + 'flipimage', 'flip') ? -1 : 1);
         // Special effect 7 (grayscale + negative): both together do not work on the camera.
         // Workaround: grayscale on the camera + negative on the MCU (processing) / in the browser (preview)
-        if (specialeffect === '7') g.filter = 'invert(1)';
+        g.filter = previewFilter();
         g.drawImage(imageObj, -imageObj.width / 2, -imageObj.height / 2);
       }
       g.restore();
+      if (!isActReference) previewSharpen();
       if (grid) drawGrid();
     }
 
@@ -9831,6 +9882,7 @@ const App = (() => {
       const p = e.target.closest('[data-param]');
       if (p && p.type === 'range') {
         updateParamOutput(p); // live value while dragging a slider
+        if (!isActReference && imageOk && CAM_PREVIEW.has(p.dataset.param)) drawRotated();
         updateTakeState();
         if (p.dataset.param === 'imagealignment.imagerotation' && !isActReference) drawRotated(); // the preview turns along with the slider
       }
