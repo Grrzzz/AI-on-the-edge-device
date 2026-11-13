@@ -8062,17 +8062,30 @@ a.nav-sub-item {
 }
 
 
+.setup .canvas-wrap {
+  position: relative;
+}
 .setup-intro {
+  position: absolute;
+  inset: 0 12px 12px;
+  justify-content: center;
+  border: 1px dashed currentColor;
+  border-radius: 0.6rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 48px 24px;
+  padding: 16px;
   text-align: center;
   color: var(--text-muted, #64748b);
 }
 .setup-intro[hidden] {
   display: none;
+}
+@media screen and (min-width: 1257px) {
+  .setup-intro {
+    inset: 0 6px 6px;
+  }
 }
 .setup-intro svg {
   width: 44px;

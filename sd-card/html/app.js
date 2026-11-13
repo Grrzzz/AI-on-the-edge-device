@@ -7836,7 +7836,7 @@ const App = (() => {
         R.canvas.height = imageObj.height;
         onLoaded();
         R.loading.style.display = 'none';
-        R.canvas.style.display = o.introHint && refMissing ? 'none' : 'block';
+        R.canvas.style.display = 'block';
       };
       imageObj.onerror = fallback;
       imageObj.src = url;
@@ -8573,6 +8573,7 @@ const App = (() => {
       if (!o.introHint) return;
       const first = refMissing && !imagePending;
       R.intro.hidden = !first;
+      R.canvas.style.visibility = first ? 'hidden' : '';
       R.take.textContent = first ? 'Take camera image' : 'Update image';
       if (R.camLock) R.camLock.firstChild.textContent = first ? 'Take the camera image first, then you can change the settings.' : 'Update the image first, then you can change the settings.';
     }
@@ -8585,7 +8586,11 @@ const App = (() => {
       isActReference = true;
       loadImageSource(Api.setup.referenceImageUrl(), () => {
         refMissing = !imageOk;
-        drawRotated(false);
+        if (o.introHint && refMissing) {
+          // the empty frame already has the size of a camera picture, so the card does not jump when the first one arrives
+          R.canvas.width = 640;
+          R.canvas.height = 480;
+        } else drawRotated(false);
         updateIntro();
         o.onReferenceState?.(imageOk);
       });
