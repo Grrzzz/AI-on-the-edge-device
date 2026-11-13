@@ -8466,7 +8466,7 @@ const App = (() => {
 
     /** The picture is outdated as soon as a camera value differs from the one the picture was taken with. */
     function imageStale() {
-      if (!imagePending || !capParams) return false;
+      if (!capParams) return false;
       if (String(camInput['imagealignment.imagerotation'].value) !== String(capParams.rotation)) return true;
       return CAPTURE_PARAMS.some(([key, name, def]) => {
         const v = camInput[name].value;
@@ -8479,7 +8479,7 @@ const App = (() => {
       const stale = imageStale();
       R.bubble.hidden = !stale;
       // Update image is only needed while there is no current picture
-      const needed = !imagePending || stale;
+      const needed = o.introHint ? refMissing || stale : !imagePending || stale;
       R.take.classList.toggle('btn-action', needed);
       R.take.classList.toggle('ghost', !needed);
       R.take.disabled = taking || !needed;
@@ -8685,7 +8685,18 @@ const App = (() => {
           // the empty frame already has the size of a camera picture, so the card does not jump when the first one arrives
           R.canvas.width = 640;
           R.canvas.height = 480;
-        } else drawRotated(false);
+        } else {
+          drawRotated(false);
+          if (o.introHint) {
+            // wizard: the stored picture is the current one, its settings are the reference for the hint
+            capParams = { rotation: camInput['imagealignment.imagerotation'].value };
+            CAPTURE_PARAMS.forEach(([key, name, def]) => {
+              const v = camInput[name].value;
+              capParams[key] = v === '' ? def : v;
+            });
+            camEnable(true);
+          }
+        }
         updateIntro();
         updateTakeState();
       });
