@@ -6683,7 +6683,7 @@ const App = (() => {
   const ROUTE_TO_TAB = { image: 'image', markers: 'markers', digit: 'digit', digits: 'digit', analog: 'analog' };
   const TAB_TO_ROUTE = { image: 'image', markers: 'markers', digit: 'digits', analog: 'analog' };
   const WIZARD_STEP_KEY = 'setupStep'; // sessionStorage, same key as the former setup.html
-  const WIZARD_LAST_STEP = 5;
+  const WIZARD_LAST_STEP = 6;
   const WIZARD_ABORT_STEP = 99;
 
   let uidCounter = 0;
@@ -9898,8 +9898,16 @@ const App = (() => {
   /* ======================================================================== */
   /* View: wizard (#/wizard), the initial setup wizard                         */
   /* ======================================================================== */
-  const WIZARD_STEPS = ['Flashlight & focus', 'Camera', 'Alignment', 'Sequences', 'Finish'];
-  const WIZARD_EDITOR_TABS = { 2: 'image', 3: 'markers', 4: 'digit' };
+  const WIZARD_STEPS = ['Meter type', 'Camera', 'Image', 'Alignment', 'Sequences', 'Finish'];
+  const WIZARD_FLOW = [
+    { name: 'Meter type', text: 'Choose the type of your meter. It sets the units and the look of the interface.' },
+    { name: 'Camera', text: 'Take a live picture, adjust the lens focus and the flashlight until the dials are sharp and free of glare.' },
+    { name: 'Image', text: 'Rotate, mirror or flip the picture and fine-tune brightness so the meter is upright and readable.' },
+    { name: 'Alignment', text: 'Place two alignment markers on fixed structures of the meter, so the device finds the dials again in every picture.' },
+    { name: 'Sequences', text: 'Mark the digits and the analog dials that make up the reading.' },
+    { name: 'Finish', text: 'Optionally protect the web interface with a password, then switch to the operational web interface.' },
+  ];
+  const WIZARD_EDITOR_TABS = { 3: 'image', 4: 'markers', 5: 'digit' };
 
   /** A row in the style of the setup page (label with help, control, unit). */
   const cfgRow = (label, help, control, cls = 'cfg-l0', attrs = '') => `
@@ -9934,7 +9942,10 @@ const App = (() => {
                   This wizard configures your device for first use. When you are done, the device restarts into the operational web interface.
                   All wizard settings stay available there.
                 </p>
-                <img class="wiz-welcome-img" src="flow_overview.jpg" alt="" />
+                <ol class="wiz-flow" data-ref="flow" aria-label="Setup steps">
+                  ${WIZARD_FLOW.map((f, i) => `<li><button type="button" class="wiz-flow-node${i === 0 ? ' active' : ''}" data-click="flowInfo" data-i="${i}"><span class="wiz-flow-num">${i + 1}</span><span class="wiz-flow-name">${App.esc(f.name)}</span></button></li>`).join('')}
+                </ol>
+                <div class="wiz-flow-info" data-ref="flowInfo" aria-live="polite"><b>${App.esc(WIZARD_FLOW[0].name)}</b><span>${App.esc(WIZARD_FLOW[0].text)}</span></div>
               </div>
             </div>
 
@@ -9956,7 +9967,11 @@ const App = (() => {
         </div>
 
         <div class="wiz-step hidden" data-panel="1">
-          <div class="cfg wiz-cfg">
+          <div class="wiz-step-content">
+            <strong>Step 1: Meter type</strong>
+            <p>Choose the type of your meter. It sets the units and the look of the interface. You can continue after you have made a choice.</p>
+          </div>
+          <div class="cfg wiz-cfg" data-card="metertheme">
             <div class="card cfg-card">
               <div class="card-header"><span class="cfg-card-title">Meter type</span></div>
               <div class="card-body cfg-body">
@@ -9964,26 +9979,38 @@ const App = (() => {
               </div>
             </div>
           </div>
+        </div>
 
+        <div class="wiz-step hidden" data-panel="2">
           <div class="wiz-step-content">
-            <strong>Step 1: Meter Type, Flashlight &amp; Lens Focus</strong>
+            <strong>Step 2: Camera initialization</strong>
             <p>
-              Choose the type of your meter, it sets the units and the look of the interface. Usually the default flashlight setup is sufficient.
-              Reconfiguration is only required if a customization is needed, e.g. drive additional external LEDs, use specific pin or use of specific LED type, ...<br />
-              Press <b>Refresh</b> to take a picture. When the image is visible, adjust the lens focus until it is as sharp as possible. Detailed instructions are available in the
-              <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/Reference-Image/#focus" target="_blank" rel="noopener noreferrer">focus adjustment guide</a><br />
+              Usually the default flashlight setup is sufficient. Reconfiguration is only required if a customization is needed, e.g. drive additional external LEDs, use a specific pin or a specific LED type.<br />
+              Take a live image and adjust the lens focus until it is as sharp as possible. Detailed instructions are available in the
+              <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/Reference-Image/#focus" target="_blank" rel="noopener noreferrer">focus adjustment guide</a>.<br />
               Verify that the flashlight does not create glare in critical processing areas. If the internal LED is insufficient or glare cannot be avoided,
               refer to <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/External-LED/" target="_blank" rel="noopener noreferrer">Installation of external LEDs</a> or
               to discussion <a href="https://github.com/jomjol/AI-on-the-edge-device/discussions/1949" target="_blank" rel="noopener noreferrer">Ways to avoid reflections</a>.
             </p>
             <p>
-              Note 1: Your changes are saved with <b>Next</b>. <b>Refresh</b> saves them first, so the picture shows the new setup.<br />
-              Note 2: <b>Next</b> is available after the preview image was refreshed at least once.<br />
-              Note 3: Camera parametrization and flashlight fine-tuning is performed in the next step.
+              Your changes are saved with <b>Next</b>; the preview saves them first, so the picture shows the new setup. <b>Next</b> is available after the first live image.
             </p>
           </div>
 
-          <div class="cfg wiz-cfg">
+          <div class="wiz-cam">
+            <div class="card wiz-cam-live">
+              <div class="card-header">
+                <span>Live camera image</span>
+                <label class="check wiz-preview-tools"><input type="checkbox" data-change="autoRefresh" data-ref="autoToggle" />Auto refresh</label>
+              </div>
+              <div class="card-body wiz-preview-body">
+                <p class="wiz-preview-hint" data-ref="previewHint">No picture yet.</p>
+                <img class="wiz-preview" data-ref="preview" alt="Image Preview" hidden />
+                <button type="button" class="button btn-action wiz-preview-btn" data-click="refresh" data-ref="refreshBtn">Show live camera image</button>
+              </div>
+            </div>
+            <div class="wiz-cam-settings">
+              <div class="cfg wiz-cfg">
             <div class="card cfg-card">
               <div class="card-header"><span class="cfg-card-title">Flashlight setup</span></div>
               <div class="card-body cfg-body">
@@ -10025,37 +10052,25 @@ const App = (() => {
               </div>
             </div>
           </div>
-
-          <div class="card">
-            <div class="card-header">
-              <span>Preview image</span>
-              <div class="wiz-preview-tools">
-                <label class="check"><input type="checkbox" data-change="autoRefresh" data-ref="autoToggle" />Auto refresh</label>
-                <button type="button" class="button btn-action" data-click="refresh" data-ref="refreshBtn">Refresh</button>
-              </div>
-            </div>
-            <div class="card-body wiz-preview-body">
-              <p class="wiz-preview-hint" data-ref="previewHint">Press Refresh to take the first picture. You can continue after that.</p>
-              <img class="wiz-preview" data-ref="preview" alt="Image Preview" hidden />
             </div>
           </div>
         </div>
 
-        <div class="wiz-step hidden" data-panel="2">
-          <div class="wiz-step-content"><strong>Step 2: Camera / Flashlight Configuration</strong></div>
-          <div class="wiz-editor" data-editor></div>
-        </div>
         <div class="wiz-step hidden" data-panel="3">
-          <div class="wiz-step-content"><strong>Step 3: Alignment Marker Configuration</strong></div>
+          <div class="wiz-step-content"><strong>Step 3: Image Configuration</strong></div>
           <div class="wiz-editor" data-editor></div>
         </div>
         <div class="wiz-step hidden" data-panel="4">
-          <div class="wiz-step-content"><strong>Step 4: Number Sequences And ROIs Configuration</strong></div>
+          <div class="wiz-step-content"><strong>Step 4: Alignment Marker Configuration</strong></div>
+          <div class="wiz-editor" data-editor></div>
+        </div>
+        <div class="wiz-step hidden" data-panel="5">
+          <div class="wiz-step-content"><strong>Step 5: Number Sequences And ROIs Configuration</strong></div>
           <div class="wiz-editor" data-editor></div>
         </div>
 
-        <div class="wiz-step hidden" data-panel="5">
-          <div class="wiz-step-content"><strong>Step 5: Configure WebUI Security &amp; Complete Initial Setup</strong></div>
+        <div class="wiz-step hidden" data-panel="6">
+          <div class="wiz-step-content"><strong>Step 6: Configure WebUI Security &amp; Complete Initial Setup</strong></div>
           <div class="cfg wiz-cfg">
             <div class="card cfg-card">
               <div class="card-header"><span class="cfg-card-title">WebUI security</span></div>
@@ -10142,6 +10157,7 @@ const App = (() => {
     let autoRefreshRunning = false;
     let logDialog = null;
     let previewTaken = false; // the preview image was refreshed at least once: only then the wizard goes on
+    let meterChosen = stepFromStorage() > 1; // the meter type has to be picked once before the wizard goes on
     let meterCombo = null;
 
     /* ------------------------------------------------------------ fields */
@@ -10253,7 +10269,7 @@ const App = (() => {
     /** Re-reads the stored configuration into all inputs, drops pending changes. */
     function syncConfigToUI() {
       cfg = Api.setup.getConfig() || cfg;
-      if (step === 1) initGpioSection();
+      if (step === 2) initGpioSection();
       loadFields(cfg);
       meterCombo?.sync();
       updateGpioUi();
@@ -10287,9 +10303,9 @@ const App = (() => {
       all('[data-panel]').forEach((p) => show(p, parseInt(p.dataset.panel, 10) === step));
       root.querySelector('.wiz-actions').hidden = step === 0; // the start screen has its own big choices: no bar
       updateStepper();
-      setNavDisabled(step === 0 || step === WIZARD_ABORT_STEP, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP || (step === 1 && !previewTaken), step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP);
+      setNavDisabled(step === 0 || step === WIZARD_ABORT_STEP, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP || (step === 1 && !meterChosen) || (step === 2 && !previewTaken), step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP);
 
-      if (step === 1) {
+      if (step === 2) {
         showPreviewHint(); // the first picture is taken by the user with Refresh
       } else if (WIZARD_EDITOR_TABS[step]) {
         const host = root.querySelector(`[data-panel="${step}"] [data-editor]`);
@@ -10315,8 +10331,9 @@ const App = (() => {
       }
       if (target < 0) target = 0;
       if (target > WIZARD_LAST_STEP && target < WIZARD_ABORT_STEP) target = WIZARD_LAST_STEP;
-      if (step === 1 && target > 1 && target < WIZARD_ABORT_STEP && !previewTaken) return; // refresh the preview first
-      if (step === 1 && target !== 1 && Object.keys(delta).length) {
+      if (step === 1 && target > 1 && target < WIZARD_ABORT_STEP && !meterChosen) return; // pick the meter type first
+      if (step === 2 && target > 2 && target < WIZARD_ABORT_STEP && !previewTaken) return; // take the live image first
+      if ((step === 1 || step === 2) && target !== step && Object.keys(delta).length) {
         stepFlashCfgBusy(true);
         const saved = await savePendingChanges();
         if (!destroyed) stepFlashCfgBusy(false);
@@ -10338,7 +10355,8 @@ const App = (() => {
       busy = flag;
       R.refreshBtn.disabled = flag;
       R.previous.disabled = flag;
-      R.next.disabled = flag || !previewTaken;
+      R.next.disabled = flag || (step === 1 ? !meterChosen : !previewTaken);
+      R.refreshBtn.textContent = previewTaken ? 'Update preview image' : 'Show live camera image';
       R.skip.disabled = flag;
     }
 
@@ -10534,6 +10552,11 @@ const App = (() => {
       complete: () => finalizeSetup(false),
       abort: () => finalizeSetup(true),
       refresh: () => manualRefreshImage(),
+      flowInfo: (e, t) => {
+        const f = WIZARD_FLOW[parseInt(t.dataset.i, 10)];
+        all('.wiz-flow-node').forEach((n) => n.classList.toggle('active', n === t));
+        R.flowInfo.replaceChildren(App.el('b', '', f.name), App.el('span', '', f.text));
+      },
       togglePw: (e, t) => {
         const hidden = R.password.type === 'password';
         R.password.type = hidden ? 'text' : 'password';
@@ -10562,12 +10585,17 @@ const App = (() => {
       const sel = R.meterType;
       App.meterTypeOptions().forEach(([value, label]) => sel.add(new Option(label, value)));
       const items = Array.from(sel.options).map((o) => ({ value: o.value, label: o.textContent, lead: logoSvg(METER_TYPE_THEME[Number(o.value)] || 'generic', 24) }));
-      meterCombo = App.createCombo(items, () => sel.value, (value) => {
+      meterCombo = App.createCombo(items, () => (meterChosen ? sel.value : ''), (value) => {
+        meterChosen = true;
+        R.next.disabled = false;
         sel.value = value;
         sel.dispatchEvent(new Event('change', { bubbles: true })); // recorded like every other field, saved with Next
         meterCombo.sync();
         MeterTheme.apply(Number(value)); // icons and colors follow right away
       });
+      meterCombo.placeholder = 'Select your meter type';
+      meterCombo.markSelected = true;
+      meterCombo.sync();
       meterCombo.el.classList.add('is-wide');
       R.meterCombo.replaceWith(meterCombo.el);
     })();

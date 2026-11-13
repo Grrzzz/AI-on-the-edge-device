@@ -7951,3 +7951,107 @@ a.nav-sub-item {
     justify-content: center;
   }
 }
+
+/* wizard welcome flow */
+.wiz-flow {
+  display: flex;
+  gap: 6px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wiz-flow li {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.wiz-flow-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--input-radius);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wiz-flow-node:hover {
+  background: var(--surface);
+}
+
+.wiz-flow-node.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.wiz-flow-num {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--surface);
+  font-size: 0.78rem;
+}
+
+.wiz-flow-node.active .wiz-flow-num {
+  background: var(--primary);
+  color: #fff;
+}
+
+.wiz-flow-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: var(--input-radius);
+  background: var(--surface);
+  line-height: 1.5;
+}
+
+.wiz-flow-info span {
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+}
+
+@media screen and (max-width: 640px) {
+  .wiz-flow-name {
+    font-size: 0.7rem;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* wizard camera step: live image left, settings right */
+.wiz-cam {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--card-gap);
+  align-items: start;
+}
+
+.wiz-cam .cfg {
+  min-width: 0;
+}
+
+.wiz-preview-btn {
+  width: auto;
+  margin: 14px auto 2px;
+  padding: 10px 28px;
+  font-size: 1rem;
+}
+
+@media screen and (max-width: 976px) {
+  .wiz-cam {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
