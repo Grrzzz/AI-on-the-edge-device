@@ -10615,13 +10615,6 @@ const App = (() => {
 
       try {
         await Api.setup.saveConfig(delta, true);
-        firework.launch(
-          isAbort
-            ? 'Initial setup aborted. Device configuration incomplete. Loading operational web interface...'
-            : 'Initial setup completed. Loading operational web interface...',
-          isAbort ? 'warning' : 'success',
-          10000,
-        );
       } catch (error) {
         const errorMsg = error.message || error;
         firework.launch(
