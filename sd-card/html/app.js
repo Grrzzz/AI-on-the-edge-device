@@ -6950,6 +6950,8 @@ const App = (() => {
     [KEY_CAM + 'flipimage']: { kind: 'switch' },
   };
   const CAM_FIELDS = CAM_ROWS.flat();
+  /** Settings the result of which is already visible on the taken picture (rotation); all others show only on a new camera picture. */
+  const CAM_PREVIEW = new Set(['imagealignment.imagerotation']);
   /** Text of the value shown next to a slider. */
   function camFormat(f, v) {
     switch (f.fmt) {
@@ -6997,7 +6999,8 @@ const App = (() => {
       const adv = CAM_BASIC.includes(name) ? '' : ' setup-cam-adv';
       const cls = `cam-ctl setup-cam-cell${adv}${gate}`;
       const label = App.esc(f.label);
-      const head = (extra) => `<div class="cam-head"><div class="tooltip-trigger" data-help="${help}"></div><span class="cam-label">${label}</span>${extra}</div>`;
+      const tag = CAM_PREVIEW.has(name) ? '<span class="cam-tag cam-tag-live" title="Shown right away on the picture">Preview</span>' : '<span class="cam-tag" title="Needs a new camera picture">Camera</span>';
+      const head = (extra) => `<div class="cam-head"><div class="tooltip-trigger" data-help="${help}"></div><span class="cam-label">${label}</span>${tag}${extra}</div>`;
       const btn = (dir, sign) => `<button type="button" class="cam-step" data-dir="${dir}" aria-label="${dir < 0 ? 'Decrease' : 'Increase'} ${label}">${sign}</button>`;
       if (f.type === 'range') {
         return `<div class="${cls} cam-range" data-cam="${name}">${head(`<output data-out="${name}">${camFormat(f, f.value)}</output>`)}
@@ -7211,6 +7214,10 @@ const App = (() => {
                     <input type="checkbox" data-change="camAdvanced" data-ref="camAdv" />Advanced
                   </label>
                 </div>
+                <ul class="cam-note">
+                  <li><span class="cam-tag cam-tag-live">Preview</span> the picture turns along at once.</li>
+                  <li><span class="cam-tag">Camera</span> needs a new picture. A hint appears after every change.</li>
+                </ul>
                 <div class="cam-wrap">
                   <div class="cam-grid" data-ref="camGrid">${camPanelMarkup()}</div>
                   <div class="cam-lock" data-ref="camLock"><span>Update the image first, then you can change the settings.</span></div>
@@ -8459,6 +8466,7 @@ const App = (() => {
     /** The picture is outdated as soon as a camera value differs from the one the picture was taken with. */
     function imageStale() {
       if (!imagePending || !capParams) return false;
+      if (String(camInput['imagealignment.imagerotation'].value) !== String(capParams.rotation)) return true;
       return CAPTURE_PARAMS.some(([key, name, def]) => {
         const v = camInput[name].value;
         return String(v === '' ? def : v) !== String(capParams[key]);
@@ -8501,7 +8509,7 @@ const App = (() => {
       if (taking) return;
       taking = true;
       R.take.disabled = true;
-      const sentParams = { ...params };
+      const sentParams = { ...params, rotation: camInput['imagealignment.imagerotation'].value };
       let result;
       try {
         result = await Api.setup.capture(params);
