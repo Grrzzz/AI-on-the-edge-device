@@ -591,13 +591,13 @@ async function reloadConfig() {
   await apiCallNotify('/config?task=reload', {}, { action: 'Configuration update', resultMsg: RELOAD_NOTIFY });
 }
 
-async function saveConfig(data, reload = false) {
+async function saveConfig(data, reload = false, quiet = false) {
   const res = await apiCallNotify(
     reload ? '/config?reload=true' : '/config',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: data },
     {
       action: 'Save config',
-      loadingMsg: 'Save and apply configuration...',
+      loadingMsg: quiet ? undefined : 'Save and apply configuration...',
       resultMsg: reload ? undefined : 'Configuration saved successfully',
     },
   );
@@ -606,7 +606,7 @@ async function saveConfig(data, reload = false) {
 
   sessionStorage.setItem('jsonConfigData', res.data);
   MeterTheme.applyFromConfig(); // the meter type may have changed
-  if (reload) processReloadFeedback(res.headers.get('X-Reload-Code'));
+  if (reload && !quiet) processReloadFeedback(res.headers.get('X-Reload-Code'));
 }
 
 async function loadConfig() {
@@ -6735,8 +6735,8 @@ const App = (() => {
     },
 
     /** Saves a partial configuration (delta). Toasts and throws on failure. */
-    async saveConfig(delta, reload = true) {
-      await saveConfig(JSON.stringify(delta), reload);
+    async saveConfig(delta, reload = true, quiet = false) {
+      await saveConfig(JSON.stringify(delta), reload, quiet);
     },
 
     /**
@@ -10614,7 +10614,7 @@ const App = (() => {
       }
 
       try {
-        await Api.setup.saveConfig(delta, true);
+        await Api.setup.saveConfig(delta, true, true);
       } catch (error) {
         const errorMsg = error.message || error;
         firework.launch(
