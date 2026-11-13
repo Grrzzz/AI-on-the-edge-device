@@ -6950,6 +6950,21 @@ const App = (() => {
     [KEY_CAM + 'flipimage']: { kind: 'switch' },
   };
   const CAM_FIELDS = CAM_ROWS.flat();
+  /** Text of the value shown next to a slider. */
+  function camFormat(f, v) {
+    switch (f.fmt) {
+      case 'zoom':
+        return `x`;
+      case 'deg':
+        return `°`;
+      case 'ms':
+        return ` ms`;
+      case 'pct':
+        return ` %`;
+      default:
+        return String(v);
+    }
+  }
   /** Parameters sent to /camera?task=capture: query key -> [config name, default] (same defaults as before) */
   const CAPTURE_PARAMS = [
     ['flashtime', 'takeimage.flashlight.flashtime', '100'],
@@ -8496,6 +8511,7 @@ const App = (() => {
         g.rotate((degrees * Math.PI) / 180);
         // Special effect 7 (grayscale + negative): both together do not work on the camera.
         // Workaround: grayscale on the camera + negative on the MCU (processing) / in the browser (preview)
+        if (specialeffect === '7') g.filter = 'invert(1)';
         g.drawImage(imageObj, -imageObj.width / 2, -imageObj.height / 2);
       }
       g.restore();
