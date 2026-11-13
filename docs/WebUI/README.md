@@ -40,4 +40,4 @@ One control layer for all widths; the original fields of the editor stay in the 
 - **Image overlays** share one look (`drawRoiMark`, `drawBadge`): soft fill, frame, rounded name badge; the selected item is solid with a halo, the others
   are transparent. "Zoom in" scales the canvas with a CSS transform (lines and text keep their size).
 - **Image tab**: the camera values are custom controls (`camPanelMarkup`, `CAM_UI`) that drive the native inputs (`data-param`), which stay the source of
-  truth. Advanced values sit behind a switch kept in `localStorage` (`camAdvanced`). The settings are blurred until a picture was taken.
+  truth. Advanced values sit behind a switch that is off whenever the page is opened (not remembered). The settings are blurred until a picture was taken.

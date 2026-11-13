@@ -4399,7 +4399,7 @@ a .rst-content .admonition-title {
   margin: 8px 0 20px;
   padding: 0;
   list-style: none;
-  counter-reset: wiz;
+  counter-reset: wiz -1; /* the meter type is step 0, the numbered steps start with the camera */
 }
 
 .wiz-stepper li {
@@ -4587,89 +4587,6 @@ a .rst-content .admonition-title {
   margin-top: 4px;
 }
 
-/* parameter tables (flashlight setup, security) */
-.wiz-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.wiz-col-label {
-  width: 350px;
-}
-
-.wiz-col-value {
-  width: 330px;
-}
-
-.wiz-col-tip {
-  width: 40px;
-}
-
-.wiz-table th {
-  padding: 14px 20px 8px;
-  text-align: left;
-  font-size: 1.05rem;
-  font-weight: 700;
-  background: transparent;
-}
-
-.wiz-table td {
-  padding: 10px 16px;
-  vertical-align: middle;
-}
-
-.wiz-table tr + tr td {
-  border-top: 1px solid var(--border);
-}
-
-.wiz-table td:first-child {
-  color: var(--text-secondary);
-}
-
-.wiz-table td:has(.tooltip-trigger) {
-  text-align: right;
-  padding-right: 5px;
-}
-
-.wiz-indent1 {
-  padding-left: 20px !important;
-}
-
-.wiz-indent2 {
-  padding-left: 40px !important;
-}
-
-.wiz-bold {
-  font-weight: bold;
-}
-
-.wiz-restricted {
-  color: var(--error);
-}
-
-.wiz-table input[type='text'],
-.wiz-table input[type='password'] {
-  width: 100%;
-  max-width: 320px;
-  margin: 0;
-}
-
-.wiz-table input[type='number'] {
-  width: 80px;
-  margin: 0 4px;
-}
-
-.wiz-table input.wiz-rgb {
-  min-width: 55px;
-  width: 55px;
-}
-
-.wiz-table select {
-  min-width: 180px;
-  max-width: 100%;
-  margin: 0;
-}
-
 .wiz-pw {
   position: relative;
   max-width: 320px;
@@ -4794,24 +4711,6 @@ a .rst-content .admonition-title {
 }
 
 @media screen and (max-width: 976px) {
-  .wiz-col-label,
-  .wiz-col-value,
-  .wiz-col-tip {
-    width: auto;
-  }
-
-  .wiz-table td {
-    padding: 8px 10px;
-  }
-
-  .wiz-indent1 {
-    padding-left: 12px !important;
-  }
-
-  .wiz-indent2 {
-    padding-left: 22px !important;
-  }
-
   .wiz-actions .wiz-link-btn {
     display: none;
   }
@@ -7820,3 +7719,546 @@ a.nav-sub-item {
   text-transform: uppercase;
   vertical-align: middle;
 }
+
+/* initial setup: the wizard has the whole screen, no menu and no way into the other areas */
+.app.wizard-mode {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app.wizard-mode .sidebar,
+.app.wizard-mode .topbar,
+.app.wizard-mode .scrim {
+  display: none !important;
+}
+
+.app.wizard-mode .content {
+  padding-top: 0;
+}
+
+/* wizard start screen: the welcome card and two big choices below it, side by side */
+.wiz-welcome {
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap);
+}
+
+.wiz-start {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--card-gap);
+}
+
+.wiz-choice {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 22px 24px;
+  border: 2px solid var(--border);
+  border-radius: var(--card-radius);
+  background: var(--bg-card);
+  box-shadow: var(--shadow);
+  color: var(--text-main);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+
+.wiz-choice svg {
+  width: 34px;
+  height: 34px;
+  margin-bottom: 6px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.wiz-choice b {
+  font-size: 1.3rem;
+  letter-spacing: -0.01em;
+}
+
+.wiz-choice span {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.wiz-choice:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary);
+}
+
+.wiz-choice-main {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+.wiz-choice-main span {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.wiz-choice-main:hover {
+  background: color-mix(in srgb, var(--primary) 90%, #000);
+}
+
+.wiz-choice.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.wiz-restore[hidden] {
+  display: none;
+}
+
+.wiz-actions[hidden] {
+  display: none;
+}
+
+@media screen and (max-width: 900px) {
+  .wiz-start {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wiz-choice {
+    padding: 18px 20px;
+  }
+}
+
+/* wizard step 1: rows like on the setup page */
+.wiz-restricted {
+  color: var(--error);
+}
+
+.wiz-cfg .cfg-label .wiz-restricted {
+  margin-left: 6px;
+}
+
+.wiz-cfg .cfg-label .tooltip-trigger {
+  display: inline-block;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.wiz-preview-hint {
+  margin: 0;
+  padding: 32px 16px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.wiz-preview-hint[hidden] {
+  display: none;
+}
+
+.wiz-preview[hidden] {
+  display: none;
+}
+
+/* wizard bar: the way forward is the main thing on the screen */
+.wiz-actions {
+  border-top: 0;
+  box-shadow: 0 -12px 32px rgba(17, 24, 39, 0.14);
+}
+
+.wiz-actions-inner {
+  gap: 16px;
+  padding: 16px clamp(8px, 2vw, 24px);
+}
+
+.wiz-actions .button {
+  height: 50px;
+  padding: 0 26px;
+  border-radius: 14px;
+  font-size: 1.02rem;
+  font-weight: 700;
+}
+
+.wiz-actions-right {
+  gap: 12px;
+}
+
+/* Next: accent color, large, with an arrow */
+.wiz-actions [data-ref='next'] {
+  min-width: 190px;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--primary) 38%, transparent);
+}
+
+.wiz-actions [data-ref='next']::after {
+  content: '\2192';
+  margin-left: 12px;
+  font-size: 1.2em;
+  line-height: 1;
+}
+
+.wiz-actions [data-ref='next']:disabled {
+  box-shadow: none;
+}
+
+/* Back: outlined, with an arrow */
+.wiz-actions [data-ref='previous'] {
+  min-width: 120px;
+  border: 2px solid var(--border);
+  background: var(--bg-card);
+}
+
+.wiz-actions [data-ref='previous']::before {
+  content: '\2190';
+  margin-right: 10px;
+  font-size: 1.2em;
+  line-height: 1;
+}
+
+/* Abort and log stay quiet on the left */
+.wiz-actions [data-ref='skip'] {
+  height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+@media screen and (max-width: 640px) {
+  .wiz-actions-inner {
+    flex-wrap: wrap-reverse;
+    gap: 10px;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .wiz-actions-right {
+    flex: 1 1 100%;
+  }
+
+  .wiz-actions-right .button {
+    flex: 1;
+    padding: 0 14px;
+  }
+
+  .wiz-actions [data-ref='next'] {
+    flex: 2;
+    min-width: 0;
+  }
+
+  .wiz-actions-left {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}
+
+/* wizard welcome flow */
+.wiz-flow {
+  display: flex;
+  gap: 6px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wiz-flow li {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.wiz-flow-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--input-radius);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wiz-flow-node:hover {
+  background: var(--surface);
+}
+
+.wiz-flow-node.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.wiz-flow-num {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--surface);
+  font-size: 0.78rem;
+}
+
+.wiz-flow-node.active .wiz-flow-num {
+  background: var(--primary);
+  color: #fff;
+}
+
+.wiz-flow-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: var(--input-radius);
+  background: var(--surface);
+  line-height: 1.5;
+}
+
+.wiz-flow-info span {
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+}
+
+@media screen and (max-width: 640px) {
+  .wiz-flow-name {
+    font-size: 0.7rem;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* wizard camera step: live image left, settings right */
+.wiz-cam {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--card-gap);
+  align-items: start;
+}
+
+.wiz-cam .cfg {
+  min-width: 0;
+}
+
+.wiz-preview-btn {
+  width: auto;
+  margin: 14px auto 2px;
+  padding: 10px 28px;
+  font-size: 1rem;
+}
+
+@media screen and (max-width: 976px) {
+  .wiz-cam {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* wizard: the open combo list stays above the sticky action bar */
+.wiz [data-card]:has(.theme-combo-btn[aria-expanded='true']) {
+  z-index: 60;
+}
+
+
+.setup .canvas-wrap {
+  position: relative;
+}
+.setup-intro {
+  position: absolute;
+  inset: 0 12px 12px;
+  justify-content: center;
+  border: 1px dashed currentColor;
+  border-radius: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  text-align: center;
+  color: var(--text-muted, #64748b);
+}
+.setup-intro[hidden] {
+  display: none;
+}
+@media screen and (min-width: 1257px) {
+  .setup-intro {
+    inset: 0 6px 6px;
+  }
+}
+.setup-intro svg {
+  width: 44px;
+  height: 44px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.setup-intro b {
+  color: var(--text, inherit);
+  font-size: 1.05rem;
+}
+.setup-intro span {
+  max-width: 420px;
+}
+
+.cam-tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  background: rgba(100, 116, 139, 0.14);
+  color: var(--text-muted, #64748b);
+  white-space: nowrap;
+}
+.cam-tag-live {
+  background: rgba(37, 99, 235, 0.12);
+  color: #2563eb;
+}
+.cam-note {
+  margin: 0;
+  padding: 0 20px 8px;
+  font-size: 0.8rem;
+  color: var(--text-muted, #64748b);
+}
+.setup-bubble {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  width: max-content;
+  max-width: calc(100% - 48px);
+  padding: 14px 14px 14px 26px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.9);
+  color: #f8fafc;
+  font-size: 1rem;
+  line-height: 1.35;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+.setup-bubble[hidden] {
+  display: none;
+}
+.setup-bubble .button {
+  flex: none;
+  white-space: nowrap;
+}
+
+.setup-bubble .button {
+  padding: 10px 20px;
+  font-size: 0.95rem;
+}
+@media screen and (max-width: 600px) {
+  .setup-bubble {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 16px 18px;
+    border-radius: 1.2rem;
+    bottom: 20px;
+    text-align: center;
+  }
+}
+
+.cam-note {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cam-note .cam-tag {
+  margin: 0 8px 0 0;
+}
+
+.setup .m-combo[hidden] {
+  display: none !important;
+}
+
+.setup .m-procs[hidden] {
+  display: none !important;
+}
+
+/* wizard ROI step: the switches get their own prominent card with an explanation */
+.setup .setup .setup-seqcard.setup-procintro {
+  padding: 16px 20px;
+  gap: 14px;
+}
+
+.setup-procintro .setup-procintro-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.setup-procintro .setup-procintro-text b {
+  color: var(--text-main);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.setup .setup-procintro .m-seqrow {
+  display: block;
+}
+
+.setup .setup-procintro .m-procs {
+  flex-direction: row;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px 40px;
+}
+
+.setup .setup-procintro .m-procs .m-proc {
+  gap: 12px;
+  color: var(--text-main);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.setup .setup-procintro .m-procs .m-proc input[type='checkbox'] {
+  width: 46px;
+  height: 26px;
+}
+
+.setup .setup-procintro .m-procs .m-proc input[type='checkbox']::after {
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+}
+
+.setup .setup-procintro .m-procs .m-proc input[type='checkbox']:checked::after {
+  transform: translateX(20px);
+}
+
+.wiz-finish-hint {
+  margin: 12px 4px 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.wiz-beta {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.wiz-help .help-item[data-help] { opacity: 0.55; padding: 10px 12px; border-radius: 8px; border: 1px solid transparent; transition: opacity 0.15s, background 0.15s; }
+.wiz-help .help-item[data-help].current { opacity: 1; background: var(--primary-soft); border-color: color-mix(in srgb, var(--primary) 40%, transparent); }
+.wiz-help .help-item[data-help].current h4 { color: var(--primary); }
+

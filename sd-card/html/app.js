@@ -591,13 +591,13 @@ async function reloadConfig() {
   await apiCallNotify('/config?task=reload', {}, { action: 'Configuration update', resultMsg: RELOAD_NOTIFY });
 }
 
-async function saveConfig(data, reload = false) {
+async function saveConfig(data, reload = false, quiet = false) {
   const res = await apiCallNotify(
     reload ? '/config?reload=true' : '/config',
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: data },
     {
       action: 'Save config',
-      loadingMsg: 'Save and apply configuration...',
+      loadingMsg: quiet ? undefined : 'Save and apply configuration...',
       resultMsg: reload ? undefined : 'Configuration saved successfully',
     },
   );
@@ -606,7 +606,7 @@ async function saveConfig(data, reload = false) {
 
   sessionStorage.setItem('jsonConfigData', res.data);
   MeterTheme.applyFromConfig(); // the meter type may have changed
-  if (reload) processReloadFeedback(res.headers.get('X-Reload-Code'));
+  if (reload && !quiet) processReloadFeedback(res.headers.get('X-Reload-Code'));
 }
 
 async function loadConfig() {
@@ -640,13 +640,14 @@ function jsonObjectKeyify(obj) {
 }
 
 function deepMergeObjects(obj1, obj2) {
+  if (Array.isArray(obj2)) return structuredClone(obj2); // arrays (markers, ROIs) are taken as a whole
   const result = {};
 
   for (const key of Object.keys(obj2)) {
-    result[key] = isObj(obj2[key]) && isObj(obj1[key]) ? deepMergeObjects(obj1[key], obj2[key]) : obj2[key];
+    result[key] = isObj(obj2[key]) && isObj(obj1[key]) && !Array.isArray(obj2[key]) ? deepMergeObjects(obj1[key], obj2[key]) : obj2[key];
   }
   for (const key of Object.keys(obj1)) {
-    if (!(key in result)) result[key] = isObj(obj1[key]) ? deepMergeObjects(obj1[key], {}) : obj1[key];
+    if (!(key in result)) result[key] = isObj(obj1[key]) && !Array.isArray(obj1[key]) ? deepMergeObjects(obj1[key], {}) : obj1[key];
   }
 
   return result;
@@ -1587,6 +1588,7 @@ const App = (() => {
     current = { key: ctx.key, view, ctx };
     setTitle(view.title);
     updateNav(ctx.key);
+    document.getElementById('app')?.classList.toggle('wizard-mode', ctx.key === 'wizard'); // the wizard has the whole screen: no menu
 
     try {
       view.mount(section, ctx);
@@ -1596,8 +1598,23 @@ const App = (() => {
     }
   }
 
+  // A device in operation mode "Setup" shows the wizard only: every other route leads back to it until the setup is left
+  let setupLeft = false;
+  const inSetupMode = () => {
+    if (setupLeft) return false;
+    try {
+      return Number(getConfigFromStorage()?.operationmode?.opmode) === -1;
+    } catch (e) {
+      return false;
+    }
+  };
+
   function onRoute() {
-    const ctx = parseHash();
+    let ctx = parseHash();
+    if (ctx.key !== 'wizard' && inSetupMode()) {
+      history.replaceState(null, '', '#/wizard');
+      ctx = parseHash();
+    }
     if (current && current.key === ctx.key && typeof current.view.route === 'function') {
       current.ctx = ctx; // same view, only the sub route changed
       current.view.route(ctx);
@@ -1711,8 +1728,8 @@ const App = (() => {
     try { storedTheme = localStorage.getItem('meterTheme') || 'generic'; } catch (e) { }
     MeterTheme.apply(storedTheme); // last known theme, no flash while the config loads
     const configLoaded = loadConfig().then(() => MeterTheme.applyFromConfig()).catch((e) => console.error('Failed to load config', e));
+    await configLoaded; // the route decides with the operation mode (setup: wizard only)
     if (!location.hash) {
-      await configLoaded;
       let setupMode = false;
       try { setupMode = Number(getConfigFromStorage()?.operationmode?.opmode) === -1; } catch (e) { }
       history.replaceState(null, '', setupMode ? '#/wizard' : '#/dashboard');
@@ -1720,7 +1737,7 @@ const App = (() => {
     onRoute();
   }
 
-  return { register, navigate, go: navigate, theme: { mode: themeMode, set: setTheme }, onThemeChange, el, h, esc, start };
+  return { register, navigate, go: navigate, leaveSetup() { setupLeft = true; }, theme: { mode: themeMode, set: setTheme }, onThemeChange, el, h, esc, start };
 })();
 
 
@@ -1889,6 +1906,7 @@ const App = (() => {
 
   // After a reboot or an update the app is reloaded from scratch and opens the dashboard
   function reloadApp() {
+    App.leaveSetup();
     window.location.hash = '#/dashboard';
     window.location.reload();
   }
@@ -3509,26 +3527,7 @@ const App = (() => {
               </div>
             </div>
 
-            <div class="card">
-              <div class="card-header"><span>Restore</span></div>
-              <div class="card-pad">
-                <div class="lead">
-                  Restores a backup created here. The existing configuration is replaced and the device restarts.
-                  Backups of firmware v16 (with a config.ini) are converted and imported.
-                </div>
-                ${pickerHtml({
-                  title: 'Drop a backup here',
-                  sub: 'or <b>browse</b> your computer &middot; *.zip, max. 16 MB',
-                  label: 'Choose a backup file or drop it here',
-                  accept: '.zip',
-                })}
-                <button class="button btn-wide btn-action" type="button" data-r="startRestore" data-action="restore" disabled>Restore</button>
-                <div class="prog sys-prog-flat">
-                  <progress data-r="restoreBar" value="0" max="100"></progress>
-                  <div class="prog-meta"><span data-r="status">Status: Idle</span><span data-r="loadedBytes"></span></div>
-                </div>
-              </div>
-            </div>
+            <div data-r="restoreHost"></div>
           </div>
 
           <div class="note-row">
@@ -3538,6 +3537,227 @@ const App = (() => {
         </div>
       </div>`;
   }
+
+  /** The restore card (backup of this application or of firmware v16). `onImported` runs after a v16 import, a normal restore reloads the app. */
+  function mountRestore(host, { onImported } = {}) {
+    host.innerHTML = `
+    <div class="card">
+      <div class="card-header"><span>Restore</span></div>
+      <div class="card-pad">
+        <div class="lead">
+          Restores a backup created here. The existing configuration is replaced and the device restarts.
+          Backups of firmware v16 (with a config.ini) are converted and imported.
+        </div>
+        ${pickerHtml({
+          title: 'Drop a backup here',
+          sub: 'or <b>browse</b> your computer &middot; *.zip, max. 16 MB',
+          label: 'Choose a backup file or drop it here',
+          accept: '.zip',
+        })}
+        <button class="button btn-wide btn-action" type="button" data-r="startRestore" data-action="restore" disabled>Restore</button>
+      </div>
+    </div>`;
+    const r = collectRefs(host);
+    let alive = true;
+    const picker = setupPicker(r, () => validateFile());
+    const overlay = createUpdateOverlay(); // restore and import show the same full screen progress as an update
+    const unlock = () => {
+      r.startRestore.disabled = false;
+      picker.setBusy(false);
+    };
+
+    // ---------------------------------------------------------------- restore
+    let legacy = null; // unzipped v16 backup (config.ini), imported instead of restored
+
+    const validateFile = async () => {
+      r.startRestore.disabled = true;
+      legacy = null;
+
+      const file = picker.file();
+      if (!file) {
+        picker.show(null);
+        return;
+      }
+      const filename = file.name;
+      const bad = (msg) => picker.show(file, msg, 'badge-error');
+
+      if (file.size > BACKUP_MAX_FILE_SIZE) return bad('Larger than 16 MB');
+      if (filename.length > 255) return bad('File name too long');
+      if (filename.includes(' ')) return bad('Name contains spaces');
+      if (!filename.toLowerCase().endsWith('.zip')) return bad('Not a ZIP file');
+
+      picker.show(file, 'Checking ...');
+      try {
+        await loadScript('/fflate.min.js');
+        const zip = fflate.unzipSync(new Uint8Array(await file.arrayBuffer()));
+
+        legacy = LegacyImport.detect(zip);
+        if (legacy) {
+          picker.show(file, 'v16 backup, will be converted', 'badge-warning');
+          r.startRestore.disabled = false;
+          return;
+        }
+        if (!zip['meta.json']) return bad('Not a backup (meta.json missing)');
+        const meta = JSON.parse(new TextDecoder().decode(zip['meta.json']));
+        if (!meta.app || meta.app.toLowerCase() !== BACKUP_APP_NAME.toLowerCase()) return bad('Backup of another application');
+
+        const when = String(meta.timestamp || '').replace('_', ' ').replace(/-(\d\d)-(\d\d)$/, ':$1:$2');
+        picker.show(file, 'Valid backup', 'badge-success');
+        if (when) r.fileSize.textContent = pickSize(file.size) + ' · created ' + when;
+        r.startRestore.disabled = false;
+      } catch (err) {
+        console.error('ZIP validation error:', err);
+        bad('Damaged ZIP file');
+      }
+    };
+
+    const runLegacyImport = async () => {
+      const c = LegacyImport.convert(legacy.ini, legacy.prevalue);
+      const notes = [...c.notes];
+      const setStatus = (text) => overlay.text(text);
+      const importFailed = (message) => {
+        console.error('Import failed:', message);
+        overlay.fail('Import failed', message, unlock);
+      };
+      overlay.open('Importing backup', 'Uploading files ...', ['Files', 'Configuration', 'Finish']);
+      overlay.step(1);
+      overlay.progress(0);
+
+      // 1. images and models
+      const uploads = [];
+      const add = (path, name) => {
+        const data = legacy.file(name);
+        if (data) uploads.push([path, data]);
+        else notes.push(`File ${name} is missing in the backup.`);
+      };
+      add('/config/reference.jpg', 'reference.jpg');
+      add('/config/marker1.jpg', 'ref0.jpg');
+      add('/config/marker2.jpg', 'ref1.jpg');
+      c.models.forEach((m) => add('/config/models/' + m, m));
+
+      for (let i = 0; i < uploads.length; i++) {
+        const [path, data] = uploads[i];
+        setStatus(`Uploading ${path.split('/').pop()} (${i + 1}/${uploads.length}) ...`);
+        overlay.progress(Math.round((i / (uploads.length + 2)) * 100), `${i + 1} of ${uploads.length} files`);
+        const res = await Api.files.upload(path, data);
+        if (!res.ok) return importFailed(`${path}: ${res.message}`);
+      }
+
+      // 2. configuration
+      overlay.step(2);
+      setStatus('Saving the configuration ...');
+      overlay.progress(Math.round((uploads.length / (uploads.length + 2)) * 100));
+      try {
+        await Api.config.save(c.delta, true);
+      } catch (e) {
+        return importFailed('Configuration could not be saved: ' + e.message);
+      }
+
+      // 3. last valid value, once the process is initialized
+      overlay.step(3);
+      if (c.fallback) {
+        setStatus('Setting the last valid value ...');
+        overlay.progress(null);
+        let done = false;
+        for (let attempt = 0; attempt < 24 && alive && !done; attempt++) {
+          await new Promise((resolve) => setTimeout(resolve, 5000));
+          const res = await apiCall('/api/fallback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sequence: c.fallback.sequence, value: c.fallback.value }),
+          });
+          done = res.ok;
+        }
+        if (!done) notes.push(`The last valid value (${c.fallback.value}) could not be set. Set it on the dashboard.`);
+      }
+
+      overlay.close();
+      picker.setBusy(false);
+      firework.launch('Backup of firmware v16 imported', 'success', 5000);
+      notes.push('Check the result under Configuration (markers, regions) and System > Setup.');
+      await confirmDialog({ title: 'Import finished', text: notes.join('\n'), okLabel: 'OK', cancelLabel: 'Close' });
+      onImported?.();
+    };
+
+    const startRestore = async () => {
+      const file = picker.file();
+      if (file && legacy) {
+        if (!(await confirmDialog({
+          title: 'Import this v16 backup?',
+          text: 'The settings of config.ini are converted and written to the device. Images and models are copied, network settings stay as they are.',
+          okLabel: 'Import',
+        }))) return;
+        r.startRestore.disabled = true;
+        picker.setBusy(true);
+        await runLegacyImport();
+        return;
+      }
+      if (!file || !(await confirmDialog({
+        title: 'Restore this backup?',
+        text: 'The existing configuration is overwritten by the selected backup and the device restarts.',
+        okLabel: 'Restore',
+        danger: true,
+      }))) return;
+
+      r.startRestore.disabled = true;
+      picker.setBusy(true);
+      overlay.open('Restoring backup', 'Uploading ...', ['Upload', 'Restore', 'Restart'], { expected: 60 });
+      overlay.step(1);
+      overlay.progress(0);
+
+      const res = await Api.ota.upload(file, (loaded, total) => {
+        const percent = Math.round((loaded / total) * 100);
+        overlay.progress(percent, `${(loaded / 1048576).toFixed(2)} of ${(total / 1048576).toFixed(2)} MB`);
+        overlay.text(`${percent} % uploaded. Please wait ...`);
+      });
+      if (!alive) return;
+      if (!res.ok) {
+        console.error('OTA upload failed:', res.message);
+        overlay.fail('Upload failed', res.message, unlock);
+        return;
+      }
+
+      // the package is processed during the restart: that is the restore step, the restart is over when the device answers again
+      overlay.step(2);
+      overlay.title('Restoring ...');
+      overlay.text('The device restores the configuration and restarts. This page reloads automatically. Do not unplug the device.');
+      overlay.progress(null);
+
+      const result = await Api.ota.rebootAndWait({ cancelled: () => !alive });
+      if (!alive) return;
+      if (result === 'online') {
+        overlay.step(3);
+        overlay.title('Backup restored');
+        overlay.text('Reloading ...');
+        reloadApp();
+      } else if (result === 'timeout') {
+        overlay.fail('Restore takes unusually long', 'Reload this page or power cycle the device.', unlock);
+      }
+    };
+
+    const onClick = (e) => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      if (btn.dataset.action === 'restore') {
+        if (!btn.disabled) startRestore();
+      } else if (btn.dataset.action === 'clear-file') {
+        picker.clear();
+        r.startRestore.disabled = true;
+      }
+    };
+    host.addEventListener('click', onClick);
+    return {
+      destroy() {
+        alive = false;
+        overlay.close();
+        host.removeEventListener('click', onClick);
+        host.textContent = '';
+      },
+    };
+  }
+
+  App.createUpdateOverlay = createUpdateOverlay;
+  App.mountRestore = mountRestore; // the wizard offers the same restore at its start
 
   App.register('system-backup', {
     title: 'Backup / Restore',
@@ -3549,7 +3769,8 @@ const App = (() => {
       let alive = true;
       this._stop = () => { alive = false; };
 
-      const picker = setupPicker(r, () => validateFile());
+      const restore = mountRestore(r.restoreHost);
+      this._restore = restore;
 
       const log = (text, cls = '') => {
         const line = App.el('div', cls ? `sys-log-${cls}` : '', String(text));
@@ -3650,181 +3871,11 @@ const App = (() => {
         }
       };
 
-      // ---------------------------------------------------------------- restore
-      let legacy = null; // unzipped v16 backup (config.ini), imported instead of restored
-
-      const validateFile = async () => {
-        r.startRestore.disabled = true;
-        legacy = null;
-
-        const file = picker.file();
-        if (!file) {
-          picker.show(null);
-          return;
-        }
-        const filename = file.name;
-        const bad = (msg) => picker.show(file, msg, 'badge-error');
-
-        if (file.size > BACKUP_MAX_FILE_SIZE) return bad('Larger than 16 MB');
-        if (filename.length > 255) return bad('File name too long');
-        if (filename.includes(' ')) return bad('Name contains spaces');
-        if (!filename.toLowerCase().endsWith('.zip')) return bad('Not a ZIP file');
-
-        picker.show(file, 'Checking ...');
-        try {
-          await loadScript('/fflate.min.js');
-          const zip = fflate.unzipSync(new Uint8Array(await file.arrayBuffer()));
-
-          legacy = LegacyImport.detect(zip);
-          if (legacy) {
-            picker.show(file, 'v16 backup, will be converted', 'badge-warning');
-            r.startRestore.disabled = false;
-            return;
-          }
-          if (!zip['meta.json']) return bad('Not a backup (meta.json missing)');
-          const meta = JSON.parse(new TextDecoder().decode(zip['meta.json']));
-          if (!meta.app || meta.app.toLowerCase() !== BACKUP_APP_NAME.toLowerCase()) return bad('Backup of another application');
-
-          const when = String(meta.timestamp || '').replace('_', ' ').replace(/-(\d\d)-(\d\d)$/, ':$1:$2');
-          picker.show(file, 'Valid backup', 'badge-success');
-          if (when) r.fileSize.textContent = pickSize(file.size) + ' · created ' + when;
-          r.startRestore.disabled = false;
-        } catch (err) {
-          console.error('ZIP validation error:', err);
-          bad('Damaged ZIP file');
-        }
-      };
-
-      const restoreFailed = (message) => {
-        console.error('OTA upload failed:', message);
-        r.status.textContent = 'Status: Upload failed. Status: ' + message;
-        firework.launch('Upload failed. Status: ' + message, 'danger', 30000);
-        r.startRestore.disabled = false;
-        picker.setBusy(false);
-        r.loadedBytes.textContent = '';
-      };
-
-      const runLegacyImport = async () => {
-        const c = LegacyImport.convert(legacy.ini, legacy.prevalue);
-        const notes = [...c.notes];
-        const setStatus = (text) => { r.status.textContent = 'Status: ' + text; };
-
-        // 1. images and models
-        const uploads = [];
-        const add = (path, name) => {
-          const data = legacy.file(name);
-          if (data) uploads.push([path, data]);
-          else notes.push(`File ${name} is missing in the backup.`);
-        };
-        add('/config/reference.jpg', 'reference.jpg');
-        add('/config/marker1.jpg', 'ref0.jpg');
-        add('/config/marker2.jpg', 'ref1.jpg');
-        c.models.forEach((m) => add('/config/models/' + m, m));
-
-        for (let i = 0; i < uploads.length; i++) {
-          const [path, data] = uploads[i];
-          setStatus(`Uploading ${path.split('/').pop()} (${i + 1}/${uploads.length}) ...`);
-          r.restoreBar.value = Math.round((i / (uploads.length + 2)) * 100);
-          const res = await Api.files.upload(path, data);
-          if (!res.ok) return restoreFailed(`${path}: ${res.message}`);
-        }
-
-        // 2. configuration
-        setStatus('Saving the configuration ...');
-        r.restoreBar.value = Math.round((uploads.length / (uploads.length + 2)) * 100);
-        try {
-          await Api.config.save(c.delta, true);
-        } catch (e) {
-          return restoreFailed('Configuration could not be saved: ' + e.message);
-        }
-
-        // 3. last valid value, once the process is initialized
-        if (c.fallback) {
-          setStatus('Setting the last valid value ...');
-          let done = false;
-          for (let attempt = 0; attempt < 24 && alive && !done; attempt++) {
-            await new Promise((resolve) => setTimeout(resolve, 5000));
-            const res = await apiCall('/api/fallback', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ sequence: c.fallback.sequence, value: c.fallback.value }),
-            });
-            done = res.ok;
-          }
-          if (!done) notes.push(`The last valid value (${c.fallback.value}) could not be set. Set it on the dashboard.`);
-        }
-
-        r.restoreBar.value = 100;
-        setStatus('Import completed');
-        picker.setBusy(false);
-        firework.launch('Backup of firmware v16 imported', 'success', 5000);
-        notes.push('Check the result under Configuration (markers, regions) and System > Setup.');
-        await confirmDialog({ title: 'Import finished', text: notes.join('\n'), okLabel: 'OK', cancelLabel: 'Close' });
-      };
-
-      const startRestore = async () => {
-        const file = picker.file();
-        if (file && legacy) {
-          if (!(await confirmDialog({
-            title: 'Import this v16 backup?',
-            text: 'The settings of config.ini are converted and written to the device. Images and models are copied, network settings stay as they are.',
-            okLabel: 'Import',
-          }))) return;
-          r.startRestore.disabled = true;
-          picker.setBusy(true);
-          await runLegacyImport();
-          return;
-        }
-        if (!file || !(await confirmDialog({
-          title: 'Restore this backup?',
-          text: 'The existing configuration is overwritten by the selected backup and the device restarts.',
-          okLabel: 'Restore',
-          danger: true,
-        }))) return;
-
-        firework.launch('Do not reload this page or switch to another page while the restore is in progress', 'warning', 90000);
-
-        r.startRestore.disabled = true;
-        picker.setBusy(true);
-        r.status.textContent = 'Status: Uploading...';
-
-        const res = await Api.ota.upload(file, (loaded, total) => {
-          const percent = Math.round((loaded / total) * 100);
-          r.restoreBar.value = percent;
-          r.status.textContent = 'Status: ' + percent + '% uploaded. Please wait...';
-          r.loadedBytes.textContent = 'Uploaded ' + (loaded / 1024 / 1024).toFixed(2) + ' MB of ' + (total / 1024 / 1024).toFixed(2) + ' MB';
-        });
-
-        r.status.textContent = 'Status: Upload completed';
-        r.restoreBar.value = 0;
-        r.loadedBytes.textContent = '';
-        if (!res.ok) return restoreFailed(res.message);
-
-        r.status.textContent = 'Status: Restoring...';
-        firework.launch('Package staged. The device will restart and restore the configuration', 'success', 5000);
-
-        const result = await Api.ota.rebootAndWait({
-          onTick: (elapsed) => { r.restoreBar.value = Math.min(Math.round(elapsed / 1250), 100); },
-          cancelled: () => !alive,
-        });
-        if (result === 'online') {
-          r.restoreBar.value = 100;
-          reloadApp();
-        } else if (result === 'timeout') {
-          firework.launch('Restore takes unusually long. Reload this page or power cycle the device', 'danger', 30000);
-        }
-      };
-
       root.addEventListener('click', (e) => {
         const btn = e.target.closest('[data-action]');
         if (!btn) return;
         switch (btn.dataset.action) {
           case 'backup': if (!btn.disabled) startBackup(); break;
-          case 'restore': if (!btn.disabled) startRestore(); break;
-          case 'clear-file':
-            picker.clear();
-            r.startRestore.disabled = true;
-            break;
           case 'open-files':
             e.preventDefault();
             App.navigate('#/system/files?path=' + BACKUP_BASE_PATH);
@@ -3835,6 +3886,7 @@ const App = (() => {
 
     unmount() {
       this._stop?.();
+      this._restore?.destroy();
     },
   });
 
@@ -6683,8 +6735,8 @@ const App = (() => {
     },
 
     /** Saves a partial configuration (delta). Toasts and throws on failure. */
-    async saveConfig(delta, reload = true) {
-      await saveConfig(JSON.stringify(delta), reload);
+    async saveConfig(delta, reload = true, quiet = false) {
+      await saveConfig(JSON.stringify(delta), reload, quiet);
     },
 
     /**
@@ -6739,12 +6791,12 @@ const App = (() => {
     },
 
     /** Cuts the marker area out of the stored reference image into /img_tmp. @returns {Promise<boolean>} */
-    async cutMarker(n, roi) {
+    async cutMarker(n, roi, quiet) {
       const body = { in: '/config/reference.jpg', out: `/img_tmp/marker${n}.jpg`, x: roi.x, y: roi.y, dx: roi.dx, dy: roi.dy };
       const res = await Api.post('/api/flow/cutref', body, {
         action: 'Marker update',
-        loadingMsg: 'Request marker update...',
-        resultMsg: 'Marker successfully updated',
+        loadingMsg: quiet ? undefined : 'Request marker update...',
+        resultMsg: quiet ? undefined : 'Marker successfully updated',
         httpObj: {
           405: (r) => ({
             msg: `Marker update available in IDLE state only. Please retry shortly. [${String(jsonField(r.data, 'message') ?? '').split(' | ')[1]?.trim() || 'Unknown State'}]`,
@@ -6806,6 +6858,8 @@ const App = (() => {
     if (input.validity.rangeUnderflow) input.value = min;
   }
 
+  /** Last real camera picture of the wizard (raw, before the calculated preview) so the camera step can come back to it. */
+  let wizardLastTake = null;
   const KEY_CAM = 'takeimage.camera.';
   /** Camera / flashlight parameter table of the image tab: two parameter columns per row (same layout as before). */
   const CAM_ROWS = [
@@ -6818,8 +6872,8 @@ const App = (() => {
       { name: 'imagealignment.imagerotation', label: 'Image Rotation', type: 'range', min: -180, max: 180, step: 0.1, value: 0, fmt: 'deg' },
     ],
     [
-      { name: 'takeimage.flashlight.flashtime', label: 'Flash Time', type: 'range', min: 100, max: 10000, step: 100, value: 2000, int: true, fmt: 'ms' },
-      { name: 'takeimage.flashlight.flashintensity', label: 'Flash Intensity', type: 'range', min: 0, max: 100, value: 50, int: true, fmt: 'pct' },
+      { name: 'takeimage.flashlight.flashtime', label: 'Flash Time', type: 'range', min: 100, max: 10000, step: 100, value: 100, int: true, fmt: 'ms' },
+      { name: 'takeimage.flashlight.flashintensity', label: 'Flash Intensity', type: 'range', min: 0, max: 100, value: 30, int: true, fmt: 'pct' },
     ],
     [
       { name: KEY_CAM + 'brightness', label: 'Brightness', type: 'range', min: -2, max: 2, value: 0, int: true, init: true },
@@ -6900,25 +6954,27 @@ const App = (() => {
     [KEY_CAM + 'flipimage']: { kind: 'switch' },
   };
   const CAM_FIELDS = CAM_ROWS.flat();
+  /** Settings shown calculated on the taken picture (rotation, mirror, flip, brightness, contrast, saturation, sharpness, special effect); all others show only on a new camera picture. */
+  const CAM_PREVIEW = new Set(['imagealignment.imagerotation', KEY_CAM + 'mirrorimage', KEY_CAM + 'flipimage', KEY_CAM + 'brightness', KEY_CAM + 'contrast', KEY_CAM + 'saturation', KEY_CAM + 'sharpness', KEY_CAM + 'specialeffect']);
   /** Text of the value shown next to a slider. */
   function camFormat(f, v) {
     switch (f.fmt) {
       case 'zoom':
-        return `${(v / 1000).toFixed(2)}x`;
+        return `x`;
       case 'deg':
-        return `${Number(v).toFixed(1)}°`;
+        return `°`;
       case 'ms':
-        return `${v} ms`;
+        return ` ms`;
       case 'pct':
-        return `${v} %`;
+        return ` %`;
       default:
         return String(v);
     }
   }
   /** Parameters sent to /camera?task=capture: query key -> [config name, default] (same defaults as before) */
   const CAPTURE_PARAMS = [
-    ['flashtime', 'takeimage.flashlight.flashtime', '2000'],
-    ['flashintensity', 'takeimage.flashlight.flashintensity', '50'],
+    ['flashtime', 'takeimage.flashlight.flashtime', '100'],
+    ['flashintensity', 'takeimage.flashlight.flashintensity', '30'],
     ['brightness', KEY_CAM + 'brightness', '0'],
     ['contrast', KEY_CAM + 'contrast', '0'],
     ['saturation', KEY_CAM + 'saturation', '0'],
@@ -6947,7 +7003,8 @@ const App = (() => {
       const adv = CAM_BASIC.includes(name) ? '' : ' setup-cam-adv';
       const cls = `cam-ctl setup-cam-cell${adv}${gate}`;
       const label = App.esc(f.label);
-      const head = (extra) => `<div class="cam-head"><div class="tooltip-trigger" data-help="${help}"></div><span class="cam-label">${label}</span>${extra}</div>`;
+      const tag = CAM_PREVIEW.has(name) ? '<span class="cam-tag cam-tag-live" title="Shown right away on the picture">Preview</span>' : '<span class="cam-tag" title="Needs a new camera picture">Camera</span>';
+      const head = (extra) => `<div class="cam-head"><div class="tooltip-trigger" data-help="${help}"></div><span class="cam-label">${label}</span>${tag}${extra}</div>`;
       const btn = (dir, sign) => `<button type="button" class="cam-step" data-dir="${dir}" aria-label="${dir < 0 ? 'Decrease' : 'Increase'} ${label}">${sign}</button>`;
       if (f.type === 'range') {
         return `<div class="${cls} cam-range" data-cam="${name}">${head(`<output data-out="${name}">${camFormat(f, f.value)}</output>`)}
@@ -7012,6 +7069,24 @@ const App = (() => {
       <p>Markers, digits and analog share one save bar at the bottom. A new image is saved separately on the Image tab.</p>
     </div>`;
 
+  const WIZARD_HELP = `
+    <div class="help-item" data-help="image">
+      <h4>Camera</h4>
+      <p>Press <b>Update image</b> to take a new picture; then the camera values can be changed. Press it again after every change. Make sure it is level (use <i>Image Rotation</i>). Markers and ROIs are placed on this image.</p>
+    </div>
+    <div class="help-item" data-help="markers">
+      <h4>Alignment</h4>
+      <p>Two markers let the device correct small shifts and rotations. Pick a marker, drag its area on the image or enter coordinates, then click <b>Update Marker</b>. Keep markers small, sharp and high-contrast.</p>
+    </div>
+    <div class="help-item" data-help="digit">
+      <h4>ROIs</h4>
+      <p>Group ROIs (<b>R</b>egions <b>O</b>f <b>I</b>nterest) into number sequences. Drag them or enter coordinates; their order defines the decimal place, <b>Move higher / lower</b> changes it. See the <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/ROI-Configuration/" target="_blank" rel="noopener noreferrer">ROI documentation</a>.</p>
+    </div>
+    <div class="help-item" data-help="finish">
+      <h4>Finish setup</h4>
+      <p>Each step is saved automatically when you continue. In the last step, optionally protect the web interface with a username and password, then press <b>Finish</b>. The device restarts on its own and starts the first reading.</p>
+    </div>`;
+
   /**
    * Mounts the setup editor (reference image / markers / digit ROIs / analog ROIs) into `root`.
    * All state lives in this closure, any number of mounts is possible (one at a time in practice).
@@ -7021,6 +7096,14 @@ const App = (() => {
    *          onNavigate?:(tab:string)=>void, onTabChange?:(tab:string)=>void, onDirtyChange?:(dirty:boolean)=>void}} [opts]
    *   tabs      show the tab bar (default true)
    *   header    show title + subtitle (default true)
+   *   introHint  (default true) while no reference image exists show a hint instead of the picture, the button reads Take camera image
+   *   onImageState({exists, pending, stale})  the picture state changed (stale: settings differ from the picture)
+   *   sequenceBar  show the number sequence selector with the digit / analog switches (default true)
+   *   seqCombo  show the number sequence combo inside that bar (default true)
+   *   tabList  tabs to show (default all)
+   *   autoDigit  switch the digits on when neither digits nor analog is on
+   *   centerMarkers  markers that were never placed start in the middle of the picture
+   *   onAlignState({ready, procs})  both markers placed (cut once) and at least one of digit / analog selected
    *   helpOpen  "How it works" expanded
    *   saveBar   'global' = core SaveBar (default), 'inline' = bar inside the editor (wizard), 'none'
    *   onNavigate(tab)  tab bar click: the host routes (and calls setTab); without it the editor switches itself
@@ -7029,7 +7112,7 @@ const App = (() => {
    */
   function mountEditor(root, tab, opts = {}) {
     const uid = ++uidCounter;
-    const o = { tabs: true, header: true, helpOpen: false, saveBar: 'global', ...opts };
+    const o = { tabs: true, header: true, helpOpen: false, saveBar: 'global', sequenceBar: true, seqCombo: true, procSwitches: true, centerMarkers: false, procIntro: false, lastCycle: true, wizardHelp: false, tabList: null, autoDigit: false, introHint: true, ...opts };
     const toInt = (v) => parseInt(v, 10);
 
     /* -------------------------------------------------------------- state */
@@ -7054,6 +7137,8 @@ const App = (() => {
     let isActReference = false;
     let specialeffect = '0';
     let currentBlobUrl = null;
+    let refMissing = false; // introHint: the device has no reference image yet
+    let capParams = null; // camera values of the picture that was really taken
     let imagePending = false; // a new camera image exists that is not saved yet
     let camUnlocked = false;
     let editorSnapshot = '';
@@ -7065,7 +7150,7 @@ const App = (() => {
     const imageObj = new Image();
 
     /* ------------------------------------------------------------- markup */
-    const tabButtons = EDITOR_TABS.map(
+    const tabButtons = EDITOR_TABS.filter((t) => !o.tabList || o.tabList.includes(t)).map(
       (t) =>
         `<button type="button" class="setup-tab" role="tab" data-click="tab" data-tab="${t}">${TAB_LABEL[t]}` +
         (t === 'markers' || t === 'digit' || t === 'analog' ? ` <span class="setup-tab-count" data-count="${t}"></span>` : '') +
@@ -7079,13 +7164,13 @@ const App = (() => {
         ${o.header ? '<div class="container-title">Configuration</div><div class="page-sub">Reference image, alignment markers and the digit and analog regions of your meter.</div>' : ''}
         <details class="setup-desc" data-ref="desc"${o.helpOpen ? ' open' : ''}>
           <summary>How it works</summary>
-          <div class="help-panel">${EDITOR_HELP}</div>
+          <div class="help-panel${o.wizardHelp ? ' wiz-help' : ''}">${o.wizardHelp ? WIZARD_HELP : EDITOR_HELP}</div>
         </details>
-        <div class="card setup-seqcard">
+        <div class="card setup-seqcard${o.procIntro ? ' setup-procintro' : ''}"${o.sequenceBar ? '' : ' hidden'}>${o.procIntro ? '<div class="setup-procintro-text"><b>Which regions does your meter have?</b><span>Switch on digits, analog dials or both. Then mark the matching zones in the picture below: use the tabs to move between the digit and the analog regions.</span></div>' : ''}
         <div class="m-only setup-seqglobal" data-ref="mSeqBar">
           <div class="m-seqrow">
-            <div class="m-combo" data-ref="mSeqCombo"></div>
-            <div class="m-procs">
+            <div class="m-combo" data-ref="mSeqCombo"${o.seqCombo ? '' : ' hidden'}></div>
+            <div class="m-procs"${o.procSwitches ? '' : ' hidden'}>
               <label class="m-proc" title="Process digit ROIs"><span>Digits</span><input type="checkbox" data-change="digitProcessing" data-ref="digitProcessing" aria-label="Process digit ROIs" /><span hidden data-ref="digitProcessingText"></span></label>
               <label class="m-proc" title="Process analog ROIs"><span>Analog</span><input type="checkbox" data-change="analogProcessing" data-ref="analogProcessing" aria-label="Process analog ROIs" /><span hidden data-ref="analogProcessingText"></span></label>
             </div>
@@ -7119,6 +7204,15 @@ const App = (() => {
               <div class="canvas-wrap">
                 <img data-ref="loading" alt="Loading..." />
                 <canvas data-ref="canvas" style="display: none"></canvas>
+                <div class="setup-bubble" data-ref="bubble" role="status" hidden>
+                  <span>The settings changed. Update the image to check the result with the camera.</span>
+                  <button type="button" class="button btn-action" data-click="take">Update image</button>
+                </div>
+                <div class="setup-intro" data-ref="intro" hidden>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+                  <b>Let's set up the camera image</b>
+                  <span>There is no picture on the device yet. Point the camera at your meter and press <i>Take camera image</i>. Save the picture, then continue with the next step.</span>
+                </div>
               </div>
               <div class="setup-imgtools" data-ref="zoomBox" hidden>
                 <label class="check setup-zoom">
@@ -7147,6 +7241,10 @@ const App = (() => {
                     <input type="checkbox" data-change="camAdvanced" data-ref="camAdv" />Advanced
                   </label>
                 </div>
+                <ul class="cam-note">
+                  <li><span class="cam-tag cam-tag-live">Preview</span> shows at once on the picture (calculated).</li>
+                  <li><span class="cam-tag">Camera</span> needs a new picture. A hint appears after every change.</li>
+                </ul>
                 <div class="cam-wrap">
                   <div class="cam-grid" data-ref="camGrid">${camPanelMarkup()}</div>
                   <div class="cam-lock" data-ref="camLock"><span>Update the image first, then you can change the settings.</span></div>
@@ -8008,9 +8106,21 @@ const App = (() => {
     /* Alignment markers                                                  */
     /* ================================================================== */
     function markerInit() {
-      delta.imagealignment = { marker: structuredClone(cfg.imagealignment.marker) };
+      const storedMarker = cfg.imagealignment.marker;
+      delta.imagealignment = { marker: structuredClone(Array.isArray(storedMarker) ? storedMarker : Object.values(storedMarker || {})) };
       markerRoi = delta.imagealignment.marker; // shorter name; an array, saved as a whole
-      if (markerSelected >= markerRoi.length) markerSelected = 0;
+      markerRoi.forEach((m, i) => {
+        m.placed = Number(m.x) > 1 || Number(m.y) > 1; // 1/1 is the factory value: never placed
+        if (o.centerMarkers && !m.placed) {
+          const w = imageObj.naturalWidth || 640;
+          const h = imageObj.naturalHeight || 480;
+          const dx = toInt(m.dx) || 40;
+          const dy = toInt(m.dy) || 40;
+          m.x = Math.round(w * (i === 0 ? 0.35 : 0.65) - dx / 2);
+          m.y = Math.round(h / 2 - dy / 2);
+          cutCentered(i, m);
+        }
+      });      if (markerSelected >= markerRoi.length) markerSelected = 0;
       // the size of a marker is the size of its image: read it for both markers (the preview and the steppers need it)
       markerRoi.forEach((m, i) => {
         const im = new Image();
@@ -8062,10 +8172,28 @@ const App = (() => {
       roi.dx = toInt(R.mdx.value);
       roi.dy = toInt(R.mdy.value);
 
-      const ok = await Api.setup.cutMarker(markerSelected + 1, roi);
+      const ok = await Api.setup.cutMarker(markerSelected + 1, roi, o.wizardHelp);
       if (!ok || destroyed) return;
       roi.modified = true;
       refreshMarker();
+      reportAlign();
+    }
+
+    // a centered start marker gets its picture right away, so Next only waits for the processing choice
+    async function cutCentered(i, m) {
+      const ok = await Api.setup.cutMarker(i + 1, m, o.wizardHelp);
+      if (!ok || destroyed || markerRoi[i] !== m) return;
+      m.modified = true;
+      if (mode === 'markers' && markerSelected === i) refreshMarker();
+      reportAlign();
+    }
+
+    function reportAlign() {
+      if (destroyed || !o.onAlignState || !Array.isArray(markerRoi) || !delta.digit) return;
+      o.onAlignState({
+        ready: markerRoi.length >= 2 && markerRoi.every((m) => m.modified || m.placed),
+        procs: !!(delta.digit.enabled || delta.analog.enabled),
+      });
     }
 
     function refreshMarker() {
@@ -8389,39 +8517,42 @@ const App = (() => {
       applyCamGates();
       updateParamOutput(el);
       delta = mergeParam(delta, f.name, el.value, !!f.int);
+      if (!isActReference && imageOk && CAM_PREVIEW.has(f.name)) drawRotated();
+      updateTakeState();
     }
 
-    const CAM_ADV_KEY = 'camAdvanced';
-    function setCamAdvanced(on, remember) {
+    /** The picture is outdated as soon as a camera value differs from the one the picture was taken with. */
+    function imageStale() {
+      if (!capParams) return false;
+      if (String(camInput['imagealignment.imagerotation'].value) !== String(capParams.rotation)) return true;
+      return CAPTURE_PARAMS.some(([key, name, def]) => {
+        const v = camInput[name].value;
+        return String(v === '' ? def : v) !== String(capParams[key]);
+      });
+    }
+
+    function updateTakeState() {
+      if (destroyed) return;
+      const stale = imageStale();
+      R.bubble.hidden = !stale;
+      // Update image is only needed while there is no current picture
+      const needed = o.introHint ? refMissing || stale || !camUnlocked : !imagePending || stale;
+      R.take.classList.toggle('btn-action', needed);
+      R.take.classList.toggle('ghost', !needed);
+      R.take.disabled = taking || !needed;
+      o.onImageState?.({ exists: !refMissing, pending: imagePending, stale });
+    }
+
+    /** The Advanced rows are closed whenever the page is opened (not remembered). */
+    function setCamAdvanced(on) {
       R.camAdv.checked = on;
       root.dataset.camAdv = on ? '1' : '0';
-      if (!remember) return;
-      try {
-        localStorage.setItem(CAM_ADV_KEY, on ? '1' : '0');
-      } catch (e) {
-        /* storage not available: the switch simply starts closed next time */
-      }
-    }
-    /** Advanced rows stay visible when one of their values is not the default, so nothing hidden has an effect. */
-    function camAdvancedInUse() {
-      return CAM_FIELDS.filter((f) => !CAM_BASIC.includes(f.name)).some((f) => {
-          const el = camInput[f.name];
-          const def = f.value !== undefined ? String(f.value) : f.options ? f.options[0][0] : '';
-        return !!el && !f.gate && String(el.value) !== def; // dependent values only count through their switch
-      });
     }
     function parseCamParams() {
       CAM_FIELDS.forEach((f) => setControlValue(camInput[f.name], getPath(cfg, f.name)));
       CAM_FIELDS.filter((f) => f.type === 'range').forEach((f) => updateParamOutput(camInput[f.name]));
       setVariableInputLimits(false);
       applyCamGates();
-      let stored = false;
-      try {
-        stored = localStorage.getItem(CAM_ADV_KEY) === '1';
-      } catch (e) {
-        stored = false;
-      }
-      setCamAdvanced(stored || camAdvancedInUse(), false);
     }
 
     let taking = false; // a picture is being taken
@@ -8436,12 +8567,13 @@ const App = (() => {
       if (taking) return;
       taking = true;
       R.take.disabled = true;
+      const sentParams = { ...params, rotation: camInput['imagealignment.imagerotation'].value };
       let result;
       try {
         result = await Api.setup.capture(params);
       } finally {
         taking = false;
-        if (!destroyed) R.take.disabled = false;
+        if (!destroyed) updateTakeState();
       }
       const { ok, blob } = result;
       if (destroyed) return;
@@ -8453,9 +8585,65 @@ const App = (() => {
       currentBlobUrl = URL.createObjectURL(blob);
       refLoadCanvas(currentBlobUrl, true);
       isActReference = false;
+      capParams = sentParams;
+      if (o.introHint) wizardLastTake = { blob, params: sentParams };
       imagePending = true;
+      refMissing = false;
+      updateIntro();
+      updateTakeState();
+      R.canvas.style.display = 'block';
       camEnable(true); // now the settings can be changed; "Update image" again takes the next picture
       refreshSaveBar();
+    }
+
+    /** CSS filter for the calculated difference between the real picture and the current inputs (estimated strengths, the hint asks for a real picture). */
+    function previewFilter() {
+      const val = (name) => camInput[name].value;
+      const cap = capParams || { specialeffect: specialeffect };
+      const diff = (key, name) => (capParams ? Number(val(name)) - Number(cap[key] ?? 0) : 0);
+      const hw = { '0': [0, 0], '1': [0, 1], '2': [1, 0], '7': [1, 0] }[String(cap.specialeffect ?? 0)] || [0, 0];
+      const want = { '0': [0, 0], '1': [0, 1], '2': [1, 0], '7': [1, 1] }[String(capParams ? val(KEY_CAM + 'specialeffect') : specialeffect)] || [0, 0];
+      const parts = [];
+      const b = diff('brightness', KEY_CAM + 'brightness');
+      const c = diff('contrast', KEY_CAM + 'contrast');
+      const s = diff('saturation', KEY_CAM + 'saturation');
+      const sh = diff('sharpness', KEY_CAM + 'sharpness');
+      if (b) parts.push(`brightness(${Math.max(0.2, 1 + 0.25 * b)})`);
+      if (c) parts.push(`contrast(${Math.max(0.2, 1 + 0.25 * c)})`);
+      if (s) parts.push(`saturate(${Math.max(0, 1 + 0.5 * s)})`);
+      if (sh < 0) parts.push(`blur(${(-sh * 0.5).toFixed(1)}px)`);
+      if (want[0] && !hw[0]) parts.push('grayscale(1)');
+      if (want[1] !== hw[1]) parts.push('invert(1)');
+      return parts.join(' ') || 'none';
+    }
+
+    /** Sharpening that was added after the real picture was taken (3x3 kernel on the canvas). */
+    function previewSharpen() {
+      if (!capParams) return;
+      const sh = Number(camInput[KEY_CAM + 'sharpness'].value) - Number(capParams.sharpness ?? 0);
+      if (sh <= 0) return;
+      const k = 0.4 * sh;
+      const w = R.canvas.width;
+      const h = R.canvas.height;
+      const src = g.getImageData(0, 0, w, h);
+      const out = g.createImageData(w, h);
+      const a = src.data;
+      const d = out.data;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * 4;
+          for (let ch = 0; ch < 3; ch++) {
+            const c0 = a[i + ch];
+            const n = a[(Math.max(0, y - 1) * w + x) * 4 + ch];
+            const s2 = a[(Math.min(h - 1, y + 1) * w + x) * 4 + ch];
+            const wv = a[(y * w + Math.max(0, x - 1)) * 4 + ch];
+            const e = a[(y * w + Math.min(w - 1, x + 1)) * 4 + ch];
+            d[i + ch] = Math.max(0, Math.min(255, c0 * (1 + 4 * k) - k * (n + s2 + wv + e)));
+          }
+          d[i + 3] = 255;
+        }
+      }
+      g.putImageData(out, 0, 0);
     }
 
     function drawRotated(grid = true) {
@@ -8468,12 +8656,17 @@ const App = (() => {
       } else {
         g.translate(R.canvas.width / 2, R.canvas.height / 2);
         g.rotate((degrees * Math.PI) / 180);
+        // mirror / flip differing from the real picture are shown calculated; the hint asks for a new picture
+        const cap = capParams || {};
+        const flipped = (name, key) => (camInput[name].value === 'true') !== ((cap[key] ?? 'false') === 'true');
+        g.scale(flipped(KEY_CAM + 'mirrorimage', 'mirror') ? -1 : 1, flipped(KEY_CAM + 'flipimage', 'flip') ? -1 : 1);
         // Special effect 7 (grayscale + negative): both together do not work on the camera.
         // Workaround: grayscale on the camera + negative on the MCU (processing) / in the browser (preview)
-        if (specialeffect === '7') g.filter = 'invert(1)';
+        g.filter = previewFilter();
         g.drawImage(imageObj, -imageObj.width / 2, -imageObj.height / 2);
       }
       g.restore();
+      if (!isActReference) previewSharpen();
       if (grid) drawGrid();
     }
 
@@ -8528,13 +8721,53 @@ const App = (() => {
       }
     }
 
+    function updateIntro() {
+      if (!o.introHint) return;
+      const first = refMissing && !imagePending;
+      R.intro.hidden = !first;
+      R.canvas.style.visibility = first ? 'hidden' : '';
+      R.take.textContent = first ? 'Take camera image' : 'Update image';
+      if (R.camLock) R.camLock.firstChild.textContent = first ? 'Take the camera image first, then you can change the settings.' : 'Update the image first, then you can change the settings.';
+    }
+
     function showReference() {
+      capParams = null;
       if (currentBlobUrl) {
         URL.revokeObjectURL(currentBlobUrl);
         currentBlobUrl = null;
       }
-      refLoadCanvas(Api.setup.referenceImageUrl(), false);
       isActReference = true;
+      loadImageSource(Api.setup.referenceImageUrl(), () => {
+        refMissing = !imageOk;
+        if (o.introHint && refMissing) {
+          // the empty frame already has the size of a camera picture, so the card does not jump when the first one arrives
+          R.canvas.width = 640;
+          R.canvas.height = 480;
+        } else {
+          drawRotated(false);
+          if (o.introHint) {
+            // wizard: the stored picture is the current one, its settings are the reference for the hint
+            capParams = { rotation: camInput['imagealignment.imagerotation'].value };
+            CAPTURE_PARAMS.forEach(([key, name, def]) => {
+              const v = camInput[name].value;
+              capParams[key] = v === '' ? def : v;
+            });
+            const last = wizardLastTake;
+            const same = last && Object.keys(last.params).every((k) => String(last.params[k]) === String(capParams[k]));
+            if (same) {
+              // the raw picture of the last real shot is still here: the calculated preview works on it again
+              currentBlobUrl = URL.createObjectURL(last.blob);
+              isActReference = false;
+              capParams = { ...last.params };
+              refLoadCanvas(currentBlobUrl, true);
+              camEnable(true);
+            }
+            // otherwise only the stored picture exists: the controls stay locked until a new picture is taken
+          }
+        }
+        updateIntro();
+        updateTakeState();
+      });
       imagePending = false;
       // a discarded picture takes its camera settings with it: the inputs show the stored values again
       delete delta.takeimage;
@@ -8682,10 +8915,11 @@ const App = (() => {
 
     function updateTabsUI() {
       all('.setup-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === mode));
+      all('.wiz-help .help-item[data-help]').forEach((it) => it.classList.toggle('current', it.dataset.help === (mode === 'analog' ? 'digit' : mode)));
       const isRoi = isRoiMode();
       R.panelImage.hidden = mode !== 'image';
       R.panelMarkers.hidden = mode !== 'markers';
-      R.panelRec.hidden = !isRoi; // recognition of the last cycle: only with the digit and analog regions
+      R.panelRec.hidden = !isRoi || !o.lastCycle; // recognition of the last cycle: only with the digit and analog regions
       if (isRoi && !['digit', 'analog'].includes(lastRecTab)) loadMarkerRecognition();
       else if (isRoi && lastRecTab !== mode) renderMarkerRecognition(); // digits <-> analog: same data, other regions
       lastRecTab = mode;
@@ -8751,6 +8985,7 @@ const App = (() => {
 
     function refreshSaveBar() {
       if (destroyed || !currentTab || initializing) return;
+      reportAlign();
       const image = mode === 'image';
       const dirty = isDirty();
       const text = image ? 'New image not saved' : 'Unsaved changes';
@@ -8843,6 +9078,11 @@ const App = (() => {
         initializing = false;
       }
       editorSnapshot = editorState();
+      if (o.autoDigit && !delta.digit.enabled && !delta.analog.enabled) {
+        R.digitProcessing.checked = true; // first visit: start with the digits
+        digitProcessingChanged();
+      }
+      reportAlign();
       R.updateMarker.disabled = false;
       updateCounts();
     }
@@ -8859,7 +9099,7 @@ const App = (() => {
             const moved = o && (toInt(m.x) !== toInt(o.x) || toInt(m.y) !== toInt(o.y));
             const resized = m.dx0 !== undefined && (m.dx !== m.dx0 || m.dy !== m.dy0);
             if (!m.modified && (moved || resized)) {
-              const cut = await Api.setup.cutMarker(i + 1, m);
+              const cut = await Api.setup.cutMarker(i + 1, m, o.wizardHelp);
               if (!cut) throw new Error(`Marker ${i + 1} could not be cut`);
               m.modified = true;
             }
@@ -9142,7 +9382,7 @@ const App = (() => {
         update() {
           const c = mCurrent(t);
           for (const key of ['w', 'h']) {
-            if (document.activeElement !== inputs[key]) inputs[key].value = c ? c[key] : '';
+            if (document.activeElement !== inputs[key]) inputs[key].value = c && Number.isFinite(c[key]) ? c[key] : '';
             inputs[key].disabled = !c;
           }
         },
@@ -9657,6 +9897,7 @@ const App = (() => {
       });
     }
     camBuildUI();
+    setCamAdvanced(false);
 
     /* ---------------------------------------------------------- events */
     const CLICKS = {
@@ -9680,7 +9921,7 @@ const App = (() => {
     };
     const CHANGES = {
       redraw: () => refreshDraw(),
-      camAdvanced: () => setCamAdvanced(R.camAdv.checked, true),
+      camAdvanced: () => setCamAdvanced(R.camAdv.checked),
       zoomRoi: () => refreshDraw(),
       markerSelect: () => markerSelectionChanged(),
       markerValue: (t) => {
@@ -9727,6 +9968,8 @@ const App = (() => {
       const p = e.target.closest('[data-param]');
       if (p && p.type === 'range') {
         updateParamOutput(p); // live value while dragging a slider
+        if (!isActReference && imageOk && CAM_PREVIEW.has(p.dataset.param)) drawRotated();
+        updateTakeState();
         if (p.dataset.param === 'imagealignment.imagerotation' && !isActReference) drawRotated(); // the preview turns along with the slider
       }
     };
@@ -9868,10 +10111,22 @@ const App = (() => {
   /* ======================================================================== */
   /* View: wizard (#/wizard), the initial setup wizard                         */
   /* ======================================================================== */
-  const WIZARD_STEPS = ['Flashlight & focus', 'Camera', 'Alignment', 'Sequences', 'Finish'];
+  const WIZARD_STEPS = ['Meter type', 'Camera', 'Alignment', 'ROIs', 'Finish'];
+  const WIZARD_FLOW = [
+    { name: 'Meter type', text: 'Choose the type of your meter. It sets the units and the look of the interface. The flashlight pin can be customized here as well.' },
+    { name: 'Camera', text: 'Take a live picture, adjust the lens focus, the flashlight and the image settings until the meter is sharp, upright and free of glare.' },
+    { name: 'Alignment', text: 'Place two alignment markers on fixed structures of the meter, so the device finds the dials again in every picture.' },
+    { name: 'ROIs', text: 'Mark the digits and the analog dials that make up the reading. Switch digits and analog on or off and use the tabs to move between them.' },
+    { name: 'Finish', text: 'Optionally protect the web interface with a password, then switch to the operational web interface.' },
+  ];
   const WIZARD_EDITOR_TABS = { 2: 'image', 3: 'markers', 4: 'digit' };
 
-  const tip = (key) => `<td><div class="tooltip-trigger" data-help="${key}"></div></td>`;
+  /** A row in the style of the setup page (label with help, control, unit). */
+  const cfgRow = (label, help, control, cls = 'cfg-l0', attrs = '') => `
+    <div class="cfg-row ${cls}"${attrs}>
+      <div class="cfg-label"><span>${label}</span>${help ? `<div class="tooltip-trigger" data-help="${help}"></div>` : ''}</div>
+      <div class="cfg-ctl">${control}</div>
+    </div>`;
 
   function wizardMarkup() {
     return `
@@ -9880,7 +10135,7 @@ const App = (() => {
           <img src="favicon.ico" alt="" class="wiz-logo" />
           <div>
             <h1 class="wiz-title">AI-on-the-Edge</h1>
-            <div class="wiz-sub">Initial setup</div>
+            <div class="wiz-sub">Initial setup <span class="wiz-beta">Beta</span></div>
           </div>
         </div>
       </header>
@@ -9891,244 +10146,123 @@ const App = (() => {
 
       <main class="wiz-content">
         <div class="wiz-step hidden" data-panel="0">
-          <div class="card">
-            <div class="card-header"><span>Welcome</span></div>
-            <div class="wiz-card-pad">
-              <p class="wiz-lead">
-                This wizard configures your device for first use. When you are done, the device restarts into the operational web interface.
-                All wizard settings stay available there. Use <b>Next</b> and <b>Back</b> to move between the steps, or <b>Abort</b> to skip the wizard.
-              </p>
-              <img class="wiz-welcome-img" src="flow_overview.jpg" alt="" />
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-header"><span>What you will set up</span></div>
-            <ol class="wiz-overview">
-              <li><div><strong>Flashlight and lens focus</strong><span>Basic flashlight setup and sharp focus</span></div></li>
-              <li><div><strong>Camera and flashlight</strong><span>Parameters for a clean, evenly lit image</span></div></li>
-              <li><div><strong>Alignment markers</strong><span>Keep the image orientation consistent</span></div></li>
-              <li><div><strong>Number sequences</strong><span>Group digit and analog ROIs into your reading</span></div></li>
-              <li><div><strong>Security and completion</strong><span>Protect the web interface and finish</span></div></li>
-            </ol>
-          </div>
-
-          <div class="card">
-            <div class="card-header"><span>Further actions</span></div>
-            <div class="card-body">
-              <div class="wiz-button-group">
-                <button type="button" class="button" data-click="go" data-href="#/system/backup">Restore config</button>
-                <button type="button" class="button" data-click="go" data-href="#/system/update">Update</button>
-                <button type="button" class="button" data-click="go" data-href="#/system/files">File explorer</button>
-                <button type="button" class="button" data-click="go" data-href="#/system/info">System info</button>
-                <button type="button" class="button" data-click="log">Log</button>
-                <button type="button" class="button" data-click="go" data-href="#/system/reboot">Reboot</button>
+          <div class="wiz-welcome">
+            <div class="card wiz-welcome-card">
+              <div class="card-header"><span>Welcome</span></div>
+              <div class="wiz-card-pad">
+                <p class="wiz-lead">
+                  This wizard configures your device for first use. When you are done, the device restarts into the operational web interface.
+                  All wizard settings stay available there.
+                </p>
+                <ol class="wiz-flow" data-ref="flow" aria-label="Setup steps">
+                  ${WIZARD_FLOW.map((f, i) => `<li><button type="button" class="wiz-flow-node${i === 0 ? ' active' : ''}" data-click="flowInfo" data-i="${i}"><span class="wiz-flow-num">${i + 1}</span><span class="wiz-flow-name">${App.esc(f.name)}</span></button></li>`).join('')}
+                </ol>
+                <div class="wiz-flow-info" data-ref="flowInfo" aria-live="polite"><b>${App.esc(WIZARD_FLOW[0].name)}</b><span>${App.esc(WIZARD_FLOW[0].text)}</span></div>
               </div>
             </div>
+
+            <div class="wiz-start" role="group" aria-label="How do you want to start?">
+              <button type="button" class="wiz-choice wiz-choice-big wiz-choice-main" data-click="startScratch">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z" /></svg>
+                <b>Start from scratch</b>
+                <span>Set up flashlight, camera, markers and regions step by step</span>
+              </button>
+              <button type="button" class="wiz-choice wiz-choice-big" data-click="startRestore" data-ref="choiceRestore" aria-expanded="false">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5M4 14v5a1 1 0 001 1h14a1 1 0 001-1v-5" /></svg>
+                <b>Restore a backup</b>
+                <span>Bring back the configuration of a backup of this application (or of firmware v16)</span>
+              </button>
+            </div>
           </div>
+
+          <div class="wiz-restore" data-ref="restoreHost" hidden></div>
         </div>
 
         <div class="wiz-step hidden" data-panel="1">
           <div class="wiz-step-content">
-            <strong>Step 1: Basic Flashlight Setup &amp; Lens Focus Adjustment</strong>
-            <p>
-              Configure flashlight basic setup and save flashlight basic configuration before proceeding. Usually default setup / mapping is sufficient.
-              Reconfiguration is only required if a customization is needed, e.g. drive additional external LEDs, use specific pin or use of specific LED type, ...<br />
-              After image is visible in preview, adjust lens focus until image is as sharp as possible. Detailed instructions are available in the
-              <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/Reference-Image/#focus" target="_blank" rel="noopener noreferrer">focus adjustment guide</a><br />
-              Verify that the flashlight does not create glare in critical processing areas. If the internal LED is insufficient or glare cannot be avoided,
-              refer to <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/External-LED/" target="_blank" rel="noopener noreferrer">Installation of external LEDs</a> or
-              to discussion <a href="https://github.com/jomjol/AI-on-the-edge-device/discussions/1949" target="_blank" rel="noopener noreferrer">Ways to avoid reflections</a>.
-            </p>
-            <p>
-              Note 1: Any pending image refresh is blocking saving or step change.<br />
-              Note 2: Camera parametrization and flashlight fine-tuning is performed in next step.
-            </p>
+            <strong>Meter type</strong>
+            <p>Choose the type of your meter. It sets the units and the look of the interface. You can continue after you have made a choice.</p>
           </div>
-
-          <div class="card">
-            <div class="card-header"><span>Flashlight setup</span></div>
-            <div class="card-body">
-              <table class="wiz-table">
-                <colgroup><col class="wiz-col-label" /><col /><col class="wiz-col-tip" /></colgroup>
-                <tbody>
-                  <tr>
-                    <td class="wiz-indent1"><span>Actual GPIO Mapping</span></td>
-                    <td><span data-ref="mapping"></span></td>
-                    <td></td>
-                  </tr>
-                  <tr>
-                    <td class="wiz-indent1"><span>GPIO Customization</span></td>
-                    <td>
-                      <select class="wiz-bold" data-field="gpio.customizationenabled" data-ref="gpioCustom" data-change="field">
-                        <option value="false" selected>Disabled</option>
-                        <option value="true">Enabled</option>
-                      </select>
-                    </td>
-                    ${tip('gpio_customizationenabled')}
-                  </tr>
-                  <tr data-gpio-row="pin">
-                    <td class="wiz-indent2"><span class="wiz-bold">Pin Selection</span></td>
-                    <td><select class="wiz-bold" data-field="gpio.gpiopin.#.gpionumber" data-int="1" data-ref="gpioPin" data-change="gpioPin"></select></td>
-                    ${tip('gpio_gpiopin_gpionumber')}
-                  </tr>
-                  <tr data-gpio-row="pin">
-                    <td class="wiz-indent2"><span>Pin Status</span></td>
-                    <td>
-                      <select data-field="gpio.gpiopin.#.pinenabled" data-pin="1" data-ref="gpioPinEnabled" data-change="field">
-                        <option value="false" selected>Disabled</option>
-                        <option value="true">Enabled</option>
-                      </select>
-                    </td>
-                    ${tip('gpio_gpiopin_pinenabled')}
-                  </tr>
-                  <tr data-gpio-row="mode">
-                    <td class="wiz-indent2">
-                      <span>Pin Mode</span>
-                      <span class="wiz-restricted hidden" data-ref="restricted"></span>
-                    </td>
-                    <td>
-                      <select data-field="gpio.gpiopin.#.pinmode" data-pin="1" data-ref="gpioPinMode" data-change="field">
-                        <option value="flashlight-default">Flashlight Default</option>
-                        <option value="flashlight-pwm">Flashlight PWM</option>
-                        <option value="flashlight-smartled">Flashlight Smartled</option>
-                        <option value="flashlight-digital">Flashlight Digital</option>
-                      </select>
-                    </td>
-                    ${tip('gpio_gpiopin_pinmode')}
-                  </tr>
-                  <tr data-gpio-row="logic">
-                    <td class="wiz-indent2"><span>Pin Logic Level</span></td>
-                    <td>
-                      <select data-field="gpio.gpiopin.#.logicactivelow" data-pin="1" data-change="field">
-                        <option value="false" selected>Active High</option>
-                        <option value="true">Active Low</option>
-                      </select>
-                    </td>
-                    ${tip('gpio_gpiopin_logicactivelow')}
-                  </tr>
-                  <tr data-gpio-row="smartled">
-                    <td class="wiz-indent2"><span>LED Type</span></td>
-                    <td>
-                      <select data-field="gpio.gpiopin.#.smartled.type" data-pin="1" data-int="1" data-change="field">
-                        <option value="0" selected>WS2812</option>
-                        <option value="1">WS2812B (universal)</option>
-                        <option value="2">WS2812B (newer variant)</option>
-                        <option value="3">WS2812B (older variant)</option>
-                        <option value="4">SK6812</option>
-                        <option value="5">WS2813</option>
-                      </select>
-                    </td>
-                    ${tip('gpio_gpiopin_smartled_type')}
-                  </tr>
-                  <tr data-gpio-row="smartled">
-                    <td class="wiz-indent2"><span>LED Color (RGB)</span></td>
-                    <td>
-                      R <input class="wiz-rgb" required type="number" min="0" max="255" value="255" data-field="gpio.gpiopin.#.smartled.colorredchannel" data-pin="1" data-int="1" data-change="field" />
-                      G <input class="wiz-rgb" required type="number" min="0" max="255" value="255" data-field="gpio.gpiopin.#.smartled.colorgreenchannel" data-pin="1" data-int="1" data-change="field" />
-                      B <input class="wiz-rgb" required type="number" min="0" max="255" value="255" data-field="gpio.gpiopin.#.smartled.colorbluechannel" data-pin="1" data-int="1" data-change="field" />
-                    </td>
-                    ${tip('gpio_gpiopin_smartled_color')}
-                  </tr>
-                  <tr data-gpio-row="intensity">
-                    <td class="wiz-indent2"><span>LED Intensity Correction</span></td>
-                    <td>
-                      <input required type="number" min="1" max="100" value="100" data-field="gpio.gpiopin.#.intensitycorrectionfactor" data-pin="1" data-int="1" data-change="field" /> %
-                    </td>
-                    ${tip('gpio_gpiopin_intensitycorrectionfactor')}
-                  </tr>
-                  <tr>
-                    <td class="wiz-indent1"><span>Flash Time</span></td>
-                    <td>
-                      <input required type="number" min="100" step="100" value="2000" data-field="takeimage.flashlight.flashtime" data-int="1" data-change="field" /> Milliseconds
-                    </td>
-                    ${tip('takeimage_flashlight_flashtime')}
-                  </tr>
-                  <tr>
-                    <td class="wiz-indent1"><span>Flash Intensity</span></td>
-                    <td>
-                      <input required type="number" min="0" max="100" value="50" data-field="takeimage.flashlight.flashintensity" data-int="1" data-change="field" /> %
-                    </td>
-                    ${tip('takeimage_flashlight_flashintensity')}
-                  </tr>
-                </tbody>
-              </table>
-              <div class="wiz-card-pad">
-                <button type="button" class="button btn-action btn-wide" data-click="saveFlashlight" data-ref="saveFlash">Save flashlight setup</button>
+          <div class="cfg wiz-cfg">
+            <div class="card cfg-card" data-card="metertheme">
+              <div class="card-header"><span class="cfg-card-title">Meter type</span></div>
+              <div class="card-body cfg-body">
+                ${cfgRow('Meter Type', 'mqtt_homeassistant_metertype', '<select data-field="mqtt.homeassistant.metertype" data-int="1" data-ref="meterType" data-change="field" hidden></select><span data-ref="meterCombo"></span>')}
               </div>
             </div>
-          </div>
-
-          <div class="card">
-            <div class="card-header">
-              <span>Preview image</span>
-              <div class="wiz-preview-tools">
-                <label class="check"><input type="checkbox" data-change="autoRefresh" data-ref="autoToggle" />Auto refresh</label>
-                <button type="button" class="button btn-action" data-click="refresh" data-ref="refreshBtn">Refresh</button>
+            <div class="card cfg-card">
+              <div class="card-header"><span class="cfg-card-title">GPIO mapping</span></div>
+              <div class="card-body cfg-body">
+                ${cfgRow('Actual GPIO Mapping', '', '<span class="cfg-info" data-ref="mapping"></span>')}
+                ${cfgRow('GPIO Customization', 'gpio_customizationenabled', `<select data-field="gpio.customizationenabled" data-ref="gpioCustom" data-change="field">
+                  <option value="false" selected>Disabled</option>
+                  <option value="true">Enabled</option>
+                </select>`)}
+                ${cfgRow('Pin Selection', 'gpio_gpiopin_gpionumber', '<select class="cfg-strong" data-field="gpio.gpiopin.#.gpionumber" data-int="1" data-ref="gpioPin" data-change="gpioPin"></select>', 'cfg-l1', ' data-gpio-row="pin"')}
+                ${cfgRow('Pin Status', 'gpio_gpiopin_pinenabled', `<select data-field="gpio.gpiopin.#.pinenabled" data-pin="1" data-ref="gpioPinEnabled" data-change="field">
+                  <option value="false" selected>Disabled</option>
+                  <option value="true">Enabled</option>
+                </select>`, 'cfg-l1', ' data-gpio-row="pin"')}
+                ${cfgRow('Pin Mode <span class="wiz-restricted hidden" data-ref="restricted"></span>', 'gpio_gpiopin_pinmode', `<select data-field="gpio.gpiopin.#.pinmode" data-pin="1" data-ref="gpioPinMode" data-change="field">
+                  <option value="flashlight-default">Flashlight Default</option>
+                  <option value="flashlight-pwm">Flashlight PWM</option>
+                  <option value="flashlight-smartled">Flashlight Smartled</option>
+                  <option value="flashlight-digital">Flashlight Digital</option>
+                </select>`, 'cfg-l1', ' data-gpio-row="mode"')}
+                ${cfgRow('Pin Logic Level', 'gpio_gpiopin_logicactivelow', `<select data-field="gpio.gpiopin.#.logicactivelow" data-pin="1" data-change="field">
+                  <option value="false" selected>Active High</option>
+                  <option value="true">Active Low</option>
+                </select>`, 'cfg-l1', ' data-gpio-row="logic"')}
+                ${cfgRow('LED Type', 'gpio_gpiopin_smartled_type', `<select data-field="gpio.gpiopin.#.smartled.type" data-pin="1" data-int="1" data-change="field">
+                  <option value="0" selected>WS2812</option>
+                  <option value="1">WS2812B (universal)</option>
+                  <option value="2">WS2812B (newer variant)</option>
+                  <option value="3">WS2812B (older variant)</option>
+                  <option value="4">SK6812</option>
+                  <option value="5">WS2813</option>
+                </select>`, 'cfg-l1', ' data-gpio-row="smartled"')}
+                ${cfgRow('LED Color (RGB)', 'gpio_gpiopin_smartled_color', `
+                  <span class="cfg-pre">R</span><input class="cfg-num-sm" required type="number" min="0" max="255" value="255" data-field="gpio.gpiopin.#.smartled.colorredchannel" data-pin="1" data-int="1" data-change="field" />
+                  <span class="cfg-pre">G</span><input class="cfg-num-sm" required type="number" min="0" max="255" value="255" data-field="gpio.gpiopin.#.smartled.colorgreenchannel" data-pin="1" data-int="1" data-change="field" />
+                  <span class="cfg-pre">B</span><input class="cfg-num-sm" required type="number" min="0" max="255" value="255" data-field="gpio.gpiopin.#.smartled.colorbluechannel" data-pin="1" data-int="1" data-change="field" />`, 'cfg-l1', ' data-gpio-row="smartled"')}
+                ${cfgRow('LED Intensity Correction', 'gpio_gpiopin_intensitycorrectionfactor', '<input class="cfg-num" required type="number" min="1" max="100" value="100" data-field="gpio.gpiopin.#.intensitycorrectionfactor" data-pin="1" data-int="1" data-change="field" /><span class="cfg-unit">%</span>', 'cfg-l1', ' data-gpio-row="intensity"')}
               </div>
             </div>
-            <div class="card-body wiz-preview-body"><img class="wiz-preview" data-ref="preview" alt="Image Preview" /></div>
           </div>
         </div>
 
         <div class="wiz-step hidden" data-panel="2">
-          <div class="wiz-step-content"><strong>Step 2: Camera / Flashlight Configuration</strong></div>
           <div class="wiz-editor" data-editor></div>
         </div>
         <div class="wiz-step hidden" data-panel="3">
-          <div class="wiz-step-content"><strong>Step 3: Alignment Marker Configuration</strong></div>
           <div class="wiz-editor" data-editor></div>
         </div>
         <div class="wiz-step hidden" data-panel="4">
-          <div class="wiz-step-content"><strong>Step 4: Number Sequences And ROIs Configuration</strong></div>
           <div class="wiz-editor" data-editor></div>
         </div>
-
         <div class="wiz-step hidden" data-panel="5">
-          <div class="wiz-step-content"><strong>Step 5: Configure WebUI Security &amp; Complete Initial Setup</strong></div>
-          <div class="card">
-            <table class="wiz-table">
-              <colgroup><col class="wiz-col-label" /><col class="wiz-col-value" /><col /></colgroup>
-              <tbody>
-                <tr><th colspan="3">WebUI Security</th></tr>
-                <tr>
-                  <td class="wiz-indent1"><span>Authentication</span></td>
-                  <td>
-                    <select data-field="webui.httpauth.authmode" data-int="1" data-ref="authMode" data-change="field">
-                      <option value="0" selected>Disabled</option>
-                      <option value="1">Enabled</option>
-                    </select>
-                  </td>
-                  ${tip('webui_httpauth_authmode')}
-                </tr>
-                <tr data-auth-row>
-                  <td class="wiz-indent2"><span>Username</span></td>
-                  <td><input type="text" data-field="webui.httpauth.username" data-change="field" autocomplete="username" /></td>
-                  ${tip('webui_httpauth_username')}
-                </tr>
-                <tr data-auth-row>
-                  <td class="wiz-indent2"><span>Password</span></td>
-                  <td>
-                    <div class="wiz-pw">
-                      <input type="password" data-field="webui.httpauth.password" data-ref="password" data-change="field" autocomplete="on" />
-                      <button type="button" class="wiz-pw-toggle" data-click="togglePw" aria-label="Show or hide the password">Show</button>
-                    </div>
-                  </td>
-                  ${tip('webui_httpauth_password')}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="info-box">
-            <p><b>INITIAL SETUP COMPLETED</b></p>
-            <p>Congratulations! You have completed the initial setup and you are now ready to switch to the operational web interface!</p>
-            <p>
-              Once you push the button below, the initial setup wizard will be completed and the device will automatically switch to operational
-              web interface. If configuration is error free, the device will automatically start with first processing. It will take
-              some time until you get the first reading.
-            </p>
-            <p><button type="button" class="button btn-action btn-wide" data-click="complete">Complete Setup Wizard</button></p>
+          <div class="setup"><div class="container-header setup-header">
+            <details class="setup-desc" open>
+              <summary>How it works</summary>
+              <div class="help-panel wiz-help" data-ref="finishHelp"></div>
+            </details>
+          </div></div>
+          <div class="cfg wiz-cfg">
+            <div class="card cfg-card">
+              <div class="card-header"><span class="cfg-card-title">WebUI security</span></div>
+              <div class="card-body cfg-body">
+                ${cfgRow('Authentication', 'webui_httpauth_authmode', `<select data-field="webui.httpauth.authmode" data-int="1" data-ref="authMode" data-change="field" hidden>
+                  <option value="0" selected>Disabled</option>
+                  <option value="1">Enabled</option>
+                </select>
+                <span class="cfg-switch-wrap"><label class="cfg-switch"><input type="checkbox" data-ref="authSwitch" data-change="authSwitch" aria-label="Authentication" /><span></span></label><span class="cfg-switch-text" data-ref="authText">Off</span></span>`)}
+                ${cfgRow('Username', 'webui_httpauth_username', '<input type="text" data-field="webui.httpauth.username" data-ref="username" data-change="field" autocomplete="off" />', 'cfg-l1', ' data-auth-row')}
+                ${cfgRow('Password', 'webui_httpauth_password', `<div class="wiz-pw">
+                  <input type="password" data-field="webui.httpauth.password" data-ref="password" data-change="field" autocomplete="new-password" />
+                  <button type="button" class="wiz-pw-toggle" data-click="togglePw" aria-label="Show or hide the password">Show</button>
+                </div>`, 'cfg-l1', ' data-auth-row')}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -10144,7 +10278,7 @@ const App = (() => {
               web interface. Please be aware: The configuration of the device is not or only partly adapted to your needs!
             </p>
             <p>Configuration can still be adapted / completed using operational web interface.</p>
-            <p><button type="button" class="button btn-action btn-wide" data-click="abort">Abort Setup Wizard</button></p>
+            <p><button type="button" class="button danger-solid btn-wide" data-click="abort">Abort Setup Wizard</button></p>
           </div>
         </div>
       </main>
@@ -10152,13 +10286,13 @@ const App = (() => {
       <footer class="wiz-actions">
         <div class="wiz-actions-inner">
           <div class="wiz-actions-left">
-            <button type="button" class="button" data-click="skip" data-ref="skip">Abort wizard</button>
+            <button type="button" class="button danger-solid" data-click="skip" data-ref="skip">Abort wizard</button>
             <button type="button" class="wiz-link-btn" data-click="log">Log</button>
-            <button type="button" class="wiz-link-btn" data-click="go" data-href="#/system/reboot">Reboot</button>
           </div>
           <div class="wiz-actions-right">
             <button type="button" class="button" data-click="previous" data-ref="previous">Back</button>
             <button type="button" class="button btn-action" data-click="next" data-ref="next">Next</button>
+            <button type="button" class="button btn-action wiz-finish-btn" data-click="complete" data-ref="finish" hidden>Finish</button>
           </div>
         </div>
       </footer>`;
@@ -10187,8 +10321,9 @@ const App = (() => {
     let delta = {}; // modified parameters of the current step (flashlight, security, operation mode)
     let editor = null;
     let busy = false;
-    let autoRefreshRunning = false;
     let logDialog = null;
+    let meterChosen = stepFromStorage() > 1; // the meter type has to be picked once before the wizard goes on
+    let meterCombo = null;
 
     /* ------------------------------------------------------------ fields */
     const pinIdx = () => R.gpioPin.selectedIndex;
@@ -10228,7 +10363,18 @@ const App = (() => {
     }
 
     function updateAuthUi() {
-      all('[data-auth-row]').forEach((row) => show(row, R.authMode.value === '1'));
+      const on = R.authMode.value === '1';
+      R.authSwitch.checked = on;
+      R.authText.textContent = on ? 'On' : 'Off';
+      all('[data-auth-row]').forEach((row) => show(row, on));
+      updateFinishState();
+    }
+
+    // Finish needs a user name and a password when the authentication is on
+    function updateFinishState() {
+      if (!R.finish) return;
+      const authOn = R.authMode.value === '1';
+      R.finish.disabled = busy || (authOn && (!R.username.value.trim() || !R.password.value));
     }
 
     /* ---------------------------------------------------------- GPIO UI */
@@ -10301,6 +10447,11 @@ const App = (() => {
       cfg = Api.setup.getConfig() || cfg;
       if (step === 1) initGpioSection();
       loadFields(cfg);
+      if (R.authMode.value !== '1') {
+        R.username.value = ''; // the factory user name is not offered: both fields start empty
+        R.password.value = '';
+      }
+      meterCombo?.sync();
       updateGpioUi();
       updateAuthUi();
       delta = {};
@@ -10328,19 +10479,44 @@ const App = (() => {
 
     function renderStep() {
       unmountEditor();
-      R.autoToggle.checked = false;
+      if (step === WIZARD_LAST_STEP && !R.finishHelp.firstElementChild) {
+        R.finishHelp.innerHTML = App.setup.wizardHelpHtml();
+        R.finishHelp.querySelector('[data-help="finish"]').classList.add('current');
+      }
       all('[data-panel]').forEach((p) => show(p, parseInt(p.dataset.panel, 10) === step));
+      R.next.hidden = step === WIZARD_LAST_STEP;
+      R.finish.hidden = step !== WIZARD_LAST_STEP;
+      updateFinishState();
+      root.querySelector('.wiz-actions').hidden = step === 0; // the start screen has its own big choices: no bar
       updateStepper();
-      setNavDisabled(step === 0 || step === WIZARD_ABORT_STEP, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP);
+      setNavDisabled(step === 0 || step === WIZARD_ABORT_STEP, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP || (step === 1 && !meterChosen) || step === 2 || step === 3 || step === 4, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP);
 
-      if (step === 1) {
-        manualRefreshImage();
-      } else if (WIZARD_EDITOR_TABS[step]) {
+      if (WIZARD_EDITOR_TABS[step]) {
         const host = root.querySelector(`[data-panel="${step}"] [data-editor]`);
         editor = App.setup.mountEditor(host, WIZARD_EDITOR_TABS[step], {
           header: false,
+          tabs: step === 4,
+          sequenceBar: step > 3,
+          seqCombo: false,
+          procSwitches: true,
+          procIntro: step === 4,
+          lastCycle: false,
+          wizardHelp: true,
+          tabList: step === 4 ? ['digit', 'analog'] : null,
+          autoDigit: step === 4,
+          centerMarkers: step === 3,
+          onAlignState: ({ ready, procs }) => {
+            if (busy) return;
+            if (step === 3) R.next.disabled = !ready;
+            if (step === 4) R.next.disabled = !procs;
+          },
+          introHint: step === 2,
+          onImageState: ({ exists, pending, stale }) => {
+            // Next needs a picture that matches the current settings
+            if (step === 2 && !busy) R.next.disabled = stale || (!pending && !exists);
+          },
           helpOpen: true,
-          saveBar: 'inline',
+          saveBar: 'none', // the steps save when you leave them
         });
       }
       root.scrollIntoView?.({ block: 'start' });
@@ -10348,7 +10524,16 @@ const App = (() => {
 
     async function navigate(target) {
       if (busy) return;
-      if (editor && editor.isDirty()) {
+      if (step >= 2 && step < WIZARD_LAST_STEP && editor && editor.isDirty()) {
+        // the new camera picture is stored with Next / Previous, no extra question
+        stepFlashCfgBusy(true);
+        try {
+          await editor.save();
+        } finally {
+          if (!destroyed) stepFlashCfgBusy(false);
+        }
+        if (destroyed || editor.isDirty()) return;
+      } else if (editor && editor.isDirty()) {
         const discard = await confirmDialog({
           title: 'Discard unsaved changes?',
           text: 'You have changes in this step that are not saved yet. Leave the step anyway?',
@@ -10359,6 +10544,23 @@ const App = (() => {
       }
       if (target < 0) target = 0;
       if (target > WIZARD_LAST_STEP && target < WIZARD_ABORT_STEP) target = WIZARD_LAST_STEP;
+      if (step === 1 && target > 1 && target < WIZARD_ABORT_STEP && !meterChosen) return; // pick the meter type first
+      if (step === 1 && target === 2) {
+        // processing starts switched off, the sequences step turns it on
+        delta.digit = { ...delta.digit, enabled: false };
+        delta.analog = { ...delta.analog, enabled: false };
+        // a device that still has the factory flash values starts with a short, gentle flash
+        const fl = cfg.takeimage?.flashlight;
+        if (fl && [1000, 2000].includes(Number(fl.flashtime)) && Number(fl.flashintensity) === 50) {
+          delta.takeimage = { ...delta.takeimage, flashlight: { flashtime: 100, flashintensity: 30 } };
+        }
+      }
+      if (step === 1 && target !== step && Object.keys(delta).length) {
+        stepFlashCfgBusy(true);
+        const saved = await savePendingChanges();
+        if (!destroyed) stepFlashCfgBusy(false);
+        if (!saved || destroyed) return;
+      }
       step = target;
       try {
         sessionStorage.setItem(WIZARD_STEP_KEY, String(step));
@@ -10369,79 +10571,22 @@ const App = (() => {
       renderStep();
     }
 
-    /* -------------------------------------------------- preview image */
-    /** Disables navigation and the flashlight buttons while the camera is busy. */
     function stepFlashCfgBusy(flag) {
       busy = flag;
-      R.saveFlash.disabled = flag;
-      R.refreshBtn.disabled = flag;
       R.previous.disabled = flag;
-      R.next.disabled = flag;
+      R.next.disabled = flag || !meterChosen;
       R.skip.disabled = flag;
     }
 
-    async function manualRefreshImage(showSpinner = true) {
-      stepFlashCfgBusy(true);
-      const img = R.preview;
-      const previousBlobUrl = img.src && img.src.startsWith('blob:') ? img.src : null;
-      const releasePrevious = () => {
-        if (previousBlobUrl) URL.revokeObjectURL(previousBlobUrl);
-      };
-      if (showSpinner) {
-        img.classList.add('is-loading');
-        img.src = loaderSpinner;
-        releasePrevious();
-      }
-
-      let blob = null;
-      try {
-        blob = await Api.setup.capturePreview(cfg?.takeimage?.flashlight?.flashtime || 0);
-      } catch (error) {
-        blob = null;
-      }
-      if (destroyed) return false;
-
-      if (showSpinner) img.classList.remove('is-loading');
-      stepFlashCfgBusy(false);
-      if (!blob) {
-        img.src = noImageAvailable;
-        releasePrevious();
-        return false;
-      }
-      if (img.src && img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
-      img.src = URL.createObjectURL(blob);
-      releasePrevious();
-      return true;
-    }
-
-    async function autoRefreshImage(isEnabled) {
-      R.autoToggle.checked = isEnabled;
-      if (!isEnabled || autoRefreshRunning) return;
-
-      let ok = false;
-      try {
-        autoRefreshRunning = true;
-        ok = await manualRefreshImage(false);
-      } finally {
-        autoRefreshRunning = false;
-      }
-      if (destroyed) return;
-      if (R.autoToggle.checked) {
-        if (!ok) await sleep(2000);
-        if (!destroyed) autoRefreshImage(true);
-      }
-    }
-
-    async function saveFlashlightSetup() {
-      R.autoToggle.checked = false;
-      stepFlashCfgBusy(true);
+    /** Saves the changes of the step (meter type, flashlight) and reloads the stored configuration. */
+    async function savePendingChanges() {
       try {
         await Api.setup.saveConfig(delta, true);
         syncConfigToUI();
+        return true;
       } catch (error) {
-        console.error('Failed to save flashlight configuration:', error);
-      } finally {
-        if (!destroyed) stepFlashCfgBusy(false);
+        console.error('Failed to save the configuration:', error);
+        return false;
       }
     }
 
@@ -10457,6 +10602,9 @@ const App = (() => {
       });
       if (!confirmed || destroyed) return;
 
+      const overlay = App.createUpdateOverlay();
+      overlay.open(isAbort ? 'Leaving the setup ...' : 'Finishing the setup ...', 'The device restarts and is not reachable for a few seconds. This page reloads automatically, there is nothing to do.');
+      overlay.progress(null);
       delta.operationmode = delta.operationmode || {};
       delta.operationmode.opmode = 1; // switch to automatic mode
       try {
@@ -10466,14 +10614,7 @@ const App = (() => {
       }
 
       try {
-        await Api.setup.saveConfig(delta, true);
-        firework.launch(
-          isAbort
-            ? 'Initial setup aborted. Device configuration incomplete. Loading operational web interface...'
-            : 'Initial setup completed. Loading operational web interface...',
-          isAbort ? 'warning' : 'success',
-          10000,
-        );
+        await Api.setup.saveConfig(delta, true, true);
       } catch (error) {
         const errorMsg = error.message || error;
         firework.launch(
@@ -10486,17 +10627,18 @@ const App = (() => {
 
       // Load the operational web interface in any case. Intentionally not cancelled when the view is left:
       // the device switches its operation mode, the page has to be reloaded.
-      setTimeout(() => {
-        const target = getDomainname();
-        if (target !== window.location.origin) {
-          window.location.assign(target + '/#/dashboard');
-        } else {
-          window.location.hash = '#/dashboard';
-          window.location.reload();
-        }
-      }, 7000);
+      App.leaveSetup();
+      await Api.ota.rebootAndWait({ interval: 2000, firstPollAfter: 6000 });
+      overlay.title('Device is back');
+      overlay.text('Loading ...');
+      const target = getDomainname();
+      if (target !== window.location.origin) {
+        window.location.assign(target + '/#/dashboard');
+      } else {
+        window.location.hash = '#/dashboard';
+        window.location.reload();
+      }
     }
-
     /* -------------------------------------------------------- log dialog */
     async function openLog() {
       if (logDialog) return;
@@ -10529,17 +10671,38 @@ const App = (() => {
     }
 
     /* ------------------------------------------------------------ events */
+    let restorePanel = null;
     const CLICKS = {
-      go: (e, t) => App.navigate(t.dataset.href),
       log: () => openLog(),
+      startScratch: () => navigate(1),
+      startRestore: () => {
+        const open = R.restoreHost.hidden;
+        R.restoreHost.hidden = !open;
+        R.choiceRestore.classList.toggle('active', open);
+        R.choiceRestore.setAttribute('aria-expanded', String(open));
+        if (open) R.restoreHost.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+        if (open && !restorePanel) {
+          restorePanel = App.mountRestore(R.restoreHost, {
+            onImported: () => {
+              // a v16 import has switched the device to automatic mode: continue in the operational web interface
+              App.leaveSetup();
+              window.location.hash = '#/dashboard';
+              window.location.reload();
+            },
+          });
+        }
+      },
       next: () => navigate(step + 1),
       previous: () => navigate(step - 1),
-      skip: () => navigate(WIZARD_ABORT_STEP),
+      skip: () => finalizeSetup(true), // asks for confirmation first
       restart: () => navigate(0),
       complete: () => finalizeSetup(false),
       abort: () => finalizeSetup(true),
-      saveFlashlight: () => saveFlashlightSetup(),
-      refresh: () => manualRefreshImage(),
+      flowInfo: (e, t) => {
+        const f = WIZARD_FLOW[parseInt(t.dataset.i, 10)];
+        all('.wiz-flow-node').forEach((n) => n.classList.toggle('active', n === t));
+        R.flowInfo.replaceChildren(App.el('b', '', f.name), App.el('span', '', f.text));
+      },
       togglePw: (e, t) => {
         const hidden = R.password.type === 'password';
         R.password.type = hidden ? 'text' : 'password';
@@ -10549,7 +10712,10 @@ const App = (() => {
     const CHANGES = {
       field: (el) => onFieldChange(el),
       gpioPin: () => onPinSelected(),
-      autoRefresh: (el) => autoRefreshImage(el.checked),
+      authSwitch: (el) => {
+        R.authMode.value = el.checked ? '1' : '0';
+        onFieldChange(R.authMode);
+      },
     };
     const onClick = (e) => {
       const t = e.target.closest('[data-click]');
@@ -10564,6 +10730,24 @@ const App = (() => {
     root.addEventListener('change', onChange);
 
     /* --------------------------------------------------------- lifecycle */
+    (function buildMeterTypeCombo() {
+      const sel = R.meterType;
+      App.meterTypeOptions().forEach(([value, label]) => sel.add(new Option(label, value)));
+      const items = Array.from(sel.options).map((o) => ({ value: o.value, label: o.textContent, lead: logoSvg(METER_TYPE_THEME[Number(o.value)] || 'generic', 24) }));
+      meterCombo = App.createCombo(items, () => (meterChosen ? sel.value : ''), (value) => {
+        meterChosen = true;
+        R.next.disabled = false;
+        sel.value = value;
+        sel.dispatchEvent(new Event('change', { bubbles: true })); // recorded like every other field, saved with Next
+        meterCombo.sync();
+        MeterTheme.apply(Number(value)); // icons and colors follow right away
+      });
+      meterCombo.placeholder = 'Select your meter type';
+      meterCombo.markSelected = true;
+      meterCombo.sync();
+      meterCombo.el.classList.add('is-wide');
+      R.meterCombo.replaceWith(meterCombo.el);
+    })();
     (async () => {
       try {
         cfg = await Api.setup.loadConfig();
@@ -10581,9 +10765,9 @@ const App = (() => {
         destroyed = true;
         unmountEditor();
         if (logDialog) logDialog.close();
+        restorePanel?.destroy();
         root.removeEventListener('click', onClick);
         root.removeEventListener('change', onChange);
-        if (R.preview.src && R.preview.src.startsWith('blob:')) URL.revokeObjectURL(R.preview.src);
         root.classList.remove('wiz');
         root.innerHTML = '';
       },
@@ -10606,7 +10790,7 @@ const App = (() => {
   /* ======================================================================== */
   /* Public component API                                                     */
   /* ======================================================================== */
-  App.setup = { mountEditor };
+  App.setup = { mountEditor, wizardHelpHtml: () => WIZARD_HELP };
 })();
 
 /* ========================================================================== */
@@ -12346,6 +12530,15 @@ const App = (() => {
     api.sync();
     return api;
   }
+
+  // the wizard builds the same meter type combo as Setup > General
+  App.createCombo = createCombo;
+  App.meterTypeOptions = () => {
+    for (const def of SCHEMA.cards) {
+      for (const row of def.rows) if (row.id === 'mqtt_homeassistant_metertype') return row.opts || [];
+    }
+    return [];
+  };
 
   // Meter Type: custom combo (icon of the meter type in front) in place of the native select, which stays as the form field
   function addMeterTypeCombo(s) {
