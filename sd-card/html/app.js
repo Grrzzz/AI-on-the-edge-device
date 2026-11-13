@@ -415,7 +415,7 @@ function plainTextSnippet(data) {
   if (!trimmed || trimmed.startsWith('<')) {
     return '';
   }
-  return trimmed.length > 180 ? trimmed.slice(0, 180) + '…' : trimmed;
+  return trimmed.length > 180 ? trimmed.slice(0, 180) + 'Ã¢â‚¬Â¦' : trimmed;
 }
 
 function launchNotifyEntry(entry, fallbackType, fallbackDuration) {
@@ -940,7 +940,7 @@ function formatLastSuccess(status, ageOffset = 0) {
   const age = status.lastSuccessSeconds + ageOffset;
   let when = '';
   if (stamp.length >= 19) when = age < 86400 ? stamp.substring(11, 19) : `${stamp.substring(0, 10)} ${stamp.substring(11, 16)}`;
-  return { text: when ? `${when} · ${formatAgo(age)}` : formatAgo(age), title: stamp.length >= 19 ? `${stamp.substring(0, 10)} ${stamp.substring(11, 19)}` : '' };
+  return { text: when ? `${when} Ã‚Â· ${formatAgo(age)}` : formatAgo(age), title: stamp.length >= 19 ? `${stamp.substring(0, 10)} ${stamp.substring(11, 19)}` : '' };
 }
 
 const SCAN_CORNERS = 'M11 21V11h10M43 11h10v10M53 43v10H43M21 53H11V43';
@@ -2685,7 +2685,7 @@ const App = (() => {
         set('chip_cores', d.chip_cores);
         set('chip_revision', d.chip_revision);
         set('chip_frequency', d.chip_frequency + ' Mhz');
-        set('chip_temp', d.chip_temp + ' °C');
+        set('chip_temp', d.chip_temp + ' Ã‚Â°C');
 
         set('camera_type', d.camera_type);
         set('camera_frequency', d.camera_frequency + '  Mhz');
@@ -2898,7 +2898,7 @@ const App = (() => {
         refs.bar.hidden = true;
         refs.steps.textContent = '';
         refs.steps.hidden = !stepLabels;
-        (stepLabels || []).forEach((label, i) => refs.steps.append(App.el('li', '', `${i + 1} · ${label}`)));
+        (stepLabels || []).forEach((label, i) => refs.steps.append(App.el('li', '', `${i + 1} Ã‚Â· ${label}`)));
         t0 = Date.now();
         clearInterval(timer);
         const tick = () => {
@@ -3603,7 +3603,7 @@ const App = (() => {
 
         const when = String(meta.timestamp || '').replace('_', ' ').replace(/-(\d\d)-(\d\d)$/, ':$1:$2');
         picker.show(file, 'Valid backup', 'badge-success');
-        if (when) r.fileSize.textContent = pickSize(file.size) + ' · created ' + when;
+        if (when) r.fileSize.textContent = pickSize(file.size) + ' Ã‚Â· created ' + when;
         r.startRestore.disabled = false;
       } catch (err) {
         console.error('ZIP validation error:', err);
@@ -4028,7 +4028,7 @@ const App = (() => {
           const head = table.createTHead().insertRow();
           [['name', 'Name'], ['type', 'Type'], ['size', 'Size']].forEach(([key, label]) => {
             const th = document.createElement('th');
-            th.textContent = label + (sort.key === key ? (sort.dir > 0 ? ' ▴' : ' ▾') : '');
+            th.textContent = label + (sort.key === key ? (sort.dir > 0 ? ' Ã¢â€“Â´' : ' Ã¢â€“Â¾') : '');
             th.dataset.action = 'sort';
             th.dataset.key = key;
             head.append(th);
@@ -4919,7 +4919,7 @@ const App = (() => {
         pos++;
       }
     };
-    if (m[1]) meter.append(el('span', 'dash-meter-sign', '−'));
+    if (m[1]) meter.append(el('span', 'dash-meter-sign', 'Ã¢Ë†â€™'));
     wheels(m[2], '');
     if (m[3]) {
       meter.append(el('span', 'dash-meter-dot'));
@@ -6083,7 +6083,7 @@ const App = (() => {
       const renderProcessError = (value, processState) => {
         const state = String(processState ?? '').toLowerCase();
         const isErrorState = ERROR_STATES.some((s) => state.includes(s));
-        ref.error.textContent = isErrorState && value < 0 ? '⚠ Process error detected. Check logs' : '';
+        ref.error.textContent = isErrorState && value < 0 ? 'Ã¢Å¡Â  Process error detected. Check logs' : '';
       };
 
       // ---- loading -------------------------------------------------------
@@ -6675,9 +6675,9 @@ const App = (() => {
   const EDITOR_TABS = ['image', 'markers', 'digit', 'analog'];
   const TAB_TITLE = {
     image: 'Reference image',
-    markers: 'Reference image · alignment markers',
-    digit: 'Reference image · digit ROIs',
-    analog: 'Reference image · analog ROIs',
+    markers: 'Reference image Ã‚Â· alignment markers',
+    digit: 'Reference image Ã‚Â· digit ROIs',
+    analog: 'Reference image Ã‚Â· analog ROIs',
   };
   const TAB_LABEL = { image: 'Image', markers: 'Markers', digit: 'Digits', analog: 'Analog' };
   // route part <-> internal tab id
@@ -6961,7 +6961,7 @@ const App = (() => {
       case 'zoom':
         return `x`;
       case 'deg':
-        return `°`;
+        return `Ã‚Â°`;
       case 'ms':
         return ` ms`;
       case 'pct':
@@ -7080,6 +7080,9 @@ const App = (() => {
    *   introHint  (default true) while no reference image exists show a hint instead of the picture, the button reads Take camera image
    *   onImageState({exists, pending, stale})  the picture state changed (stale: settings differ from the picture)
    *   sequenceBar  show the number sequence selector with the digit / analog switches (default true)
+   *   seqCombo  show the number sequence combo inside that bar (default true)
+   *   centerMarkers  markers that were never placed start in the middle of the picture
+   *   onAlignState({ready, procs})  both markers placed (cut once) and at least one of digit / analog selected
    *   helpOpen  "How it works" expanded
    *   saveBar   'global' = core SaveBar (default), 'inline' = bar inside the editor (wizard), 'none'
    *   onNavigate(tab)  tab bar click: the host routes (and calls setTab); without it the editor switches itself
@@ -7088,7 +7091,7 @@ const App = (() => {
    */
   function mountEditor(root, tab, opts = {}) {
     const uid = ++uidCounter;
-    const o = { tabs: true, header: true, helpOpen: false, saveBar: 'global', sequenceBar: true, introHint: true, ...opts };
+    const o = { tabs: true, header: true, helpOpen: false, saveBar: 'global', sequenceBar: true, seqCombo: true, centerMarkers: false, introHint: true, ...opts };
     const toInt = (v) => parseInt(v, 10);
 
     /* -------------------------------------------------------------- state */
@@ -7145,7 +7148,7 @@ const App = (() => {
         <div class="card setup-seqcard"${o.sequenceBar ? '' : ' hidden'}>
         <div class="m-only setup-seqglobal" data-ref="mSeqBar">
           <div class="m-seqrow">
-            <div class="m-combo" data-ref="mSeqCombo"></div>
+            <div class="m-combo" data-ref="mSeqCombo"${o.seqCombo ? '' : ' hidden'}></div>
             <div class="m-procs">
               <label class="m-proc" title="Process digit ROIs"><span>Digits</span><input type="checkbox" data-change="digitProcessing" data-ref="digitProcessing" aria-label="Process digit ROIs" /><span hidden data-ref="digitProcessingText"></span></label>
               <label class="m-proc" title="Process analog ROIs"><span>Analog</span><input type="checkbox" data-change="analogProcessing" data-ref="analogProcessing" aria-label="Process analog ROIs" /><span hidden data-ref="analogProcessingText"></span></label>
@@ -8085,7 +8088,17 @@ const App = (() => {
       const storedMarker = cfg.imagealignment.marker;
       delta.imagealignment = { marker: structuredClone(Array.isArray(storedMarker) ? storedMarker : Object.values(storedMarker || {})) };
       markerRoi = delta.imagealignment.marker; // shorter name; an array, saved as a whole
-      if (markerSelected >= markerRoi.length) markerSelected = 0;
+      markerRoi.forEach((m, i) => {
+        m.placed = Number(m.x) > 1 || Number(m.y) > 1; // 1/1 is the factory value: never placed
+        if (o.centerMarkers && !m.placed) {
+          const w = imageObj.naturalWidth || 640;
+          const h = imageObj.naturalHeight || 480;
+          const dx = toInt(m.dx) || 40;
+          const dy = toInt(m.dy) || 40;
+          m.x = Math.round(w * (i === 0 ? 0.35 : 0.65) - dx / 2);
+          m.y = Math.round(h / 2 - dy / 2);
+        }
+      });      if (markerSelected >= markerRoi.length) markerSelected = 0;
       // the size of a marker is the size of its image: read it for both markers (the preview and the steppers need it)
       markerRoi.forEach((m, i) => {
         const im = new Image();
@@ -8141,6 +8154,15 @@ const App = (() => {
       if (!ok || destroyed) return;
       roi.modified = true;
       refreshMarker();
+      reportAlign();
+    }
+
+    function reportAlign() {
+      if (destroyed || !o.onAlignState || !Array.isArray(markerRoi) || !delta.digit) return;
+      o.onAlignState({
+        ready: markerRoi.length >= 2 && markerRoi.every((m) => m.modified || m.placed),
+        procs: !!(delta.digit.enabled || delta.analog.enabled),
+      });
     }
 
     function refreshMarker() {
@@ -8804,7 +8826,7 @@ const App = (() => {
     function renderMarkerRecognition() {
       if (destroyed || !R.recBody) return;
       const kind = mode === 'analog' ? 'analog' : 'digit';
-      R.recTitle.textContent = `Last cycle · ${kind === 'analog' ? 'analog' : 'digits'}`;
+      R.recTitle.textContent = `Last cycle Ã‚Â· ${kind === 'analog' ? 'analog' : 'digits'}`;
       const body = R.recBody;
       body.textContent = '';
       const note = (text) => {
@@ -8931,6 +8953,7 @@ const App = (() => {
 
     function refreshSaveBar() {
       if (destroyed || !currentTab || initializing) return;
+      reportAlign();
       const image = mode === 'image';
       const dirty = isDirty();
       const text = image ? 'New image not saved' : 'Unsaved changes';
@@ -10353,7 +10376,7 @@ const App = (() => {
       if (usage.substring(0, 10) === 'flashlight') defaultOption.removeAttribute('hidden');
       else defaultOption.setAttribute('hidden', 'true');
       if (usage.substring(0, 10) === 'restricted') {
-        R.restricted.textContent = '(⚠ DEFAULT: ' + usage.substring(12).replace(/-/g, ' ').toUpperCase() + ')';
+        R.restricted.textContent = '(Ã¢Å¡Â  DEFAULT: ' + usage.substring(12).replace(/-/g, ' ').toUpperCase() + ')';
         show(R.restricted, true);
       } else {
         show(R.restricted, false);
@@ -10424,14 +10447,19 @@ const App = (() => {
       all('[data-panel]').forEach((p) => show(p, parseInt(p.dataset.panel, 10) === step));
       root.querySelector('.wiz-actions').hidden = step === 0; // the start screen has its own big choices: no bar
       updateStepper();
-      setNavDisabled(step === 0 || step === WIZARD_ABORT_STEP, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP || (step === 1 && !meterChosen) || step === 2, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP);
+      setNavDisabled(step === 0 || step === WIZARD_ABORT_STEP, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP || (step === 1 && !meterChosen) || step === 2 || step === 3, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP);
 
       if (WIZARD_EDITOR_TABS[step]) {
         const host = root.querySelector(`[data-panel="${step}"] [data-editor]`);
         editor = App.setup.mountEditor(host, WIZARD_EDITOR_TABS[step], {
           header: false,
-          tabs: step > 2,
+          tabs: step > 3,
           sequenceBar: step > 2,
+          seqCombo: step > 3,
+          centerMarkers: step === 3,
+          onAlignState: ({ ready, procs }) => {
+            if (step === 3 && !busy) R.next.disabled = !(ready && procs);
+          },
           introHint: step === 2,
           onImageState: ({ exists, pending, stale }) => {
             // Next needs a picture that matches the current settings
@@ -10446,7 +10474,7 @@ const App = (() => {
 
     async function navigate(target) {
       if (busy) return;
-      if (step === 2 && editor && editor.isDirty()) {
+      if ((step === 2 || step === 3) && editor && editor.isDirty()) {
         // the new camera picture is stored with Next / Previous, no extra question
         stepFlashCfgBusy(true);
         try {
@@ -11018,7 +11046,7 @@ const App = (() => {
       {
         "id": "metertheme", "title": "Meter Type & Theme",
         "rows": [
-          {"label": "Meter Type", "lvl": 0, "id": "mqtt_homeassistant_metertype", "name": "mqtt.homeassistant.metertype", "t": "select", "opts": [["0", "Generic (No Units)"], ["1", "Water (Value: m³, Rate: m³/h)"], ["2", "Water (Value: L, Rate: L/h*)"], ["15", "Water (Value: L, Rate: L/min)"], ["3", "Water (Value: gal, Rate: gal/h*)"], ["16", "Water (Value: gal, Rate: gal/min)"], ["4", "Water (Value: ft³, Rate: ft³/min)"], ["5", "Gas (Value: m³, Rate: m³/h)"], ["6", "Gas (Value: ft³, Rate: ft³/min)"], ["7", "Energy (Value: Wh, Rate: W)"], ["8", "Energy (Value: kWh, Rate: kW)"], ["9", "Energy (Value: MWh, Rate: MW)"], ["10", "Energy (Value: GJ, Rate: GJ/h*)"], ["11", "Temperature (Value: °C, Rate: °C/min)"], ["12", "Temperature (Value: °F, Rate: °F/min)"], ["13", "Pressure (Value: bar, Rate: bar/min)"], ["14", "Pressure (Value: psi, Rate: psi/min)"]], "def": "1", "wide": true, "int": true},
+          {"label": "Meter Type", "lvl": 0, "id": "mqtt_homeassistant_metertype", "name": "mqtt.homeassistant.metertype", "t": "select", "opts": [["0", "Generic (No Units)"], ["1", "Water (Value: mÃ‚Â³, Rate: mÃ‚Â³/h)"], ["2", "Water (Value: L, Rate: L/h*)"], ["15", "Water (Value: L, Rate: L/min)"], ["3", "Water (Value: gal, Rate: gal/h*)"], ["16", "Water (Value: gal, Rate: gal/min)"], ["4", "Water (Value: ftÃ‚Â³, Rate: ftÃ‚Â³/min)"], ["5", "Gas (Value: mÃ‚Â³, Rate: mÃ‚Â³/h)"], ["6", "Gas (Value: ftÃ‚Â³, Rate: ftÃ‚Â³/min)"], ["7", "Energy (Value: Wh, Rate: W)"], ["8", "Energy (Value: kWh, Rate: kW)"], ["9", "Energy (Value: MWh, Rate: MW)"], ["10", "Energy (Value: GJ, Rate: GJ/h*)"], ["11", "Temperature (Value: Ã‚Â°C, Rate: Ã‚Â°C/min)"], ["12", "Temperature (Value: Ã‚Â°F, Rate: Ã‚Â°F/min)"], ["13", "Pressure (Value: bar, Rate: bar/min)"], ["14", "Pressure (Value: psi, Rate: psi/min)"]], "def": "1", "wide": true, "int": true},
         ],
       },
       {
@@ -11266,7 +11294,7 @@ const App = (() => {
     if (released) facts.push(`${released} (${age})`);
     if (cat?.kb) facts.push(`${cat.kb} KB`);
     if (cat?.input) facts.push(`input ${cat.input}`);
-    return { name, type, t, cat, version, released, age, quantized, chip: t ? t.chip : '?', sub: facts.join(' · ') };
+    return { name, type, t, cat, version, released, age, quantized, chip: t ? t.chip : '?', sub: facts.join(' Ã‚Â· ') };
   }
 
   function describeModel(file) {
@@ -11500,7 +11528,7 @@ const App = (() => {
     SaveBar.set({
       dirty,
       saveLabel: s.reboot ? 'Save and restart' : 'Save',
-      text: s.reboot ? 'Unsaved changes – a restart is required' : 'Unsaved changes',
+      text: s.reboot ? 'Unsaved changes Ã¢â‚¬â€œ a restart is required' : 'Unsaved changes',
       onSave: () => save(s),
       onDiscard: () => discard(s),
     });
@@ -12175,7 +12203,7 @@ const App = (() => {
     if (mode.warn) {
       const restricted = usage.startsWith('restricted');
       mode.warn.hidden = !restricted;
-      mode.warn.textContent = restricted ? '(⚠ DEFAULT: ' + usage.substring(12).replace(/-/g, ' ').toUpperCase() + ')' : '';
+      mode.warn.textContent = restricted ? '(Ã¢Å¡Â  DEFAULT: ' + usage.substring(12).replace(/-/g, ' ').toUpperCase() + ')' : '';
     }
   }
 
@@ -13242,16 +13270,16 @@ const CycleMonitor = (() => {
       const elapsed = status.cycleSeconds + drift;
       const left = status.processTime - elapsed;
       timer = `running for ${formatSeconds(elapsed)}`;
-      if (status.processTime > 0) timer += left > 0 ? ` · about ${formatSeconds(Math.ceil(left))} left` : ' · finishing ...';
+      if (status.processTime > 0) timer += left > 0 ? ` Ã‚Â· about ${formatSeconds(Math.ceil(left))} left` : ' Ã‚Â· finishing ...';
     } else if (waiting) {
       // Automatic mode: countdown to the next run instead of the idle time
       timer = paused
-        ? `no automatic cycles · ${formatCountdown(status.nextRunSeconds)} left`
+        ? `no automatic cycles Ã‚Â· ${formatCountdown(status.nextRunSeconds)} left`
         : `next run in ${formatCountdown(status.nextRunSeconds - drift)}`;
     } else {
       timer = `${status.running ? 'running for' : 'in this state for'} ${formatSeconds(status.stateSeconds + drift)}`;
     }
-    if (status.running && paused) timer += ' · paused afterwards';
+    if (status.running && paused) timer += ' Ã‚Â· paused afterwards';
     return timer;
   }
 
@@ -13273,7 +13301,7 @@ const CycleMonitor = (() => {
       panel.dataset.phase = '';
       $('cycle-state').textContent = 'Device not reachable';
       $('cycle-count').textContent = '#-';
-      $('cycle-timer').textContent = ' ';
+      $('cycle-timer').textContent = 'Ã‚Â ';
       btn.disabled = true;
       btn.classList.remove('queue');
       btn.textContent = 'Start cycle';
@@ -13298,7 +13326,7 @@ const CycleMonitor = (() => {
 
     const drift = (performance.now() - fetchedAt) / 1000;
     const timer = timerText();
-    $('cycle-timer').textContent = stale ? `${timer} · device is busy` : timer;
+    $('cycle-timer').textContent = stale ? `${timer} Ã‚Â· device is busy` : timer;
 
     pauseBtn.hidden = !status.autoStart;
     pauseBtn.disabled = false; // also usable while a cycle runs or the device is busy
@@ -13366,7 +13394,7 @@ const CycleMonitor = (() => {
 
   return {
     last: () => status,
-    timerText: () => (stale && status ? `${timerText()} · device is busy` : timerText()),
+    timerText: () => (stale && status ? `${timerText()} Ã‚Â· device is busy` : timerText()),
     start() {
       $('cycle-start')?.addEventListener('click', start);
       $('cycle-pause')?.addEventListener('click', togglePause);

@@ -8175,3 +8175,7 @@ a.nav-sub-item {
 .cam-note .cam-tag {
   margin: 0 8px 0 0;
 }
+
+.setup .m-combo[hidden] {
+  display: none !important;
+}
