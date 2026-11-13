@@ -8483,7 +8483,7 @@ const App = (() => {
       const stale = imageStale();
       R.bubble.hidden = !stale;
       // Update image is only needed while there is no current picture
-      const needed = o.introHint ? refMissing || stale : !imagePending || stale;
+      const needed = o.introHint ? refMissing || stale || !camUnlocked : !imagePending || stale;
       R.take.classList.toggle('btn-action', needed);
       R.take.classList.toggle('ghost', !needed);
       R.take.disabled = taking || !needed;
