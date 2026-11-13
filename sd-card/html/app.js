@@ -640,13 +640,14 @@ function jsonObjectKeyify(obj) {
 }
 
 function deepMergeObjects(obj1, obj2) {
+  if (Array.isArray(obj2)) return structuredClone(obj2); // arrays (markers, ROIs) are taken as a whole
   const result = {};
 
   for (const key of Object.keys(obj2)) {
-    result[key] = isObj(obj2[key]) && isObj(obj1[key]) ? deepMergeObjects(obj1[key], obj2[key]) : obj2[key];
+    result[key] = isObj(obj2[key]) && isObj(obj1[key]) && !Array.isArray(obj2[key]) ? deepMergeObjects(obj1[key], obj2[key]) : obj2[key];
   }
   for (const key of Object.keys(obj1)) {
-    if (!(key in result)) result[key] = isObj(obj1[key]) ? deepMergeObjects(obj1[key], {}) : obj1[key];
+    if (!(key in result)) result[key] = isObj(obj1[key]) && !Array.isArray(obj1[key]) ? deepMergeObjects(obj1[key], {}) : obj1[key];
   }
 
   return result;
