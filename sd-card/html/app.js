@@ -9901,8 +9901,6 @@ const App = (() => {
   const WIZARD_STEPS = ['Flashlight & focus', 'Camera', 'Alignment', 'Sequences', 'Finish'];
   const WIZARD_EDITOR_TABS = { 2: 'image', 3: 'markers', 4: 'digit' };
 
-  const tip = (key) => `<td><div class="tooltip-trigger" data-help="${key}"></div></td>`;
-
   /** A row in the style of the setup page (label with help, control, unit). */
   const cfgRow = (label, help, control, cls = 'cfg-l0', attrs = '') => `
     <div class="cfg-row ${cls}"${attrs}>
@@ -10058,38 +10056,21 @@ const App = (() => {
 
         <div class="wiz-step hidden" data-panel="5">
           <div class="wiz-step-content"><strong>Step 5: Configure WebUI Security &amp; Complete Initial Setup</strong></div>
-          <div class="card">
-            <table class="wiz-table">
-              <colgroup><col class="wiz-col-label" /><col class="wiz-col-value" /><col /></colgroup>
-              <tbody>
-                <tr><th colspan="3">WebUI Security</th></tr>
-                <tr>
-                  <td class="wiz-indent1"><span>Authentication</span></td>
-                  <td>
-                    <select data-field="webui.httpauth.authmode" data-int="1" data-ref="authMode" data-change="field">
-                      <option value="0" selected>Disabled</option>
-                      <option value="1">Enabled</option>
-                    </select>
-                  </td>
-                  ${tip('webui_httpauth_authmode')}
-                </tr>
-                <tr data-auth-row>
-                  <td class="wiz-indent2"><span>Username</span></td>
-                  <td><input type="text" data-field="webui.httpauth.username" data-change="field" autocomplete="username" /></td>
-                  ${tip('webui_httpauth_username')}
-                </tr>
-                <tr data-auth-row>
-                  <td class="wiz-indent2"><span>Password</span></td>
-                  <td>
-                    <div class="wiz-pw">
-                      <input type="password" data-field="webui.httpauth.password" data-ref="password" data-change="field" autocomplete="on" />
-                      <button type="button" class="wiz-pw-toggle" data-click="togglePw" aria-label="Show or hide the password">Show</button>
-                    </div>
-                  </td>
-                  ${tip('webui_httpauth_password')}
-                </tr>
-              </tbody>
-            </table>
+          <div class="cfg wiz-cfg">
+            <div class="card cfg-card">
+              <div class="card-header"><span class="cfg-card-title">WebUI security</span></div>
+              <div class="card-body cfg-body">
+                ${cfgRow('Authentication', 'webui_httpauth_authmode', `<select data-field="webui.httpauth.authmode" data-int="1" data-ref="authMode" data-change="field">
+                  <option value="0" selected>Disabled</option>
+                  <option value="1">Enabled</option>
+                </select>`)}
+                ${cfgRow('Username', 'webui_httpauth_username', '<input type="text" data-field="webui.httpauth.username" data-change="field" autocomplete="username" />', 'cfg-l1', ' data-auth-row')}
+                ${cfgRow('Password', 'webui_httpauth_password', `<div class="wiz-pw">
+                  <input type="password" data-field="webui.httpauth.password" data-ref="password" data-change="field" autocomplete="on" />
+                  <button type="button" class="wiz-pw-toggle" data-click="togglePw" aria-label="Show or hide the password">Show</button>
+                </div>`, 'cfg-l1', ' data-auth-row')}
+              </div>
+            </div>
           </div>
 
           <div class="info-box">
