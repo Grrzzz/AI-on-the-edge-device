@@ -8080,7 +8080,8 @@ const App = (() => {
     /* Alignment markers                                                  */
     /* ================================================================== */
     function markerInit() {
-      delta.imagealignment = { marker: structuredClone(cfg.imagealignment.marker) };
+      const storedMarker = cfg.imagealignment.marker;
+      delta.imagealignment = { marker: structuredClone(Array.isArray(storedMarker) ? storedMarker : Object.values(storedMarker || {})) };
       markerRoi = delta.imagealignment.marker; // shorter name; an array, saved as a whole
       if (markerSelected >= markerRoi.length) markerSelected = 0;
       // the size of a marker is the size of its image: read it for both markers (the preview and the steppers need it)
