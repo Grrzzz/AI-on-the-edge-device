@@ -10241,18 +10241,21 @@ const App = (() => {
           <div class="wiz-editor" data-editor></div>
         </div>
         <div class="wiz-step hidden" data-panel="5">
-          <details class="setup-desc" open>
-            <summary>How it works</summary>
-            <div class="help-panel wiz-help" data-ref="finishHelp"></div>
-          </details>
+          <div class="setup"><div class="container-header setup-header">
+            <details class="setup-desc" open>
+              <summary>How it works</summary>
+              <div class="help-panel wiz-help" data-ref="finishHelp"></div>
+            </details>
+          </div></div>
           <div class="cfg wiz-cfg">
             <div class="card cfg-card">
               <div class="card-header"><span class="cfg-card-title">WebUI security</span></div>
               <div class="card-body cfg-body">
-                ${cfgRow('Authentication', 'webui_httpauth_authmode', `<select data-field="webui.httpauth.authmode" data-int="1" data-ref="authMode" data-change="field">
+                ${cfgRow('Authentication', 'webui_httpauth_authmode', `<select data-field="webui.httpauth.authmode" data-int="1" data-ref="authMode" data-change="field" hidden>
                   <option value="0" selected>Disabled</option>
                   <option value="1">Enabled</option>
-                </select>`)}
+                </select>
+                <span class="cfg-switch-wrap"><label class="cfg-switch"><input type="checkbox" data-ref="authSwitch" data-change="authSwitch" aria-label="Authentication" /><span></span></label><span class="cfg-switch-text" data-ref="authText">Off</span></span>`)}
                 ${cfgRow('Username', 'webui_httpauth_username', '<input type="text" data-field="webui.httpauth.username" data-ref="username" data-change="field" autocomplete="off" />', 'cfg-l1', ' data-auth-row')}
                 ${cfgRow('Password', 'webui_httpauth_password', `<div class="wiz-pw">
                   <input type="password" data-field="webui.httpauth.password" data-ref="password" data-change="field" autocomplete="new-password" />
@@ -10261,8 +10264,6 @@ const App = (() => {
               </div>
             </div>
           </div>
-
-          <p class="wiz-finish-hint">Finish switches the device to the operational web interface and starts the first reading. The page restarts on its own and is back after a few seconds.</p>
         </div>
 
         <div class="wiz-step hidden" data-panel="99">
@@ -10362,7 +10363,10 @@ const App = (() => {
     }
 
     function updateAuthUi() {
-      all('[data-auth-row]').forEach((row) => show(row, R.authMode.value === '1'));
+      const on = R.authMode.value === '1';
+      R.authSwitch.checked = on;
+      R.authText.textContent = on ? 'On' : 'Off';
+      all('[data-auth-row]').forEach((row) => show(row, on));
       updateFinishState();
     }
 
@@ -10715,6 +10719,10 @@ const App = (() => {
     const CHANGES = {
       field: (el) => onFieldChange(el),
       gpioPin: () => onPinSelected(),
+      authSwitch: (el) => {
+        R.authMode.value = el.checked ? '1' : '0';
+        onFieldChange(R.authMode);
+      },
     };
     const onClick = (e) => {
       const t = e.target.closest('[data-click]');
