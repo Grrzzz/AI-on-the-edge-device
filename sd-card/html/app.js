@@ -10447,7 +10447,7 @@ const App = (() => {
         delta.analog = { ...delta.analog, enabled: false };
         // a device that still has the factory flash values starts with a short, gentle flash
         const fl = cfg.takeimage?.flashlight;
-        if (fl && Number(fl.flashtime) === 2000 && Number(fl.flashintensity) === 50) {
+        if (fl && [1000, 2000].includes(Number(fl.flashtime)) && Number(fl.flashintensity) === 50) {
           delta.takeimage = { ...delta.takeimage, flashlight: { flashtime: 100, flashintensity: 30 } };
         }
       }
