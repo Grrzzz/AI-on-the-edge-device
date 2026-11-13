@@ -8055,3 +8055,9 @@ a.nav-sub-item {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* wizard: the open combo list stays above the sticky action bar */
+.wiz [data-card]:has(.theme-combo-btn[aria-expanded='true']) {
+  z-index: 60;
+}
+
