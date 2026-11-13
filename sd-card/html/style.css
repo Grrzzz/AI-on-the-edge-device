@@ -8251,6 +8251,7 @@ a.nav-sub-item {
   text-transform: uppercase;
 }
 
-.wiz-help .help-item[data-help] { opacity: 0.55; }
-.wiz-help .help-item[data-help].current { opacity: 1; }
+.wiz-help .help-item[data-help] { opacity: 0.55; padding: 10px 12px; border-radius: 8px; border: 1px solid transparent; transition: opacity 0.15s, background 0.15s; }
+.wiz-help .help-item[data-help].current { opacity: 1; background: var(--primary-soft); border-color: color-mix(in srgb, var(--primary) 40%, transparent); }
+.wiz-help .help-item[data-help].current h4 { color: var(--primary); }
 
