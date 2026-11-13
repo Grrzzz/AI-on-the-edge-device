@@ -4399,7 +4399,7 @@ a .rst-content .admonition-title {
   margin: 8px 0 20px;
   padding: 0;
   list-style: none;
-  counter-reset: wiz;
+  counter-reset: wiz -1; /* the meter type is step 0, the numbered steps start with the camera */
 }
 
 .wiz-stepper li {

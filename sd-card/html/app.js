@@ -7071,19 +7071,19 @@ const App = (() => {
 
   const WIZARD_HELP = `
     <div class="help-item" data-help="image">
-      <h4>Step 2 · Camera</h4>
+      <h4>Camera</h4>
       <p>Press <b>Update image</b> to take a new picture; then the camera values can be changed. Press it again after every change. Make sure it is level (use <i>Image Rotation</i>). Markers and ROIs are placed on this image.</p>
     </div>
     <div class="help-item" data-help="markers">
-      <h4>Step 3 · Alignment</h4>
+      <h4>Alignment</h4>
       <p>Two markers let the device correct small shifts and rotations. Pick a marker, drag its area on the image or enter coordinates, then click <b>Update Marker</b>. Keep markers small, sharp and high-contrast.</p>
     </div>
     <div class="help-item" data-help="digit">
-      <h4>Step 4 · ROIs</h4>
+      <h4>ROIs</h4>
       <p>Group ROIs (<b>R</b>egions <b>O</b>f <b>I</b>nterest) into number sequences. Drag them or enter coordinates; their order defines the decimal place, <b>Move higher / lower</b> changes it. See the <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/ROI-Configuration/" target="_blank" rel="noopener noreferrer">ROI documentation</a>.</p>
     </div>
     <div class="help-item" data-help="finish">
-      <h4>Step 5 · Finish setup</h4>
+      <h4>Finish setup</h4>
       <p>Each step is saved automatically when you continue. In the last step, optionally protect the web interface with a username and password, then press <b>Finish</b>. The device restarts on its own and starts the first reading.</p>
     </div>`;
 
@@ -10180,7 +10180,7 @@ const App = (() => {
 
         <div class="wiz-step hidden" data-panel="1">
           <div class="wiz-step-content">
-            <strong>Step 1: Meter type</strong>
+            <strong>Meter type</strong>
             <p>Choose the type of your meter. It sets the units and the look of the interface. You can continue after you have made a choice.</p>
           </div>
           <div class="cfg wiz-cfg">
