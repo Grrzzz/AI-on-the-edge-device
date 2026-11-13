@@ -6868,8 +6868,8 @@ const App = (() => {
       { name: 'imagealignment.imagerotation', label: 'Image Rotation', type: 'range', min: -180, max: 180, step: 0.1, value: 0, fmt: 'deg' },
     ],
     [
-      { name: 'takeimage.flashlight.flashtime', label: 'Flash Time', type: 'range', min: 100, max: 10000, step: 100, value: 2000, int: true, fmt: 'ms' },
-      { name: 'takeimage.flashlight.flashintensity', label: 'Flash Intensity', type: 'range', min: 0, max: 100, value: 50, int: true, fmt: 'pct' },
+      { name: 'takeimage.flashlight.flashtime', label: 'Flash Time', type: 'range', min: 100, max: 10000, step: 100, value: 100, int: true, fmt: 'ms' },
+      { name: 'takeimage.flashlight.flashintensity', label: 'Flash Intensity', type: 'range', min: 0, max: 100, value: 30, int: true, fmt: 'pct' },
     ],
     [
       { name: KEY_CAM + 'brightness', label: 'Brightness', type: 'range', min: -2, max: 2, value: 0, int: true, init: true },
@@ -6952,8 +6952,8 @@ const App = (() => {
   const CAM_FIELDS = CAM_ROWS.flat();
   /** Parameters sent to /camera?task=capture: query key -> [config name, default] (same defaults as before) */
   const CAPTURE_PARAMS = [
-    ['flashtime', 'takeimage.flashlight.flashtime', '2000'],
-    ['flashintensity', 'takeimage.flashlight.flashintensity', '50'],
+    ['flashtime', 'takeimage.flashlight.flashtime', '100'],
+    ['flashintensity', 'takeimage.flashlight.flashintensity', '30'],
     ['brightness', KEY_CAM + 'brightness', '0'],
     ['contrast', KEY_CAM + 'contrast', '0'],
     ['saturation', KEY_CAM + 'saturation', '0'],
@@ -10334,6 +10334,11 @@ const App = (() => {
         // processing starts switched off, the sequences step turns it on
         delta.digit = { ...delta.digit, enabled: false };
         delta.analog = { ...delta.analog, enabled: false };
+        // a device that still has the factory flash values starts with a short, gentle flash
+        const fl = cfg.takeimage?.flashlight;
+        if (fl && Number(fl.flashtime) === 2000 && Number(fl.flashintensity) === 50) {
+          delta.takeimage = { ...delta.takeimage, flashlight: { flashtime: 100, flashintensity: 30 } };
+        }
       }
       if (step === 1 && target !== step && Object.keys(delta).length) {
         stepFlashCfgBusy(true);
