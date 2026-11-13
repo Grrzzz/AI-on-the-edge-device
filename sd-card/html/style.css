@@ -8179,3 +8179,7 @@ a.nav-sub-item {
 .setup .m-combo[hidden] {
   display: none !important;
 }
+
+.setup .m-procs[hidden] {
+  display: none !important;
+}
