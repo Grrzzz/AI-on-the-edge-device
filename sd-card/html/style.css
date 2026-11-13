@@ -8165,3 +8165,13 @@ a.nav-sub-item {
     text-align: center;
   }
 }
+
+.cam-note {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cam-note .cam-tag {
+  margin: 0 8px 0 0;
+}

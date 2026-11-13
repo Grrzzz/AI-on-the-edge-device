@@ -7214,7 +7214,10 @@ const App = (() => {
                     <input type="checkbox" data-change="camAdvanced" data-ref="camAdv" />Advanced
                   </label>
                 </div>
-                <p class="cam-note"><span class="cam-tag cam-tag-live">Preview</span> shows at once, calculated on the picture. <span class="cam-tag">Camera</span> needs a new picture.</p>
+                <ul class="cam-note">
+                  <li><span class="cam-tag cam-tag-live">Preview</span> shows at once, calculated on the picture.</li>
+                  <li><span class="cam-tag">Camera</span> needs a new picture.</li>
+                </ul>
                 <div class="cam-wrap">
                   <div class="cam-grid" data-ref="camGrid">${camPanelMarkup()}</div>
                   <div class="cam-lock" data-ref="camLock"><span>Update the image first, then you can change the settings.</span></div>
