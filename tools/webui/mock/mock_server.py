@@ -664,6 +664,8 @@ class H(SimpleHTTPRequestHandler):
         _map = {"/img_tmp/alg_roi.jpg": "alg_roi.jpg", "/img_tmp/alg.jpg": "alg.jpg", "/img_tmp/raw.jpg": "raw.jpg", "/fileserver/config/reference.jpg": "reference.jpg",
                 "/fileserver/config/marker1.jpg": "marker1.jpg", "/fileserver/config/marker2.jpg": "marker2.jpg",
                 "/fileserver/img_tmp/marker1.jpg": "marker1.jpg", "/fileserver/img_tmp/marker2.jpg": "marker2.jpg"}
+        if FRESH and p == "/fileserver/config/reference.jpg" and not any(x[0].endswith("/config/reference.jpg") for x in STATE.get("uploads", [])):
+            return self._send("not found", "text/plain", 404)  # a fresh device has no reference image until one is saved
         _name = _map.get(p)
         if _name is None and p.startswith("/img_tmp/") and p.endswith("_org.jpg"):
             _name = p.rsplit("/", 1)[-1]

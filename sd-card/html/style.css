@@ -8061,3 +8061,31 @@ a.nav-sub-item {
   z-index: 60;
 }
 
+
+.setup-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-muted, #64748b);
+}
+.setup-intro[hidden] {
+  display: none;
+}
+.setup-intro svg {
+  width: 44px;
+  height: 44px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.setup-intro b {
+  color: var(--text, inherit);
+  font-size: 1.05rem;
+}
+.setup-intro span {
+  max-width: 420px;
+}

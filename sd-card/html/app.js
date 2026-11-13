@@ -7071,6 +7071,8 @@ const App = (() => {
    *          onNavigate?:(tab:string)=>void, onTabChange?:(tab:string)=>void, onDirtyChange?:(dirty:boolean)=>void}} [opts]
    *   tabs      show the tab bar (default true)
    *   header    show title + subtitle (default true)
+   *   introHint  first run: while no reference image exists show a hint instead of the picture, the button reads Take camera image
+   *   onReferenceState(exists)  called whenever the stored reference image was (re)loaded
    *   sequenceBar  show the number sequence selector with the digit / analog switches (default true)
    *   helpOpen  "How it works" expanded
    *   saveBar   'global' = core SaveBar (default), 'inline' = bar inside the editor (wizard), 'none'
@@ -7080,7 +7082,7 @@ const App = (() => {
    */
   function mountEditor(root, tab, opts = {}) {
     const uid = ++uidCounter;
-    const o = { tabs: true, header: true, helpOpen: false, saveBar: 'global', sequenceBar: true, ...opts };
+    const o = { tabs: true, header: true, helpOpen: false, saveBar: 'global', sequenceBar: true, introHint: false, ...opts };
     const toInt = (v) => parseInt(v, 10);
 
     /* -------------------------------------------------------------- state */
@@ -7105,6 +7107,7 @@ const App = (() => {
     let isActReference = false;
     let specialeffect = '0';
     let currentBlobUrl = null;
+    let refMissing = false; // introHint: the device has no reference image yet
     let imagePending = false; // a new camera image exists that is not saved yet
     let camUnlocked = false;
     let editorSnapshot = '';
@@ -7170,6 +7173,11 @@ const App = (() => {
               <div class="canvas-wrap">
                 <img data-ref="loading" alt="Loading..." />
                 <canvas data-ref="canvas" style="display: none"></canvas>
+                <div class="setup-intro" data-ref="intro" hidden>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+                  <b>Let's set up the camera image</b>
+                  <span>There is no picture on the device yet. Point the camera at your meter and press <i>Take camera image</i>. Save the picture, then continue with the next step.</span>
+                </div>
               </div>
               <div class="setup-imgtools" data-ref="zoomBox" hidden>
                 <label class="check setup-zoom">
@@ -7828,7 +7836,7 @@ const App = (() => {
         R.canvas.height = imageObj.height;
         onLoaded();
         R.loading.style.display = 'none';
-        R.canvas.style.display = 'block';
+        R.canvas.style.display = o.introHint && refMissing ? 'none' : 'block';
       };
       imageObj.onerror = fallback;
       imageObj.src = url;
@@ -8484,6 +8492,9 @@ const App = (() => {
       refLoadCanvas(currentBlobUrl, true);
       isActReference = false;
       imagePending = true;
+      refMissing = false;
+      updateIntro();
+      R.canvas.style.display = 'block';
       camEnable(true); // now the settings can be changed; "Update image" again takes the next picture
       refreshSaveBar();
     }
@@ -8558,13 +8569,26 @@ const App = (() => {
       }
     }
 
+    function updateIntro() {
+      if (!o.introHint) return;
+      const first = refMissing && !imagePending;
+      R.intro.hidden = !first;
+      R.take.textContent = first ? 'Take camera image' : 'Update image';
+      if (R.camLock) R.camLock.firstChild.textContent = first ? 'Take the camera image first, then you can change the settings.' : 'Update the image first, then you can change the settings.';
+    }
+
     function showReference() {
       if (currentBlobUrl) {
         URL.revokeObjectURL(currentBlobUrl);
         currentBlobUrl = null;
       }
-      refLoadCanvas(Api.setup.referenceImageUrl(), false);
       isActReference = true;
+      loadImageSource(Api.setup.referenceImageUrl(), () => {
+        refMissing = !imageOk;
+        drawRotated(false);
+        updateIntro();
+        o.onReferenceState?.(imageOk);
+      });
       imagePending = false;
       // a discarded picture takes its camera settings with it: the inputs show the stored values again
       delete delta.takeimage;
@@ -10272,7 +10296,7 @@ const App = (() => {
       all('[data-panel]').forEach((p) => show(p, parseInt(p.dataset.panel, 10) === step));
       root.querySelector('.wiz-actions').hidden = step === 0; // the start screen has its own big choices: no bar
       updateStepper();
-      setNavDisabled(step === 0 || step === WIZARD_ABORT_STEP, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP || (step === 1 && !meterChosen), step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP);
+      setNavDisabled(step === 0 || step === WIZARD_ABORT_STEP, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP || (step === 1 && !meterChosen) || step === 2, step === WIZARD_LAST_STEP || step === WIZARD_ABORT_STEP);
 
       if (WIZARD_EDITOR_TABS[step]) {
         const host = root.querySelector(`[data-panel="${step}"] [data-editor]`);
@@ -10280,6 +10304,10 @@ const App = (() => {
           header: false,
           tabs: step > 2,
           sequenceBar: step > 2,
+          introHint: step === 2,
+          onReferenceState: (exists) => {
+            if (step === 2 && !busy) R.next.disabled = !exists;
+          },
           helpOpen: true,
           saveBar: 'inline',
         });
