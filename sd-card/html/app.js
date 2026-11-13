@@ -7082,9 +7082,9 @@ const App = (() => {
       <h4>Step 4 · ROIs</h4>
       <p>Group ROIs (<b>R</b>egions <b>O</b>f <b>I</b>nterest) into number sequences. Drag them or enter coordinates; their order defines the decimal place, <b>Move higher / lower</b> changes it. See the <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/ROI-Configuration/" target="_blank" rel="noopener noreferrer">ROI documentation</a>.</p>
     </div>
-    <div class="help-item">
-      <h4>Saving</h4>
-      <p>Each step is saved automatically when you continue.</p>
+    <div class="help-item" data-help="finish">
+      <h4>Step 5 · Finish setup</h4>
+      <p>Each step is saved automatically when you continue. In the last step, optionally protect the web interface with a username and password, then press <b>Finish</b>. The device restarts on its own and starts the first reading.</p>
     </div>`;
 
   /**
