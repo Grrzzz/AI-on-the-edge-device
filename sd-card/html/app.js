@@ -415,7 +415,7 @@ function plainTextSnippet(data) {
   if (!trimmed || trimmed.startsWith('<')) {
     return '';
   }
-  return trimmed.length > 180 ? trimmed.slice(0, 180) + '…' : trimmed;
+  return trimmed.length > 180 ? trimmed.slice(0, 180) + 'Ã¢â‚¬Â¦' : trimmed;
 }
 
 function launchNotifyEntry(entry, fallbackType, fallbackDuration) {
@@ -940,7 +940,7 @@ function formatLastSuccess(status, ageOffset = 0) {
   const age = status.lastSuccessSeconds + ageOffset;
   let when = '';
   if (stamp.length >= 19) when = age < 86400 ? stamp.substring(11, 19) : `${stamp.substring(0, 10)} ${stamp.substring(11, 16)}`;
-  return { text: when ? `${when} · ${formatAgo(age)}` : formatAgo(age), title: stamp.length >= 19 ? `${stamp.substring(0, 10)} ${stamp.substring(11, 19)}` : '' };
+  return { text: when ? `${when} Ã‚Â· ${formatAgo(age)}` : formatAgo(age), title: stamp.length >= 19 ? `${stamp.substring(0, 10)} ${stamp.substring(11, 19)}` : '' };
 }
 
 const SCAN_CORNERS = 'M11 21V11h10M43 11h10v10M53 43v10H43M21 53H11V43';
@@ -2685,7 +2685,7 @@ const App = (() => {
         set('chip_cores', d.chip_cores);
         set('chip_revision', d.chip_revision);
         set('chip_frequency', d.chip_frequency + ' Mhz');
-        set('chip_temp', d.chip_temp + ' °C');
+        set('chip_temp', d.chip_temp + ' Ã‚Â°C');
 
         set('camera_type', d.camera_type);
         set('camera_frequency', d.camera_frequency + '  Mhz');
@@ -2898,7 +2898,7 @@ const App = (() => {
         refs.bar.hidden = true;
         refs.steps.textContent = '';
         refs.steps.hidden = !stepLabels;
-        (stepLabels || []).forEach((label, i) => refs.steps.append(App.el('li', '', `${i + 1} · ${label}`)));
+        (stepLabels || []).forEach((label, i) => refs.steps.append(App.el('li', '', `${i + 1} Ã‚Â· ${label}`)));
         t0 = Date.now();
         clearInterval(timer);
         const tick = () => {
@@ -3603,7 +3603,7 @@ const App = (() => {
 
         const when = String(meta.timestamp || '').replace('_', ' ').replace(/-(\d\d)-(\d\d)$/, ':$1:$2');
         picker.show(file, 'Valid backup', 'badge-success');
-        if (when) r.fileSize.textContent = pickSize(file.size) + ' · created ' + when;
+        if (when) r.fileSize.textContent = pickSize(file.size) + ' Ã‚Â· created ' + when;
         r.startRestore.disabled = false;
       } catch (err) {
         console.error('ZIP validation error:', err);
@@ -3756,6 +3756,7 @@ const App = (() => {
     };
   }
 
+  App.createUpdateOverlay = createUpdateOverlay;
   App.mountRestore = mountRestore; // the wizard offers the same restore at its start
 
   App.register('system-backup', {
@@ -4028,7 +4029,7 @@ const App = (() => {
           const head = table.createTHead().insertRow();
           [['name', 'Name'], ['type', 'Type'], ['size', 'Size']].forEach(([key, label]) => {
             const th = document.createElement('th');
-            th.textContent = label + (sort.key === key ? (sort.dir > 0 ? ' ▴' : ' ▾') : '');
+            th.textContent = label + (sort.key === key ? (sort.dir > 0 ? ' Ã¢â€“Â´' : ' Ã¢â€“Â¾') : '');
             th.dataset.action = 'sort';
             th.dataset.key = key;
             head.append(th);
@@ -4919,7 +4920,7 @@ const App = (() => {
         pos++;
       }
     };
-    if (m[1]) meter.append(el('span', 'dash-meter-sign', '−'));
+    if (m[1]) meter.append(el('span', 'dash-meter-sign', 'Ã¢Ë†â€™'));
     wheels(m[2], '');
     if (m[3]) {
       meter.append(el('span', 'dash-meter-dot'));
@@ -6083,7 +6084,7 @@ const App = (() => {
       const renderProcessError = (value, processState) => {
         const state = String(processState ?? '').toLowerCase();
         const isErrorState = ERROR_STATES.some((s) => state.includes(s));
-        ref.error.textContent = isErrorState && value < 0 ? '⚠ Process error detected. Check logs' : '';
+        ref.error.textContent = isErrorState && value < 0 ? 'Ã¢Å¡Â  Process error detected. Check logs' : '';
       };
 
       // ---- loading -------------------------------------------------------
@@ -6675,9 +6676,9 @@ const App = (() => {
   const EDITOR_TABS = ['image', 'markers', 'digit', 'analog'];
   const TAB_TITLE = {
     image: 'Reference image',
-    markers: 'Reference image · alignment markers',
-    digit: 'Reference image · digit ROIs',
-    analog: 'Reference image · analog ROIs',
+    markers: 'Reference image Ã‚Â· alignment markers',
+    digit: 'Reference image Ã‚Â· digit ROIs',
+    analog: 'Reference image Ã‚Â· analog ROIs',
   };
   const TAB_LABEL = { image: 'Image', markers: 'Markers', digit: 'Digits', analog: 'Analog' };
   // route part <-> internal tab id
@@ -6790,12 +6791,12 @@ const App = (() => {
     },
 
     /** Cuts the marker area out of the stored reference image into /img_tmp. @returns {Promise<boolean>} */
-    async cutMarker(n, roi) {
+    async cutMarker(n, roi, quiet) {
       const body = { in: '/config/reference.jpg', out: `/img_tmp/marker${n}.jpg`, x: roi.x, y: roi.y, dx: roi.dx, dy: roi.dy };
       const res = await Api.post('/api/flow/cutref', body, {
         action: 'Marker update',
-        loadingMsg: 'Request marker update...',
-        resultMsg: 'Marker successfully updated',
+        loadingMsg: quiet ? undefined : 'Request marker update...',
+        resultMsg: quiet ? undefined : 'Marker successfully updated',
         httpObj: {
           405: (r) => ({
             msg: `Marker update available in IDLE state only. Please retry shortly. [${String(jsonField(r.data, 'message') ?? '').split(' | ')[1]?.trim() || 'Unknown State'}]`,
@@ -6961,7 +6962,7 @@ const App = (() => {
       case 'zoom':
         return `x`;
       case 'deg':
-        return `°`;
+        return `Ã‚Â°`;
       case 'ms':
         return ` ms`;
       case 'pct':
@@ -7093,7 +7094,7 @@ const App = (() => {
    */
   function mountEditor(root, tab, opts = {}) {
     const uid = ++uidCounter;
-    const o = { tabs: true, header: true, helpOpen: false, saveBar: 'global', sequenceBar: true, seqCombo: true, procSwitches: true, centerMarkers: false, procIntro: false, lastCycle: true, tabList: null, autoDigit: false, introHint: true, ...opts };
+    const o = { tabs: true, header: true, helpOpen: false, saveBar: 'global', sequenceBar: true, seqCombo: true, procSwitches: true, centerMarkers: false, procIntro: false, lastCycle: true, wizardHelp: false, tabList: null, autoDigit: false, introHint: true, ...opts };
     const toInt = (v) => parseInt(v, 10);
 
     /* -------------------------------------------------------------- state */
@@ -7145,7 +7146,7 @@ const App = (() => {
         ${o.header ? '<div class="container-title">Configuration</div><div class="page-sub">Reference image, alignment markers and the digit and analog regions of your meter.</div>' : ''}
         <details class="setup-desc" data-ref="desc"${o.helpOpen ? ' open' : ''}>
           <summary>How it works</summary>
-          <div class="help-panel">${EDITOR_HELP}</div>
+          <div class="help-panel${o.wizardHelp ? ' wiz-help' : ''}">${o.wizardHelp ? WIZARD_HELP : EDITOR_HELP}</div>
         </details>
         <div class="card setup-seqcard${o.procIntro ? ' setup-procintro' : ''}"${o.sequenceBar ? '' : ' hidden'}>${o.procIntro ? '<div class="setup-procintro-text"><b>Which regions does your meter have?</b><span>Switch on digits, analog dials or both. Then mark the matching zones in the picture below: use the tabs to move between the digit and the analog regions.</span></div>' : ''}
         <div class="m-only setup-seqglobal" data-ref="mSeqBar">
@@ -8153,7 +8154,7 @@ const App = (() => {
       roi.dx = toInt(R.mdx.value);
       roi.dy = toInt(R.mdy.value);
 
-      const ok = await Api.setup.cutMarker(markerSelected + 1, roi);
+      const ok = await Api.setup.cutMarker(markerSelected + 1, roi, o.wizardHelp);
       if (!ok || destroyed) return;
       roi.modified = true;
       refreshMarker();
@@ -8162,7 +8163,7 @@ const App = (() => {
 
     // a centered start marker gets its picture right away, so Next only waits for the processing choice
     async function cutCentered(i, m) {
-      const ok = await Api.setup.cutMarker(i + 1, m);
+      const ok = await Api.setup.cutMarker(i + 1, m, o.wizardHelp);
       if (!ok || destroyed || markerRoi[i] !== m) return;
       m.modified = true;
       if (mode === 'markers' && markerSelected === i) refreshMarker();
@@ -8838,7 +8839,7 @@ const App = (() => {
     function renderMarkerRecognition() {
       if (destroyed || !R.recBody) return;
       const kind = mode === 'analog' ? 'analog' : 'digit';
-      R.recTitle.textContent = `Last cycle · ${kind === 'analog' ? 'analog' : 'digits'}`;
+      R.recTitle.textContent = `Last cycle Ã‚Â· ${kind === 'analog' ? 'analog' : 'digits'}`;
       const body = R.recBody;
       body.textContent = '';
       const note = (text) => {
@@ -9079,7 +9080,7 @@ const App = (() => {
             const moved = o && (toInt(m.x) !== toInt(o.x) || toInt(m.y) !== toInt(o.y));
             const resized = m.dx0 !== undefined && (m.dx !== m.dx0 || m.dy !== m.dy0);
             if (!m.modified && (moved || resized)) {
-              const cut = await Api.setup.cutMarker(i + 1, m);
+              const cut = await Api.setup.cutMarker(i + 1, m, o.wizardHelp);
               if (!cut) throw new Error(`Marker ${i + 1} could not be cut`);
               m.modified = true;
             }
@@ -10212,24 +10213,12 @@ const App = (() => {
         </div>
 
         <div class="wiz-step hidden" data-panel="2">
-          <div class="wiz-step-content">
-            <strong>Step 2: Camera and image</strong>
-            <p>
-              Take a live image with <b>Update image</b> and adjust the lens focus until it is as sharp as possible. Detailed instructions are available in the
-              <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/Reference-Image/#focus" target="_blank" rel="noopener noreferrer">focus adjustment guide</a>.<br />
-              Verify that the flashlight does not create glare in critical processing areas. If the internal LED is insufficient or glare cannot be avoided,
-              refer to <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/External-LED/" target="_blank" rel="noopener noreferrer">Installation of external LEDs</a> or
-              to discussion <a href="https://github.com/jomjol/AI-on-the-edge-device/discussions/1949" target="_blank" rel="noopener noreferrer">Ways to avoid reflections</a>.
-            </p>
-          </div>
           <div class="wiz-editor" data-editor></div>
         </div>
         <div class="wiz-step hidden" data-panel="3">
-          <div class="wiz-step-content"><strong>Step 3: Alignment Marker Configuration</strong></div>
           <div class="wiz-editor" data-editor></div>
         </div>
         <div class="wiz-step hidden" data-panel="4">
-          <div class="wiz-step-content"><strong>Step 4: Regions of interest</strong></div>
           <div class="wiz-editor" data-editor></div>
         </div>
         <div class="wiz-step hidden" data-panel="5">
@@ -10392,7 +10381,7 @@ const App = (() => {
       if (usage.substring(0, 10) === 'flashlight') defaultOption.removeAttribute('hidden');
       else defaultOption.setAttribute('hidden', 'true');
       if (usage.substring(0, 10) === 'restricted') {
-        R.restricted.textContent = '(⚠ DEFAULT: ' + usage.substring(12).replace(/-/g, ' ').toUpperCase() + ')';
+        R.restricted.textContent = '(Ã¢Å¡Â  DEFAULT: ' + usage.substring(12).replace(/-/g, ' ').toUpperCase() + ')';
         show(R.restricted, true);
       } else {
         show(R.restricted, false);
@@ -10482,6 +10471,7 @@ const App = (() => {
           procSwitches: true,
           procIntro: step === 4,
           lastCycle: false,
+          wizardHelp: true,
           tabList: step === 4 ? ['digit', 'analog'] : null,
           autoDigit: step === 4,
           centerMarkers: step === 3,
@@ -10582,7 +10572,7 @@ const App = (() => {
       });
       if (!confirmed || destroyed) return;
 
-      const overlay = createUpdateOverlay();
+      const overlay = App.createUpdateOverlay();
       overlay.open(isAbort ? 'Leaving the setup ...' : 'Finishing the setup ...', 'The device restarts and is not reachable for a few seconds. This page reloads automatically, there is nothing to do.');
       overlay.progress(null);
       delta.operationmode = delta.operationmode || {};
@@ -11079,7 +11069,7 @@ const App = (() => {
       {
         "id": "metertheme", "title": "Meter Type & Theme",
         "rows": [
-          {"label": "Meter Type", "lvl": 0, "id": "mqtt_homeassistant_metertype", "name": "mqtt.homeassistant.metertype", "t": "select", "opts": [["0", "Generic (No Units)"], ["1", "Water (Value: m³, Rate: m³/h)"], ["2", "Water (Value: L, Rate: L/h*)"], ["15", "Water (Value: L, Rate: L/min)"], ["3", "Water (Value: gal, Rate: gal/h*)"], ["16", "Water (Value: gal, Rate: gal/min)"], ["4", "Water (Value: ft³, Rate: ft³/min)"], ["5", "Gas (Value: m³, Rate: m³/h)"], ["6", "Gas (Value: ft³, Rate: ft³/min)"], ["7", "Energy (Value: Wh, Rate: W)"], ["8", "Energy (Value: kWh, Rate: kW)"], ["9", "Energy (Value: MWh, Rate: MW)"], ["10", "Energy (Value: GJ, Rate: GJ/h*)"], ["11", "Temperature (Value: °C, Rate: °C/min)"], ["12", "Temperature (Value: °F, Rate: °F/min)"], ["13", "Pressure (Value: bar, Rate: bar/min)"], ["14", "Pressure (Value: psi, Rate: psi/min)"]], "def": "1", "wide": true, "int": true},
+          {"label": "Meter Type", "lvl": 0, "id": "mqtt_homeassistant_metertype", "name": "mqtt.homeassistant.metertype", "t": "select", "opts": [["0", "Generic (No Units)"], ["1", "Water (Value: mÃ‚Â³, Rate: mÃ‚Â³/h)"], ["2", "Water (Value: L, Rate: L/h*)"], ["15", "Water (Value: L, Rate: L/min)"], ["3", "Water (Value: gal, Rate: gal/h*)"], ["16", "Water (Value: gal, Rate: gal/min)"], ["4", "Water (Value: ftÃ‚Â³, Rate: ftÃ‚Â³/min)"], ["5", "Gas (Value: mÃ‚Â³, Rate: mÃ‚Â³/h)"], ["6", "Gas (Value: ftÃ‚Â³, Rate: ftÃ‚Â³/min)"], ["7", "Energy (Value: Wh, Rate: W)"], ["8", "Energy (Value: kWh, Rate: kW)"], ["9", "Energy (Value: MWh, Rate: MW)"], ["10", "Energy (Value: GJ, Rate: GJ/h*)"], ["11", "Temperature (Value: Ã‚Â°C, Rate: Ã‚Â°C/min)"], ["12", "Temperature (Value: Ã‚Â°F, Rate: Ã‚Â°F/min)"], ["13", "Pressure (Value: bar, Rate: bar/min)"], ["14", "Pressure (Value: psi, Rate: psi/min)"]], "def": "1", "wide": true, "int": true},
         ],
       },
       {
@@ -11327,7 +11317,7 @@ const App = (() => {
     if (released) facts.push(`${released} (${age})`);
     if (cat?.kb) facts.push(`${cat.kb} KB`);
     if (cat?.input) facts.push(`input ${cat.input}`);
-    return { name, type, t, cat, version, released, age, quantized, chip: t ? t.chip : '?', sub: facts.join(' · ') };
+    return { name, type, t, cat, version, released, age, quantized, chip: t ? t.chip : '?', sub: facts.join(' Ã‚Â· ') };
   }
 
   function describeModel(file) {
@@ -11561,7 +11551,7 @@ const App = (() => {
     SaveBar.set({
       dirty,
       saveLabel: s.reboot ? 'Save and restart' : 'Save',
-      text: s.reboot ? 'Unsaved changes – a restart is required' : 'Unsaved changes',
+      text: s.reboot ? 'Unsaved changes Ã¢â‚¬â€œ a restart is required' : 'Unsaved changes',
       onSave: () => save(s),
       onDiscard: () => discard(s),
     });
@@ -12236,7 +12226,7 @@ const App = (() => {
     if (mode.warn) {
       const restricted = usage.startsWith('restricted');
       mode.warn.hidden = !restricted;
-      mode.warn.textContent = restricted ? '(⚠ DEFAULT: ' + usage.substring(12).replace(/-/g, ' ').toUpperCase() + ')' : '';
+      mode.warn.textContent = restricted ? '(Ã¢Å¡Â  DEFAULT: ' + usage.substring(12).replace(/-/g, ' ').toUpperCase() + ')' : '';
     }
   }
 
@@ -13303,16 +13293,16 @@ const CycleMonitor = (() => {
       const elapsed = status.cycleSeconds + drift;
       const left = status.processTime - elapsed;
       timer = `running for ${formatSeconds(elapsed)}`;
-      if (status.processTime > 0) timer += left > 0 ? ` · about ${formatSeconds(Math.ceil(left))} left` : ' · finishing ...';
+      if (status.processTime > 0) timer += left > 0 ? ` Ã‚Â· about ${formatSeconds(Math.ceil(left))} left` : ' Ã‚Â· finishing ...';
     } else if (waiting) {
       // Automatic mode: countdown to the next run instead of the idle time
       timer = paused
-        ? `no automatic cycles · ${formatCountdown(status.nextRunSeconds)} left`
+        ? `no automatic cycles Ã‚Â· ${formatCountdown(status.nextRunSeconds)} left`
         : `next run in ${formatCountdown(status.nextRunSeconds - drift)}`;
     } else {
       timer = `${status.running ? 'running for' : 'in this state for'} ${formatSeconds(status.stateSeconds + drift)}`;
     }
-    if (status.running && paused) timer += ' · paused afterwards';
+    if (status.running && paused) timer += ' Ã‚Â· paused afterwards';
     return timer;
   }
 
@@ -13334,7 +13324,7 @@ const CycleMonitor = (() => {
       panel.dataset.phase = '';
       $('cycle-state').textContent = 'Device not reachable';
       $('cycle-count').textContent = '#-';
-      $('cycle-timer').textContent = ' ';
+      $('cycle-timer').textContent = 'Ã‚Â ';
       btn.disabled = true;
       btn.classList.remove('queue');
       btn.textContent = 'Start cycle';
@@ -13359,7 +13349,7 @@ const CycleMonitor = (() => {
 
     const drift = (performance.now() - fetchedAt) / 1000;
     const timer = timerText();
-    $('cycle-timer').textContent = stale ? `${timer} · device is busy` : timer;
+    $('cycle-timer').textContent = stale ? `${timer} Ã‚Â· device is busy` : timer;
 
     pauseBtn.hidden = !status.autoStart;
     pauseBtn.disabled = false; // also usable while a cycle runs or the device is busy
@@ -13427,7 +13417,7 @@ const CycleMonitor = (() => {
 
   return {
     last: () => status,
-    timerText: () => (stale && status ? `${timerText()} · device is busy` : timerText()),
+    timerText: () => (stale && status ? `${timerText()} Ã‚Â· device is busy` : timerText()),
     start() {
       $('cycle-start')?.addEventListener('click', start);
       $('cycle-pause')?.addEventListener('click', togglePause);
