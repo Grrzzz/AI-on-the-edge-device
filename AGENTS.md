@@ -122,6 +122,8 @@ Details that were unclear before:
 - Release notes live in `.builds/release_notes_XY.md` (ignored by git, pattern: first line "X.Y.Z Grrzzz - summary", "What is new", "Installation"). Pass them to `gh release create --notes-file`.
 - Order: merge the feature branch into `develop`, README section and notes, tag, `touch code/main/CMakeLists.txt`, build, check `firmware.bin`, then (after the OK) push `develop` and the tag and create the release.
 - PlatformIO is not on PATH here: `python -m pip install platformio`, then run `python -m platformio run -e esp32cam` in `code/` (3 to 5 minutes, log to a file).
+- The tag must sit on the **last commit** (HEAD) that is built: commit everything first, then tag, then `touch` and build. A commit after tagging makes the build report `Develop: <branch> @ <hash>`. The check is not only that the version appears in `firmware.bin`: `Develop: . @ .` is always in the binary as a format string, but the stamped values must read `<hash>.<branch>.vX.Y.Z-Grrzzz` (the tag as last value, with the hash of HEAD).
+- If a tag has to move after publishing: `git push --force origin vX.Y.Z-Grrzzz`, delete the release asset through the API and upload the rebuilt zip.
 - A build and a release are not a device test: say so in the release notes and to the owner.
 ## Owner's preferences
 
