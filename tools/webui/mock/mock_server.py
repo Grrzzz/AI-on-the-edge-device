@@ -247,6 +247,7 @@ def api_post(path, body):
             STATE["fallback"] = str(data["value"])
         return 200, {"ok": True, "sequence": data["sequence"], "value": STATE["fallback"]}
     if path == "/api/reboot":
+        STATE["down_until"] = time.time() + 5  # simulated restart: the device is unreachable for 5 s
         return 200, {"ok": True, "code": "001", "message": "Reboot initiated"}
     if path in ("/api/mqtt/discovery", "/api/mqtt/deviceinfo"):
         return 200, {"ok": True, "code": "001", "message": "Publication scheduled"}
@@ -504,7 +505,15 @@ class H(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _down(self):
+        if time.time() < STATE.get("down_until", 0):
+            self._send("Device restarting", "text/plain", 503)
+            return True
+        return False
+
     def do_POST(self):
+        if self._down():
+            return
         u = urlparse(self.path)
         n = int(self.headers.get("Content-Length", "0") or 0)
         body = self.rfile.read(n) if n else b""
@@ -557,6 +566,8 @@ class H(SimpleHTTPRequestHandler):
         return self._send("OK", "text/plain")
 
     def do_GET(self):
+        if self._down():
+            return
         u = urlparse(self.path)
         q = parse_qs(u.query)
         p = u.path
