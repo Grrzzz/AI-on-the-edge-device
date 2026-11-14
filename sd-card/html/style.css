@@ -5197,6 +5197,14 @@ a .rst-content .admonition-title {
   background: var(--primary-soft);
 }
 
+.cfg .cfg-opt-card[data-value="-1"] {
+  background: color-mix(in srgb, var(--meter-accent, var(--primary)) 14%, var(--bg-card));
+}
+
+.cfg .cfg-opt-card[data-value="-1"].cfg-on {
+  background: color-mix(in srgb, var(--meter-accent, var(--primary)) 26%, var(--bg-card));
+}
+
 .cfg .cfg-opt-card b {
   font-size: 0.9rem;
 }
