@@ -3,7 +3,7 @@
 |                   | WebUI               | REST API
 |:---               |:---                 |:----
 | Parameter Name    | Username            | username
-| Default Value     | `aiote`             | `aiote`
+| Default Value     | (empty)             | (empty)
 
 
 ## Description

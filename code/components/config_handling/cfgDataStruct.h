@@ -415,7 +415,7 @@ struct CfgData {
     struct SectionWebUi {
         struct HttpAuth {
             int authMode = HTTP_AUTH_DISABLED;
-            std::string username = "aiote";
+            std::string username = "";
             std::string password = "";
         } httpAuth;
         struct AutoRefresh {

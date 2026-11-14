@@ -334,7 +334,7 @@ Modify JSON elements accordingly to test default values and stringfy as compact 
   "webui": {
     "httpauth": {
       "authmode": 0,
-      "username": "aiote",
+      "username": "",
       "password": ""
     },
     "autorefresh": {
