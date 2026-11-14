@@ -598,7 +598,7 @@ async function saveConfig(data, reload = false, quiet = false) {
     {
       action: 'Save config',
       loadingMsg: quiet ? undefined : 'Save and apply configuration...',
-      resultMsg: reload ? undefined : 'Configuration saved successfully',
+      resultMsg: reload || quiet ? undefined : 'Configuration saved successfully',
     },
   );
 
@@ -4421,13 +4421,13 @@ const App = (() => {
         </div>`;
       root.innerHTML = `
         <div class="container">
-          ${viewHeader('MCP', 'Let an AI assistant such as Claude work with this device (beta).')}
+          ${viewHeader('MCP', 'Let an AI assistant such as Claude work with this device.')}
           <div class="container-content">
 
             <div class="card cfg-card">
-              <div class="card-header"><span class="cfg-card-title">MCP server</span><span class="beta-pill">Beta</span></div>
+              <div class="card-header"><span class="cfg-card-title">MCP server</span></div>
               <div class="card-body cfg-body">
-                <div class="mcp-note"><b>Beta:</b> new, first tested on a device (reading, moving a region) but not yet over a longer time. The assistant can read the device, move alignment markers and regions, change settings and start cycles.
+                <div class="mcp-note">The assistant can read the device, move alignment markers and regions, change settings and start cycles.
                   It is off by default. Everyone with the token has this access, so use it only in a network you trust.</div>
                 ${switchRow('Server', 'on', 'onText')}
                 ${switchRow('System actions', 'sys', 'sysText', 'delete files, reboot, update')}
@@ -7084,7 +7084,7 @@ const App = (() => {
     </div>
     <div class="help-item" data-help="finish">
       <h4>Finish setup</h4>
-      <p>Each step is saved automatically when you continue. In the last step, optionally protect the web interface with a username and password, then press <b>Finish</b>. The device restarts on its own and starts the first reading.</p>
+      <p>Each step is saved automatically when you continue. In the last step, optionally protect the web interface with a username and password and set up MQTT, then press <b>Finish</b>. The device restarts on its own and starts the first reading.</p>
     </div>`;
 
   /**
@@ -10117,7 +10117,7 @@ const App = (() => {
     { name: 'Camera', text: 'Take a live picture, adjust the lens focus, the flashlight and the image settings until the meter is sharp, upright and free of glare.' },
     { name: 'Alignment', text: 'Place two alignment markers on fixed structures of the meter, so the device finds the dials again in every picture.' },
     { name: 'ROIs', text: 'Mark the digits and the analog dials that make up the reading. Switch digits and analog on or off and use the tabs to move between them.' },
-    { name: 'Finish', text: 'Optionally protect the web interface with a password, then switch to the operational web interface.' },
+    { name: 'Finish', text: 'Optionally protect the web interface with a password and set up MQTT, then switch to the operational web interface.' },
   ];
   const WIZARD_EDITOR_TABS = { 2: 'image', 3: 'markers', 4: 'digit' };
 
@@ -10249,13 +10249,13 @@ const App = (() => {
           </div></div>
           <div class="cfg wiz-cfg">
             <div class="card cfg-card">
-              <div class="card-header"><span class="cfg-card-title">WebUI security</span></div>
-              <div class="card-body cfg-body">
-                ${cfgRow('Authentication', 'webui_httpauth_authmode', `<select data-field="webui.httpauth.authmode" data-int="1" data-ref="authMode" data-change="field" hidden>
+              <div class="card-header"><span class="cfg-card-title">WebUI security (Basic Auth)</span>
+                <select data-field="webui.httpauth.authmode" data-int="1" data-ref="authMode" data-change="field" hidden>
                   <option value="0" selected>Disabled</option>
                   <option value="1">Enabled</option>
                 </select>
-                <span class="cfg-switch-wrap"><label class="cfg-switch"><input type="checkbox" data-ref="authSwitch" data-change="authSwitch" aria-label="Authentication" /><span></span></label><span class="cfg-switch-text" data-ref="authText">Off</span></span>`)}
+                <span class="cfg-switch-wrap cfg-enable"><label class="cfg-switch"><input type="checkbox" data-ref="authSwitch" data-change="authSwitch" aria-label="Authentication" /><span></span></label><span class="cfg-switch-text" data-ref="authText">Off</span></span></div>
+              <div class="card-body cfg-body">
                 ${cfgRow('Username', 'webui_httpauth_username', '<input type="text" data-field="webui.httpauth.username" data-ref="username" data-change="field" autocomplete="off" />', 'cfg-l1', ' data-auth-row')}
                 ${cfgRow('Password', 'webui_httpauth_password', `<div class="wiz-pw">
                   <input type="password" data-field="webui.httpauth.password" data-ref="password" data-change="field" autocomplete="new-password" />
@@ -10263,6 +10263,7 @@ const App = (() => {
                 </div>`, 'cfg-l1', ' data-auth-row')}
               </div>
             </div>
+            <div data-ref="mqttHost"></div>
           </div>
         </div>
 
@@ -10318,6 +10319,7 @@ const App = (() => {
     let destroyed = false;
     let step = stepFromStorage();
     let cfg = {};
+    let mqttCard = null;
     let delta = {}; // modified parameters of the current step (flashlight, security, operation mode)
     let editor = null;
     let busy = false;
@@ -10360,6 +10362,18 @@ const App = (() => {
       delta = mergeParam(delta, name, el.value, isInt(el));
       if (el === R.gpioCustom || el.dataset.pin === '1') updateGpioUi();
       if (el === R.authMode) updateAuthUi();
+      updateFinishState();
+    }
+
+    /** The MQTT card of the setup page, built from the same schema; its changes are merged into the delta on Finish. */
+    async function mountMqtt() {
+      if (mqttCard) mqttCard.destroy();
+      mqttCard = await App.setup.mountMqttCard(R.mqttHost, cfg, (d) => {
+        delta = deepMergeObjects(delta, d);
+        updateFinishState();
+      });
+      if (destroyed) mqttCard.destroy();
+      updateFinishState();
     }
 
     function updateAuthUi() {
@@ -10374,7 +10388,8 @@ const App = (() => {
     function updateFinishState() {
       if (!R.finish) return;
       const authOn = R.authMode.value === '1';
-      R.finish.disabled = busy || (authOn && (!R.username.value.trim() || !R.password.value));
+      const mqttIncomplete = !!mqttCard && mqttCard.incomplete();
+      R.finish.disabled = busy || (authOn && (!R.username.value.trim() || !R.password.value)) || mqttIncomplete;
     }
 
     /* ---------------------------------------------------------- GPIO UI */
@@ -10454,6 +10469,7 @@ const App = (() => {
       meterCombo?.sync();
       updateGpioUi();
       updateAuthUi();
+      mountMqtt();
       delta = {};
     }
 
@@ -10729,6 +10745,9 @@ const App = (() => {
     };
     root.addEventListener('click', onClick);
     root.addEventListener('change', onChange);
+    root.addEventListener('input', (e) => {
+      if (e.target.closest('.wiz-cfg')) updateFinishState(); // Finish follows the typing, not only the change event
+    });
 
     /* --------------------------------------------------------- lifecycle */
     (function buildMeterTypeCombo() {
@@ -10831,8 +10850,8 @@ const App = (() => {
       return getConfigFromStorage(0);
     },
     // POST /config[?reload=true] with the changed parameters only (delta object). Throws on failure.
-    async save(delta, reload) {
-      await saveConfig(JSON.stringify(delta), reload);
+    async save(delta, reload, quiet) {
+      await saveConfig(JSON.stringify(delta), reload, quiet);
     },
     // GET /config?task=reload: apply the stored configuration without restart
     reload() {
@@ -10913,7 +10932,7 @@ const App = (() => {
       {
         "id": "operation", "title": "Operation",
         "rows": [
-          {"label": "Operation Mode", "lvl": 1, "id": "operationmode_opmode", "name": "operationmode.opmode", "t": "cards", "opts": [["-1", "Setup"], ["0", "Manual"], ["1", "Automatic"]], "def": "-1", "int": true, "desc": {"-1": "Configure the device. No automatic readings.", "0": "Readings only when you trigger them.", "1": "Readings on a fixed schedule."}},
+          {"label": "Operation Mode", "lvl": 1, "id": "operationmode_opmode", "name": "operationmode.opmode", "t": "cards", "opts": [["-1", "Setup"], ["0", "Manual"], ["1", "Automatic"]], "def": "-1", "int": true, "desc": {"-1": "Restarts the device in the initial setup wizard process.", "0": "Readings only when you trigger them.", "1": "Readings on a fixed schedule."}},
           {"label": "Automatic Process Interval", "lvl": 2, "show": ["classvisibility_operationmode_opmode_auto"], "id": "operationmode_automaticprocessinterval", "name": "operationmode.automaticprocessinterval", "t": "number", "def": "1.00", "min": 0.01, "step": 0.01, "req": true, "unit": "Minutes"},
           {"h": "Demo Mode", "show": ["classvisibility_operationmode_opmode_demomode"]},
           {"label": "Use Demo Images", "lvl": 1, "show": ["classvisibility_operationmode_opmode_demomode"], "id": "operationmode_usedemoimages", "name": "operationmode.usedemoimages", "t": "switch", "def": "false", "adv": true},
@@ -11101,11 +11120,11 @@ const App = (() => {
         ],
       },
       {
-        "id": "webui", "title": "WebUI",
+        "id": "webui", "title": "WebUI security (Basic Auth)",
+        "enable": {"id": "webui_httpauth_authmode", "name": "webui.httpauth.authmode", "t": "switch", "on": "1", "off": "0", "def": "0", "int": true, "strong": true},
         "rows": [
-          {"label": "Authentication", "lvl": 1, "id": "webui_httpauth_authmode", "name": "webui.httpauth.authmode", "t": "switch", "on": "1", "off": "0", "def": "0", "int": true},
-          {"label": "Username", "lvl": 2, "show": ["classvisibility_webui_authmode"], "id": "webui_httpauth_username", "name": "webui.httpauth.username", "t": "text"},
-          {"label": "Password", "lvl": 2, "show": ["classvisibility_webui_authmode"], "id": "webui_httpauth_password", "name": "webui.httpauth.password", "t": "password", "auto": "on"},
+          {"label": "Username", "lvl": 1, "show": ["classvisibility_webui_authmode"], "id": "webui_httpauth_username", "name": "webui.httpauth.username", "t": "text", "req": true},
+          {"label": "Password", "lvl": 1, "show": ["classvisibility_webui_authmode"], "id": "webui_httpauth_password", "name": "webui.httpauth.password", "t": "password", "auto": "on"},
           {"h": "Dashboard"},
           {"label": "Page Auto Refresh", "lvl": 1, "id": "webui_autorefresh_dashboard_enabled", "name": "webui.autorefresh.dashboard.enabled", "t": "switch", "def": "true", "hide": "obsolete"},
           {"label": "Refresh Time", "lvl": 2, "show": ["classvisibility_webui_autorefresh_dashboard_enabled"], "id": "webui_autorefresh_dashboard_refreshtime", "name": "webui.autorefresh.dashboard.refreshtime", "t": "number", "def": "5", "min": 1, "req": true, "int": true, "unit": "Seconds", "hide": "obsolete"},
@@ -11575,6 +11594,7 @@ const App = (() => {
   }
 
   function updateSaveBar(s) {
+    if (s.embedded) return; // the wizard card has no save bar
     const dirty = Object.keys(s.delta).length > 0;
     SaveBar.set({
       dirty,
@@ -11585,17 +11605,20 @@ const App = (() => {
     });
   }
 
-  async function save(s) {
+  function confirmSetupRestart() {
+    return confirmDialog({
+      title: 'Restart into the setup wizard?',
+      text: 'The device restarts and opens the setup wizard. Automatic readings stop until the wizard is finished. Your current configuration is kept and shown in the wizard.',
+      okLabel: 'Restart and start wizard',
+      danger: true,
+    });
+  }
+
+  async function save(s, confirmed) {
     let reboot = s.reboot;
     const toSetup = s.delta.operationmode && Number(s.delta.operationmode.opmode) === -1 && Number(getConfigFromStorage()?.operationmode?.opmode) !== -1;
     if (toSetup) {
-      const ok = await confirmDialog({
-        title: 'Restart into the setup wizard?',
-        text: 'The device restarts and opens the setup wizard. Automatic readings stop until the wizard is finished. Your current configuration is kept and shown in the wizard.',
-        okLabel: 'Restart and start wizard',
-        danger: true,
-      });
-      if (!ok) return;
+      if (!confirmed && !(await confirmSetupRestart())) return;
       reboot = true;
       try {
         sessionStorage.setItem('wizardExisting', '1');
@@ -11606,9 +11629,10 @@ const App = (() => {
     }
     SaveBar.busy(true);
     try {
-      await Api.config.save(s.delta, !reboot);
+      await Api.config.save(s.delta, !reboot, toSetup);
       if (s.dead) return;
       if (reboot) {
+        if (toSetup) App.leaveSetup(); // the stored mode is now Setup: without this the router would send the reboot page to the wizard
         s.timer = setTimeout(() => App.navigate(REBOOT_ROUTE), REBOOT_DELAY_MS);
       } else {
         s.delta = {}; // saved: nothing pending anymore
@@ -13146,6 +13170,16 @@ const App = (() => {
         break;
       case 'pick': {
         const fld = s.fields[Number(t.closest('[data-fid]').dataset.fid)];
+        if (fld.f.id === 'operationmode_opmode' && t.dataset.value === '-1' && Number(getConfigFromStorage()?.operationmode?.opmode) !== -1) {
+          // setup mode needs a restart: ask right away; cancel keeps the current mode
+          confirmSetupRestart().then((ok) => {
+            if (!ok || s.dead) return;
+            setValue(fld, t.dataset.value);
+            onChanged(s, fld);
+            save(s, true);
+          });
+          break;
+        }
         setValue(fld, t.dataset.value);
         onChanged(s, fld);
         break;
@@ -13215,6 +13249,71 @@ const App = (() => {
     }
   }
 
+  /*
+   * The MQTT card of the setup page inside the wizard: same schema card, same rules and same delta handling.
+   * -> { incomplete(), destroy() }; onDelta(delta) gets the accumulated changes after every edit.
+   */
+  async function mountMqttCard(host, cfg, onDelta) {
+    const certs = await Api.config.certs().catch(() => []);
+    const s = {
+      root: host,
+      embedded: true,
+      cfg,
+      certs,
+      models: [],
+      help: { pop: null, key: null, btn: null, pinned: false, timer: null },
+      advOn: false,
+      delta: {},
+      reboot: false,
+      active: {},
+      vals: {},
+      pins: [],
+      seqs: [],
+      ix: { pin: 0, seq: 0 },
+      fields: [],
+      byId: {},
+      rowById: {},
+      fieldsOfRow: new Map(),
+      cards: [],
+      cardById: {},
+    };
+    for (const [key, value] of jsonObjectKeyify(cfg)) s.vals[key.toLowerCase()] = value;
+    const def = SCHEMA.cards.find((c) => c.id === 'mqtt');
+    host.replaceChildren(buildCard(s, def));
+    s.layout = host;
+    for (const fld of s.fields) {
+      if (fld.f.t === 'info' || fld.f.noload) continue;
+      const v = s.vals[keyOf(s, fld.f)];
+      setValue(fld, v !== undefined ? v : fld.f.def);
+    }
+    attachHelpEvents(s);
+    applyVisibility(s);
+    const sendDelta = () => onDelta(s.delta);
+    const ac = new AbortController();
+    for (const ev of ['change', 'input']) {
+      host.addEventListener(ev, (e) => {
+        onFieldEvent(s, e);
+        if (e.type === 'change') sendDelta();
+        else onDelta({});
+      }, { signal: ac.signal });
+    }
+    return {
+      incomplete() {
+        return s.fields.some((fld) => {
+          if (!fld.f.req || fld.f.adv || !fld.el.closest) return false;
+          const hidden = fld.el.closest('[hidden]') && host.contains(fld.el.closest('[hidden]'));
+          return !hidden && String(getValue(fld)).trim() === '';
+        });
+      },
+      destroy() {
+        ac.abort();
+        hideHelp(s);
+        if (s.help.pop) s.help.pop.remove();
+        host.replaceChildren();
+      },
+    };
+  }
+  App.setup.mountMqttCard = mountMqttCard;
   /* ======================================================================== */
   /* View                                                                     */
   /* ======================================================================== */

@@ -5198,11 +5198,12 @@ a .rst-content .admonition-title {
 }
 
 .cfg .cfg-opt-card[data-value="-1"] {
-  background: color-mix(in srgb, var(--meter-accent, var(--primary)) 14%, var(--bg-card));
+  background: var(--surface);
 }
 
 .cfg .cfg-opt-card[data-value="-1"].cfg-on {
-  background: color-mix(in srgb, var(--meter-accent, var(--primary)) 26%, var(--bg-card));
+  background: var(--surface-hover);
+  border-color: var(--primary);
 }
 
 .cfg .cfg-opt-card b {
@@ -8270,3 +8271,8 @@ a.nav-sub-item {
 .wiz-help .help-item[data-help].current { opacity: 1; background: var(--primary-soft); border-color: color-mix(in srgb, var(--primary) 40%, transparent); }
 .wiz-help .help-item[data-help].current h4 { color: var(--primary); }
 
+.wiz-cfg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap);
+}
