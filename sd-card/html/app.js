@@ -10322,7 +10322,7 @@ const App = (() => {
     let editor = null;
     let busy = false;
     let logDialog = null;
-    let meterChosen = stepFromStorage() > 1; // the meter type has to be picked once before the wizard goes on
+    let meterChosen = stepFromStorage() > 1 || sessionStorage.getItem('wizardExisting') === '1'; // a configured device keeps its type; the meter type has to be picked once before the wizard goes on
     let meterCombo = null;
 
     /* ------------------------------------------------------------ fields */
@@ -10609,6 +10609,7 @@ const App = (() => {
       delta.operationmode.opmode = 1; // switch to automatic mode
       try {
         sessionStorage.removeItem(WIZARD_STEP_KEY);
+        sessionStorage.removeItem('wizardExisting');
       } catch (e) {
         /* storage blocked */
       }
@@ -11585,7 +11586,24 @@ const App = (() => {
   }
 
   async function save(s) {
-    const reboot = s.reboot;
+    let reboot = s.reboot;
+    const toSetup = s.delta.operationmode && Number(s.delta.operationmode.opmode) === -1 && Number(getConfigFromStorage()?.operationmode?.opmode) !== -1;
+    if (toSetup) {
+      const ok = await confirmDialog({
+        title: 'Restart into the setup wizard?',
+        text: 'The device restarts and opens the setup wizard. Automatic readings stop until the wizard is finished. Your current configuration is kept and shown in the wizard.',
+        okLabel: 'Restart and start wizard',
+        danger: true,
+      });
+      if (!ok) return;
+      reboot = true;
+      try {
+        sessionStorage.setItem('wizardExisting', '1');
+        sessionStorage.removeItem('setupStep');
+      } catch (e) {
+        /* storage blocked */
+      }
+    }
     SaveBar.busy(true);
     try {
       await Api.config.save(s.delta, !reboot);
