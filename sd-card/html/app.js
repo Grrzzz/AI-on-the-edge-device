@@ -6960,13 +6960,13 @@ const App = (() => {
   function camFormat(f, v) {
     switch (f.fmt) {
       case 'zoom':
-        return `x`;
+        return `${(v / 1000).toFixed(2)}x`;
       case 'deg':
-        return `°`;
+        return `${Number(v).toFixed(1)}°`;
       case 'ms':
-        return ` ms`;
+        return `${v} ms`;
       case 'pct':
-        return ` %`;
+        return `${v} %`;
       default:
         return String(v);
     }
