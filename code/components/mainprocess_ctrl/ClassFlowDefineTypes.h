@@ -50,6 +50,15 @@ struct RoiData { // ROI
     int confidencePct = -1;        // Confidence of the result in percent (0-100), -1: model gives none
     int CNNResult = -10;           // Normalized to 0-99 (exception for class11: 0-10: 0-9+NaN), default: negative number equal to "-1.0"
     std::string sCNNResult = "-1"; // Result clamped and converted to string for visualization purpose
+
+    // ROI cache (RAM only): result of the last real network run and the fingerprint of its input
+    float cacheFingerprint[64] = {};
+    bool cacheValid = false;    // a real run is stored
+    int cacheAge = 0;           // cycles since that real run
+    bool cached = false;        // this cycle's result came from the cache
+    int cacheResult = -10;
+    std::string cacheSResult;
+    int cacheConfidence = -1;
 };
 
 

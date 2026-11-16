@@ -31,6 +31,9 @@ int alignDy = 0;
 Rect alignMarkers[2];
 int alignMarkerCount = 0;
 std::vector<RoiResult> rois;
+int cacheRoiCount = 0;
+int cacheHitCount = 0;
+int cacheSavedMs = 0;
 volatile TickType_t lastPollTick = 0; // last request of /api/live (0: never)
 
 // Short wait: the web server must not block the flow and the other way round
@@ -92,6 +95,43 @@ void begin(int cycle)
     rawAvailable = false;
     alignAvailable = false;
     rois.clear();
+    cacheRoiCount = 0;
+    cacheHitCount = 0;
+    cacheSavedMs = 0;
+}
+
+
+bool isAlignOk()
+{
+    Lock lock;
+    return alignAvailable && alignOk;
+}
+
+
+void cacheRoi(bool hit, int ms)
+{
+    Lock lock;
+    cacheRoiCount++;
+    if (hit) {
+        cacheHitCount++;
+        cacheSavedMs += ms;
+    }
+}
+
+
+void cacheSaving(int ms)
+{
+    Lock lock;
+    cacheSavedMs += ms;
+}
+
+
+void cacheStats(int &rois, int &hits, int &savedMs)
+{
+    Lock lock;
+    rois = cacheRoiCount;
+    hits = cacheHitCount;
+    savedMs = cacheSavedMs;
 }
 
 

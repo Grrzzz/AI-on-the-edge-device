@@ -278,6 +278,13 @@ esp_err_t handler_api_status(httpd_req_t *req)
     // Last successful cycle: age [s] (-1: none since boot) and local time
     cJSON_AddNumberToObject(root, "lastSuccessSeconds", lastSuccessUptime >= 0 && now >= lastSuccessUptime ? (double)(now - lastSuccessUptime) : -1);
     cJSON_AddStringToObject(root, "lastSuccess", lastSuccessTime.c_str());
+    // ROI cache of the last cycle: ROIs looked at, answered from the cache, estimated time saved [ms]
+    int cacheRois = 0, cacheHits = 0, cacheSavedMs = 0;
+    LiveFlow::cacheStats(cacheRois, cacheHits, cacheSavedMs);
+    cJSON *cache = cJSON_AddObjectToObject(root, "roiCache");
+    cJSON_AddNumberToObject(cache, "rois", cacheRois);
+    cJSON_AddNumberToObject(cache, "hits", cacheHits);
+    cJSON_AddNumberToObject(cache, "savedMs", cacheSavedMs);
     return apiSendJson(req, "200 OK", root);
 }
 
@@ -789,6 +796,10 @@ static void addRecognitionRois(cJSON *parent, const char *key, const auto &roiLi
             cJSON_AddStringToObject(item, "image", ("/img_tmp/" + roi->param->roiName + "_org.jpg").c_str());
             if (roi->confidencePct >= 0) {
                 cJSON_AddNumberToObject(item, "confidence", roi->confidencePct);
+            }
+            cJSON_AddBoolToObject(item, "cached", roi->cached);
+            if (roi->cached) {
+                cJSON_AddNumberToObject(item, "cacheAge", roi->cacheAge);
             }
         }
         else {

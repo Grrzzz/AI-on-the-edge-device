@@ -26,6 +26,14 @@ class ClassFlowCNNGeneral : public ClassLogImage
 
     bool saveAllFiles;
 
+    bool roiCacheEnabled = false;
+    float roiCacheThreshold = 0.1f;
+    int roiRunMs = 0;      // duration of one real ROI run (load + invoke) [ms]
+    int allocateMs = 0;    // duration of the tensor allocation [ms]
+
+    bool computeFingerprint(const CImage &img, float *out) const;
+    bool roiCacheHit(RoiData &roi, const float *fingerprint) const;
+
     int evalAnalogNumber(int _value, int _resultPreviousNumber) const;
     int evalDigitNumber(int _value, int _valuePreviousNumber, int _resultPreviousNumber, bool _isPreviousAnalog = false,
                         int _analogDigitSyncValue = 92) const;

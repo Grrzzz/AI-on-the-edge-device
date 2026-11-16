@@ -4,7 +4,10 @@
 #include <math.h>
 #include <sys/types.h>
 
+#include <string.h>
+
 #include <esp_log.h>
+#include <esp_timer.h>
 
 #include "configClass.h"
 #include "ClassLogFile.h"
@@ -66,6 +69,8 @@ bool ClassFlowCNNGeneral::loadParameter()
 
     cnnModelFile = "/sdcard/config/models/" + (isDigit ? sectionDigitPtr->model : sectionAnalogPtr->model);
     cnnGoodThreshold = isDigit ? sectionDigitPtr->cnnGoodThreshold : 0.0;
+    roiCacheEnabled = isDigit ? sectionDigitPtr->roiCache : sectionAnalogPtr->roiCache;
+    roiCacheThreshold = isDigit ? sectionDigitPtr->roiCacheThreshold : sectionAnalogPtr->roiCacheThreshold;
 
     saveImagesEnabled = isDigit ? sectionDigitPtr->debug.saveRoiImages : sectionAnalogPtr->debug.saveRoiImages;
     imagesLocation = "/sdcard" + (isDigit ? sectionDigitPtr->debug.roiImagesLocation : sectionAnalogPtr->debug.roiImagesLocation);
@@ -230,14 +235,98 @@ bool ClassFlowCNNGeneral::resolveNetworkParameter()
 }
 
 
+static const int ROI_CACHE_MAX_AGE = 10; // Forced recalculation after this many cycles
+static const int ROI_CACHE_MIN_CONFIDENCE = 100;
+
+// 8x8 grayscale fingerprint, normalized to mean 0 and standard deviation 1 (robust against brightness and contrast changes)
+bool ClassFlowCNNGeneral::computeFingerprint(const CImage &img, float *out) const
+{
+    const uint8_t *data = img.getImgData();
+    const int w = img.getWidth();
+    const int h = img.getHeight();
+    const int ch = img.getChannels();
+    if (data == nullptr || w < 8 || h < 8 || ch < 1) {
+        return false;
+    }
+
+    for (int by = 0; by < 8; by++) {
+        for (int bx = 0; bx < 8; bx++) {
+            const int x0 = bx * w / 8;
+            const int x1 = (bx + 1) * w / 8;
+            const int y0 = by * h / 8;
+            const int y1 = (by + 1) * h / 8;
+            float sum = 0.0f;
+            int n = 0;
+            for (int y = y0; y < y1; y++) {
+                for (int x = x0; x < x1; x++) {
+                    const uint8_t *p = data + (y * w + x) * ch;
+                    sum += (ch >= 3) ? (p[0] + p[1] + p[2]) / 3.0f : (float)p[0];
+                    n++;
+                }
+            }
+            out[by * 8 + bx] = n > 0 ? sum / n : 0.0f;
+        }
+    }
+
+    float mean = 0.0f;
+    for (int i = 0; i < 64; i++) {
+        mean += out[i];
+    }
+    mean /= 64.0f;
+    float var = 0.0f;
+    for (int i = 0; i < 64; i++) {
+        var += (out[i] - mean) * (out[i] - mean);
+    }
+    const float sd = sqrtf(var / 64.0f);
+    for (int i = 0; i < 64; i++) {
+        out[i] = (out[i] - mean) / (sd > 1.0f ? sd : 1.0f);
+    }
+    return true;
+}
+
+
+bool ClassFlowCNNGeneral::roiCacheHit(RoiData &roi, const float *fingerprint) const
+{
+    if (!roiCacheEnabled || !roi.cacheValid || roi.cacheAge >= ROI_CACHE_MAX_AGE || roi.cacheConfidence < ROI_CACHE_MIN_CONFIDENCE) {
+        return false;
+    }
+    if (!LiveFlow::isAlignOk()) {
+        return false;
+    }
+
+    float dev = 0.0f;
+    for (int i = 0; i < 64; i++) {
+        dev += fabsf(fingerprint[i] - roi.cacheFingerprint[i]);
+    }
+    return (dev / 64.0f) <= roiCacheThreshold;
+}
+
+
 bool ClassFlowCNNGeneral::doInvokeCnn(const std::string time)
 {
     const auto roiSavingSize = sectionDigitPtr ? sectionDigitPtr->debug.roiSavingSize : sectionAnalogPtr->debug.roiSavingSize;
     const std::string logPath = createLogFolder(time, roiSavingSize == ROI_SAVE_FULL_SIZE_AND_RESIZED);
 
-    if (!tflite->makeAllocate()) {
-        LogFile.writeToFile(ESP_LOG_ERROR, TAG, "Allocation of TFLite tensors failed");
-        LogFile.writeHeapInfo("invokeCnn-MakeAllocate");
+    // Tensors are only allocated when at least one ROI needs a real run (see ROI cache)
+    bool allocated = false;
+    const bool cacheable = roiCacheEnabled && (cnnType == CNNTYPE_DIGIT_CLASS100 || cnnType == CNNTYPE_ANALOG_CLASS100);
+
+    auto allocate = [&]() {
+        if (allocated) {
+            return true;
+        }
+        const int64_t t0 = esp_timer_get_time();
+        if (!tflite->makeAllocate()) {
+            LogFile.writeToFile(ESP_LOG_ERROR, TAG, "Allocation of TFLite tensors failed");
+            LogFile.writeHeapInfo("invokeCnn-MakeAllocate");
+            return false;
+        }
+        allocateMs = (int)((esp_timer_get_time() - t0) / 1000);
+        allocated = true;
+        return true;
+    };
+
+    if (!cacheable && !allocate()) {
         return false;
     }
 
@@ -259,7 +348,24 @@ bool ClassFlowCNNGeneral::doInvokeCnn(const std::string time)
                 case CNNTYPE_ANALOG_CLASS100: { // Models ana-class100*
                     modelTypeMsg = "Type: " +
                                    std::string(cnnType == CNNTYPE_DIGIT_CLASS100 ? "Digit (dig-class100)" : "Analog (ana-class100)");
-                    success = tflite->loadInputImage(*(roi->imageRoiResized)) && tflite->invoke();
+                    roi->cached = false;
+
+                    float fingerprint[64];
+                    const bool haveFingerprint = cacheable && computeFingerprint(*(roi->imageRoiResized), fingerprint);
+                    if (haveFingerprint && roiCacheHit(*roi, fingerprint)) {
+                        roi->CNNResult = roi->cacheResult;
+                        roi->sCNNResult = roi->cacheSResult;
+                        roi->confidencePct = roi->cacheConfidence;
+                        roi->cacheAge++;
+                        roi->cached = true;
+                        LiveFlow::cacheRoi(true, roiRunMs);
+                        logImageResult = roi->CNNResult;
+                        success = true;
+                        break;
+                    }
+
+                    const int64_t runStart = esp_timer_get_time();
+                    success = allocate() && tflite->loadInputImage(*(roi->imageRoiResized)) && tflite->invoke();
 
                     if (!success) {
                         break;
@@ -289,6 +395,19 @@ bool ClassFlowCNNGeneral::doInvokeCnn(const std::string time)
                     roi->CNNResult = std::clamp(roi->CNNResult, 0, 99);
                     roi->sCNNResult = to_stringWithPrecision(roi->CNNResult / 10.0, 1);
                     logImageResult = roi->CNNResult;
+
+                    if (cacheable) {
+                        roiRunMs = (int)((esp_timer_get_time() - runStart) / 1000);
+                        LiveFlow::cacheRoi(false, 0);
+                        roi->cacheValid = haveFingerprint;
+                        roi->cacheAge = 0;
+                        roi->cacheResult = roi->CNNResult;
+                        roi->cacheSResult = roi->sCNNResult;
+                        roi->cacheConfidence = roi->confidencePct;
+                        if (haveFingerprint) {
+                            memcpy(roi->cacheFingerprint, fingerprint, sizeof(fingerprint));
+                        }
+                    }
                     break;
                 }
 
@@ -409,7 +528,12 @@ bool ClassFlowCNNGeneral::doInvokeCnn(const std::string time)
         }
     }
 
-    tflite->deleteInterpreter();
+    if (allocated) {
+        tflite->deleteInterpreter();
+    }
+    else if (cacheable) {
+        LiveFlow::cacheSaving(allocateMs);
+    }
     return true;
 }
 
