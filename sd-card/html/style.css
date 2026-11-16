@@ -516,7 +516,7 @@ body {
 
 .cycle-cache-main {
   font-weight: 600;
-  color: var(--text);
+  color: var(--text-main);
 }
 
 .cycle-last[hidden] {
