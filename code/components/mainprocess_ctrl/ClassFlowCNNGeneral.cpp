@@ -236,8 +236,7 @@ bool ClassFlowCNNGeneral::resolveNetworkParameter()
 
 
 static const int ROI_CACHE_MAX_AGE = 10; // Forced recalculation after this many cycles
-static const int ROI_CACHE_MIN_CONFIDENCE = 100;
-static const int ROI_CACHE_MIN_CONFIDENCE_OTHER = 95;
+static const int ROI_CACHE_MIN_CONFIDENCE = 80;
 
 // 8x8 grayscale fingerprint, normalized to mean 0 and standard deviation 1 (robust against brightness and contrast changes)
 bool ClassFlowCNNGeneral::computeFingerprint(const CImage &img, float *out) const
@@ -291,11 +290,8 @@ bool ClassFlowCNNGeneral::roiCacheHit(RoiData &roi, const float *fingerprint) co
     if (!roiCacheEnabled || !roi.cacheValid || roi.cacheAge >= ROI_CACHE_MAX_AGE) {
         return false;
     }
-    // class100 models give a sharp 100 % when sure; the fit of dig-cont and the output of class11 are rarely exactly 100.
     // Models without a confidence (ana-cont, -1) are not filtered.
-    const bool isClass100 = (cnnType == CNNTYPE_DIGIT_CLASS100 || cnnType == CNNTYPE_ANALOG_CLASS100);
-    const int minConfidence = isClass100 ? ROI_CACHE_MIN_CONFIDENCE : ROI_CACHE_MIN_CONFIDENCE_OTHER;
-    if (roi.cacheConfidence >= 0 && roi.cacheConfidence < minConfidence) {
+    if (roi.cacheConfidence >= 0 && roi.cacheConfidence < ROI_CACHE_MIN_CONFIDENCE) {
         return false;
     }
     if (!LiveFlow::isAlignOk()) {

@@ -11300,7 +11300,7 @@ const App = (() => {
     digit_roicache: {
       title: 'Digit caching',
       text: 'Skips the AI for digits whose image has not changed since the last cycle and reuses the previous result. This shortens the cycle.',
-      tip: 'Reused results are marked with a dashed frame and the symbol \u21bb. Every 10th cycle, after a restart, after a configuration change and for results with a low confidence the AI runs again. The cache is kept in RAM only.',
+      tip: 'Reused results are marked with a dashed frame and the symbol \u21bb. Every 10th cycle, after a restart, after a configuration change and for results with a confidence below 80 % the AI runs again. The cache is kept in RAM only.',
     },
     digit_roicachethreshold: {
       title: 'Digit cache sensitivity',
@@ -11310,7 +11310,7 @@ const App = (() => {
     analog_roicache: {
       title: 'Analog caching',
       text: 'Skips the AI for dials whose image has not changed since the last cycle and reuses the previous result. This shortens the cycle.',
-      tip: 'Reused results are marked with a dashed frame and the symbol \u21bb. Every 10th cycle, after a restart, after a configuration change and for results with a low confidence the AI runs again. The cache is kept in RAM only.',
+      tip: 'Reused results are marked with a dashed frame and the symbol \u21bb. Every 10th cycle, after a restart, after a configuration change and for results with a confidence below 80 % the AI runs again. The cache is kept in RAM only.',
     },
     analog_roicachethreshold: {
       title: 'Analog cache sensitivity',
