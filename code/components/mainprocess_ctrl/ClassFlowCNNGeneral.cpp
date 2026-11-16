@@ -315,13 +315,11 @@ bool ClassFlowCNNGeneral::doInvokeCnn(const std::string time)
         if (allocated) {
             return true;
         }
-        const int64_t t0 = esp_timer_get_time();
         if (!tflite->makeAllocate()) {
             LogFile.writeToFile(ESP_LOG_ERROR, TAG, "Allocation of TFLite tensors failed");
             LogFile.writeHeapInfo("invokeCnn-MakeAllocate");
             return false;
         }
-        allocateMs = (int)((esp_timer_get_time() - t0) / 1000);
         allocated = true;
         return true;
     };
@@ -358,13 +356,12 @@ bool ClassFlowCNNGeneral::doInvokeCnn(const std::string time)
                         roi->confidencePct = roi->cacheConfidence;
                         roi->cacheAge++;
                         roi->cached = true;
-                        LiveFlow::cacheRoi(true, roiRunMs);
+                        LiveFlow::cacheRoi(true);
                         logImageResult = roi->CNNResult;
                         success = true;
                         break;
                     }
 
-                    const int64_t runStart = esp_timer_get_time();
                     success = allocate() && tflite->loadInputImage(*(roi->imageRoiResized)) && tflite->invoke();
 
                     if (!success) {
@@ -397,8 +394,7 @@ bool ClassFlowCNNGeneral::doInvokeCnn(const std::string time)
                     logImageResult = roi->CNNResult;
 
                     if (cacheable) {
-                        roiRunMs = (int)((esp_timer_get_time() - runStart) / 1000);
-                        LiveFlow::cacheRoi(false, 0);
+                        LiveFlow::cacheRoi(false);
                         roi->cacheValid = haveFingerprint;
                         roi->cacheAge = 0;
                         roi->cacheResult = roi->CNNResult;
@@ -530,9 +526,6 @@ bool ClassFlowCNNGeneral::doInvokeCnn(const std::string time)
 
     if (allocated) {
         tflite->deleteInterpreter();
-    }
-    else if (cacheable) {
-        LiveFlow::cacheSaving(allocateMs);
     }
     return true;
 }

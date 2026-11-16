@@ -28,8 +28,6 @@ class ClassFlowCNNGeneral : public ClassLogImage
 
     bool roiCacheEnabled = false;
     float roiCacheThreshold = 0.1f;
-    int roiRunMs = 0;      // duration of one real ROI run (load + invoke) [ms]
-    int allocateMs = 0;    // duration of the tensor allocation [ms]
 
     bool computeFingerprint(const CImage &img, float *out) const;
     bool roiCacheHit(RoiData &roi, const float *fingerprint) const;

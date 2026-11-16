@@ -61,14 +61,11 @@ void roiDone(const std::string &sequence, const char *kind, const std::string &r
 /// Alignment of this cycle was successful (false before the alignment ran)
 bool isAlignOk();
 
-/// ROI cache: one ROI of this cycle (hit: network skipped), usedMs: network time of a real run (hit: estimated saving)
-void cacheRoi(bool hit, int ms);
+/// ROI cache: one ROI of this cycle (hit: network skipped)
+void cacheRoi(bool hit);
 
-/// ROI cache: additional saved time (e.g. tensor allocation that was not needed)
-void cacheSaving(int ms);
-
-/// ROI cache statistics of the last cycle
-void cacheStats(int &rois, int &hits, int &savedMs);
+/// ROI cache statistics of the current/last cycle: ROIs looked at and answered from the cache
+void cacheStats(int &rois, int &hits);
 
 /// JSON object for GET /api/live, the caller has to delete it
 cJSON *liveJson(bool running, const std::string &state);

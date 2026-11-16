@@ -2,6 +2,7 @@
 #include "../../include/defines.h"
 #include "../../include/api_helper.h"
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -44,6 +45,10 @@ static bool manualFlowStart = false;
 static long automaticProcessInterval = 0;
 static int cycleCounter = 0;
 static int processingTime = 0;
+static int referenceCycleMs = 0; // Duration of the last cycle without ROI cache hits [ms]
+static int cacheRoisLast = 0;    // ROIs looked at / answered from the cache in the last completed cycle
+static int cacheHitsLast = 0;
+static int cacheSavedMs = 0;     // Saved time of the last cycle against that reference [ms], -1: no reference yet
 static time_t cycleStartUptime = 0; // Uptime [s] when the running cycle started
 static bool autoCountdownPaused = false;     // Countdown to the next automatic cycle is paused (config mode), reset by reboot
 static int64_t autoCountdownRemainingMs = -1; // Remaining wait time until the next automatic cycle [ms], -1 if not waiting
@@ -278,13 +283,12 @@ esp_err_t handler_api_status(httpd_req_t *req)
     // Last successful cycle: age [s] (-1: none since boot) and local time
     cJSON_AddNumberToObject(root, "lastSuccessSeconds", lastSuccessUptime >= 0 && now >= lastSuccessUptime ? (double)(now - lastSuccessUptime) : -1);
     cJSON_AddStringToObject(root, "lastSuccess", lastSuccessTime.c_str());
-    // ROI cache of the last cycle: ROIs looked at, answered from the cache, estimated time saved [ms]
-    int cacheRois = 0, cacheHits = 0, cacheSavedMs = 0;
-    LiveFlow::cacheStats(cacheRois, cacheHits, cacheSavedMs);
+    // ROI cache: ROIs looked at and answered from the cache, time saved by the last completed cycle [ms] (-1: unknown)
     cJSON *cache = cJSON_AddObjectToObject(root, "roiCache");
-    cJSON_AddNumberToObject(cache, "rois", cacheRois);
-    cJSON_AddNumberToObject(cache, "hits", cacheHits);
+    cJSON_AddNumberToObject(cache, "rois", cacheRoisLast);
+    cJSON_AddNumberToObject(cache, "hits", cacheHitsLast);
     cJSON_AddNumberToObject(cache, "savedMs", cacheSavedMs);
+    cJSON_AddNumberToObject(cache, "referenceMs", referenceCycleMs);
     return apiSendJson(req, "200 OK", root);
 }
 
@@ -1166,6 +1170,21 @@ void task_autodoFlow(void *pvParameter)
             LogFile.writeToFile(ESP_LOG_DEBUG, TAG, "WIFI Signal (RSSI): " + std::to_string(getWifiRssi()) + "dBm");
 
             processingTime = (int)(getUptime() - cycleStartTime);
+            {
+                // Time saved by the ROI cache: duration of the last cycle without cache hits minus this cycle
+                int rois = 0, hits = 0;
+                LiveFlow::cacheStats(rois, hits);
+                cacheRoisLast = rois;
+                cacheHitsLast = hits;
+                const int cycleMs = (int)((esp_timer_get_time() - cycleStartActualTime) / 1000);
+                if (hits == 0) {
+                    referenceCycleMs = cycleMs;
+                    cacheSavedMs = 0;
+                }
+                else {
+                    cacheSavedMs = referenceCycleMs > 0 ? std::max(0, referenceCycleMs - cycleMs) : -1;
+                }
+            }
             // Cycle finished -> Logfile
             LogFile.writeToFile(ESP_LOG_INFO, TAG,
                                 "Cycle #" + std::to_string(cycleCounter) + " completed (" + std::to_string(processingTime) + "s)");

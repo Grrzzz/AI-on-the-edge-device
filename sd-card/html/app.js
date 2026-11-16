@@ -13556,9 +13556,9 @@ const CycleMonitor = (() => {
       main.className = 'cycle-cache-main';
       main.textContent = `Cache hit ${pct}%`;
       const sub = document.createElement('div');
-      sub.textContent = `${rc.hits} / ${rc.rois} ROIs reused \u00b7 ${(rc.savedMs / 1000).toFixed(1)} s saved (estimate)`;
+      sub.textContent = `${rc.hits} / ${rc.rois} ROIs reused` + (rc.savedMs >= 0 ? ` \u00b7 ${(rc.savedMs / 1000).toFixed(1)} s saved` : '');
       cacheRow.append(main, sub);
-      cacheRow.title = 'ROIs reused from the previous cycle in the last cycle, estimated time saved';
+      cacheRow.title = 'ROIs reused from the previous cycle. Time saved: duration of the last cycle without cache hits minus the last cycle.';
     }
 
     const ready = status.cycleStart === 'ready' && !stale;
