@@ -484,9 +484,10 @@ body {
 }
 
 .rec-roi-src.is-reused {
-  font-size: 0.7em;
-  vertical-align: 0.05em;
-  opacity: 0.85;
+  font-size: 1em;
+  font-weight: 700;
+  vertical-align: 0;
+  opacity: 1;
 }
 
 .rec .rec-roi-title {
@@ -506,7 +507,8 @@ body {
 .rec-legend {
   display: flex;
   gap: 12px;
-  margin-top: 10px;
+  margin-top: 2px;
+  padding: 0 20px 16px;
   font-size: 0.68rem;
   color: var(--text-secondary);
 }
