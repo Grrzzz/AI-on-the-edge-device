@@ -5295,7 +5295,7 @@ const App = (() => {
           ctx.fillStyle = col;
           ctx.fillRect(r.x, r.y, r.w, r.h);
           ctx.restore();
-          ctx.globalAlpha = appear * (reused ? 0.75 : 1);
+          ctx.globalAlpha = appear * (reused ? 0.85 : 1);
           ctx.lineWidth = 2 + flash * 2 + scan;
           ctx.strokeStyle = col;
           if (reused) ctx.setLineDash([5, 3]); // reused result: dashed frame, same theme color
@@ -5323,10 +5323,10 @@ const App = (() => {
               // reused: light label with theme colored text and frame
               ctx.fillStyle = 'rgba(255,255,255,0.88)';
               ctx.fill();
-              ctx.globalAlpha = 0.14;
+              ctx.globalAlpha = 0.2;
               ctx.fillStyle = col;
               ctx.fill();
-              ctx.globalAlpha = 0.75;
+              ctx.globalAlpha = 0.9;
               ctx.lineWidth = 1;
               ctx.strokeStyle = col;
               ctx.stroke();

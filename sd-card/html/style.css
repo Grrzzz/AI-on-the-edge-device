@@ -4071,8 +4071,24 @@ a .rst-content .admonition-title {
 }
 
 .dash-rec .rec-roi-grid {
-  grid-template-columns: repeat(auto-fill, 46px);
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.dash-rec .rec-roi-grid > .rec-roi-tile {
+  flex: 0 0 46px;
+  width: 46px;
+}
+
+.dash-rec .rec-roi-block {
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.dash-rec .rec-roi-title {
+  gap: 12px;
 }
 
 .dash-rec .rec-body {
