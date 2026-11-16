@@ -4819,6 +4819,8 @@ const App = (() => {
           na: !r.valid,
           image: r.valid ? r.image : null,
           confidence: typeof r.confidence === 'number' ? r.confidence : null,
+          cached: !!r.cached,
+          cacheAge: typeof r.cacheAge === 'number' ? r.cacheAge : 0,
           rect: r.rect && typeof r.rect.x === 'number' ? r.rect : null,
         })),
       });
@@ -4869,6 +4871,10 @@ const App = (() => {
         const tile = el('div', 'rec-roi-tile');
         tile.dataset.status = roiStatus(roi);
         tile.dataset.roi = kind;
+        if (roi.cached) {
+          tile.dataset.cached = '1';
+          tile.title = `Result from the cache (image unchanged), real run ${roi.cacheAge} cycle(s) ago`;
+        }
         if (!roi.na && roi.image) {
           const img = el('img', 'rec-roi-img');
           img.src = Api.process.imageUrl(roi.image);
@@ -4877,6 +4883,7 @@ const App = (() => {
         } else {
           tile.append(el('div', 'rec-roi-value na', 'N/A'), el('div', 'rec-roi-noimg', 'No image'));
         }
+        if (roi.cached) tile.append(el('div', 'rec-roi-cached', `cached ${roi.cacheAge}`));
         grid.append(tile);
       }
       wrap.append(grid);
@@ -10985,6 +10992,8 @@ const App = (() => {
         "enable": {"id": "digit_enabled", "name": "digit.enabled", "t": "switch", "def": "false", "strong": true},
         "rows": [
           {"label": "Model", "lvl": 1, "show": ["classvisibility_digit_enabled"], "id": "digit_model", "name": "digit.model", "t": "select", "wide": true, "req": true, "opts": "models:dig", "dyn": true},
+          {"label": "Caching", "lvl": 1, "show": ["classvisibility_digit_enabled"], "id": "digit_roicache", "name": "digit.roicache", "t": "switch", "def": "false"},
+          {"label": "Cache Sensitivity", "lvl": 2, "show": ["classvisibility_digit_enabled", "classvisibility_digit_roicache"], "id": "digit_roicachethreshold", "name": "digit.roicachethreshold", "t": "number", "def": "0.10", "min": 0, "max": 1, "step": 0.01, "req": true, "adv": true},
           {"h": "Debug", "show": ["classvisibility_digit_enabled"]},
           {"label": "Save ROI Images", "lvl": 1, "show": ["classvisibility_digit_enabled"], "id": "digit_debug_saveroiimages", "name": "digit.debug.saveroiimages", "t": "switch", "def": "false", "adv": true},
           {"label": "ROI Images Location", "lvl": 2, "show": ["classvisibility_digit_enabled", "classvisibility_digit_debug_saveroiimages"], "id": "digit_debug_roiimageslocation", "name": "digit.debug.roiimageslocation", "t": "text", "req": true},
@@ -10997,6 +11006,8 @@ const App = (() => {
         "enable": {"id": "analog_enabled", "name": "analog.enabled", "t": "switch", "def": "false", "strong": true},
         "rows": [
           {"label": "Model", "lvl": 1, "show": ["classvisibility_analog_enabled"], "id": "analog_model", "name": "analog.model", "t": "select", "wide": true, "req": true, "opts": "models:ana", "dyn": true},
+          {"label": "Caching", "lvl": 1, "show": ["classvisibility_analog_enabled"], "id": "analog_roicache", "name": "analog.roicache", "t": "switch", "def": "false"},
+          {"label": "Cache Sensitivity", "lvl": 2, "show": ["classvisibility_analog_enabled", "classvisibility_analog_roicache"], "id": "analog_roicachethreshold", "name": "analog.roicachethreshold", "t": "number", "def": "0.05", "min": 0, "max": 1, "step": 0.01, "req": true, "adv": true},
           {"h": "Debug", "show": ["classvisibility_analog_enabled"]},
           {"label": "Save ROI Images", "lvl": 1, "show": ["classvisibility_analog_enabled"], "id": "analog_debug_saveroiimages", "name": "analog.debug.saveroiimages", "t": "switch", "def": "false", "adv": true},
           {"label": "ROI Images Location", "lvl": 2, "show": ["classvisibility_analog_enabled", "classvisibility_analog_debug_saveroiimages"], "id": "analog_debug_roiimageslocation", "name": "analog.debug.roiimageslocation", "t": "text", "ph": "/log/analog", "req": true},
@@ -13456,6 +13467,7 @@ const CycleMonitor = (() => {
     const btn = $('cycle-start');
     const pauseBtn = $('cycle-pause');
     const lastRow = $('cycle-last');
+    const cacheRow = $('cycle-cache');
 
     // While the device computes an image it does not answer for a while: keep the last state ("busy") and
     // only report 'not reachable' when the silence lasts much longer than a cycle step
@@ -13504,6 +13516,12 @@ const CycleMonitor = (() => {
     lastRow.hidden = false;
     $('cycle-last-value').textContent = last.text;
     lastRow.title = last.title;
+    const rc = status.roiCache;
+    cacheRow.hidden = !(rc && rc.hits > 0);
+    if (!cacheRow.hidden) {
+      cacheRow.textContent = `ROI cache: ${rc.hits} of ${rc.rois}, saved about ${(rc.savedMs / 1000).toFixed(1)} s`;
+      cacheRow.title = 'ROIs answered from the cache in the last cycle, estimated time saved';
+    }
 
     const ready = status.cycleStart === 'ready' && !stale;
     const queued = status.cycleStart === 'queued' && !stale;
