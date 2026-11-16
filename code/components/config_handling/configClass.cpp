@@ -442,6 +442,8 @@ template <typename SectionType> void ConfigClass::parseSectionRoi(const char *se
     cJsonUtils::parseBool(sectionObj, {"enabled"}, section.enabled);
     cJsonUtils::parseString(sectionObj, {"model"}, section.model);
     cJsonUtils::parseFloatClamped(sectionObj, {"cnngoodthreshold"}, section.cnnGoodThreshold, 0.0f, 1.0f); // Only digit
+    cJsonUtils::parseBool(sectionObj, {"roicache"}, section.roiCache);
+    cJsonUtils::parseFloatClamped(sectionObj, {"roicachethreshold"}, section.roiCacheThreshold, 0.0f, 1.0f);
 
     cJSON *seqArr = cJSON_GetObjectItem(sectionObj, "sequence");
     for (int i = 0; i < cJSON_GetArraySize(seqArr); i++) {
@@ -894,6 +896,8 @@ esp_err_t ConfigClass::serializeConfig(bool unityTest)
     addEl(digit, "enabled", cfgDataTemp.sectionDigit.enabled);
     addEl(digit, "model", cfgDataTemp.sectionDigit.model);
     addEl(digit, "cnngoodthreshold", to_stringWithPrecision(cfgDataTemp.sectionDigit.cnnGoodThreshold, 2));
+    addEl(digit, "roicache", cfgDataTemp.sectionDigit.roiCache);
+    addEl(digit, "roicachethreshold", to_stringWithPrecision(cfgDataTemp.sectionDigit.roiCacheThreshold, 2));
 
     cJSON *digitSeqArr = addArr(digit, "sequence");
     for (const auto &seq : cfgDataTemp.sectionDigit.sequence) {
@@ -922,6 +926,8 @@ esp_err_t ConfigClass::serializeConfig(bool unityTest)
     cJSON *analog = addObj(cJsonObject, "analog");
     addEl(analog, "enabled", cfgDataTemp.sectionAnalog.enabled);
     addEl(analog, "model", cfgDataTemp.sectionAnalog.model);
+    addEl(analog, "roicache", cfgDataTemp.sectionAnalog.roiCache);
+    addEl(analog, "roicachethreshold", to_stringWithPrecision(cfgDataTemp.sectionAnalog.roiCacheThreshold, 2));
 
     cJSON *analogSeqArr = addArr(analog, "sequence");
     for (const auto &seq : cfgDataTemp.sectionAnalog.sequence) {

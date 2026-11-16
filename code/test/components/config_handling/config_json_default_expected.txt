@@ -74,6 +74,8 @@ Modify JSON elements accordingly to test default values and stringfy as compact 
     "enabled": true,
     "model": "dig-class100_0182_s2_q.tflite",
     "cnngoodthreshold": "0.80",
+    "roicache": false,
+    "roicachethreshold": "0.10",
     "sequence": [
       {
         "sequenceid": 0,
@@ -91,6 +93,8 @@ Modify JSON elements accordingly to test default values and stringfy as compact 
   "analog": {
     "enabled": true,
     "model": "ana-class100_0201_s1_q.tflite",
+    "roicache": false,
+    "roicachethreshold": "0.05",
     "sequence": [
       {
         "sequenceid": 0,
