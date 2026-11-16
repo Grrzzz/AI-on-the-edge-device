@@ -4090,20 +4090,6 @@ a .rst-content .admonition-title {
   margin-bottom: 6px;
 }
 
-/* the digit crops are tall: keep them narrow so they do not dominate the analog dials */
-.dash-rec .rec-roi-grid.is-digit {
-  grid-template-columns: repeat(auto-fill, 28px);
-  gap: 6px;
-}
-
-.dash-rec .rec-roi-grid.is-digit .rec-roi-tile {
-  padding: 3px 2px;
-}
-
-.dash-rec .rec-roi-grid.is-digit .rec-roi-value {
-  font-size: 0.7rem;
-}
-
 .rec .rec-image-body {
   padding: 0 12px 12px;
 }
