@@ -709,6 +709,19 @@ esp_err_t ClassControlCamera::captureToFile(std::string _file, CfgData::SectionT
         }
 
         // Capture image
+        // Temporary parameters: let auto exposure / auto gain settle (a cycle runs with parameters set long before)
+        if (_paramCameraTemp != NULL &&
+            (_paramCameraTemp->exposureControlMode > 0 || _paramCameraTemp->gainControlMode == 1)) {
+            for (int i = 0; i < 4; ++i) {
+                camera_fb_t *settle = esp_camera_fb_get();
+                if (settle == NULL) {
+                    break;
+                }
+                esp_camera_fb_return(settle);
+                vTaskDelay(pdMS_TO_TICKS(100));
+            }
+        }
+
         camera_fb_t *fb = esp_camera_fb_get();
         esp_camera_fb_return(fb);
         fb = esp_camera_fb_get();
@@ -825,6 +838,19 @@ esp_err_t ClassControlCamera::captureToHTTP(httpd_req_t *_req, CfgData::SectionT
         if (paramFlashlightInternal.flashTime > 0) {
             setFlashlight(true);
             vTaskDelay(pdMS_TO_TICKS(paramFlashlightInternal.flashTime));
+        }
+
+        // Temporary parameters: let auto exposure / auto gain settle (a cycle runs with parameters set long before)
+        if (_paramCameraTemp != NULL &&
+            (_paramCameraTemp->exposureControlMode > 0 || _paramCameraTemp->gainControlMode == 1)) {
+            for (int i = 0; i < 4; ++i) {
+                camera_fb_t *settle = esp_camera_fb_get();
+                if (settle == NULL) {
+                    break;
+                }
+                esp_camera_fb_return(settle);
+                vTaskDelay(pdMS_TO_TICKS(100));
+            }
         }
 
         camera_fb_t *fb = esp_camera_fb_get();
