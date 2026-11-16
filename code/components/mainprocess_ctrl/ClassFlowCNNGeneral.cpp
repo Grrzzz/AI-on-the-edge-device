@@ -508,7 +508,7 @@ bool ClassFlowCNNGeneral::doInvokeCnn(const std::string time)
             LogFile.writeToFile(ESP_LOG_DEBUG, TAG, modelTypeMsg);
             LogFile.writeToFile(ESP_LOG_DEBUG, TAG, "Result: " + roi->sCNNResult);
             LiveFlow::roiDone(sequence->sequenceName, sectionDigitPtr ? "digit" : "analog", roiName, roi->sCNNResult, roi->confidencePct,
-                              roi->isRejected);
+                              roi->isRejected, roi->cached);
             LiveFlow::stepPause(LiveFlow::PAUSE_ROI_MS);
 
             if (saveImagesEnabled) {

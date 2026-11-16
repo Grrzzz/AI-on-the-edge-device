@@ -18,6 +18,7 @@ struct RoiResult {
     std::string value;
     int confidence = -1;
     bool rejected = false;
+    bool cached = false;
 };
 
 SemaphoreHandle_t mutex = NULL;
@@ -158,7 +159,7 @@ void alignmentDone(bool ok, float rotation, int dx, int dy, const Rect *markers,
 
 
 void roiDone(const std::string &sequence, const char *kind, const std::string &roiName, const std::string &value, int confidencePct,
-             bool rejected)
+             bool rejected, bool cached)
 {
     Lock lock;
     RoiResult r;
@@ -168,6 +169,7 @@ void roiDone(const std::string &sequence, const char *kind, const std::string &r
     r.value = value;
     r.confidence = confidencePct;
     r.rejected = rejected;
+    r.cached = cached;
     rois.push_back(r);
 }
 
@@ -220,6 +222,7 @@ cJSON *liveJson(bool running, const std::string &state)
             cJSON_AddNumberToObject(o, "confidence", r.confidence);
         }
         cJSON_AddBoolToObject(o, "rejected", r.rejected);
+        cJSON_AddBoolToObject(o, "cached", r.cached);
         cJSON_AddItemToArray(list, o);
     }
     return root;

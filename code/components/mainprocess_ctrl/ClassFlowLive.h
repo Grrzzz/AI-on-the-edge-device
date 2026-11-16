@@ -56,7 +56,7 @@ void alignmentDone(bool ok, float rotation, int dx, int dy, const Rect *markers,
 
 /// Result of one ROI (digit or analog). confidencePct: 0 to 100, negative if the model gives none
 void roiDone(const std::string &sequence, const char *kind, const std::string &roiName, const std::string &value, int confidencePct,
-             bool rejected);
+             bool rejected, bool cached = false);
 
 /// Alignment of this cycle was successful (false before the alignment ran)
 bool isAlignOk();
