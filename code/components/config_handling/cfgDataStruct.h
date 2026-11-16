@@ -294,7 +294,7 @@ struct CfgData {
         std::string model = "ana-class100_0201_s1_q.tflite"; // with extention, but without path
         float cnnGoodThreshold = 0.80;                       // placeholder: not in use
         bool roiCache = false;          // Skip the network for ROIs that look like in the last real run
-        float roiCacheThreshold = 0.05; // Max. mean deviation of the normalized 8x8 fingerprint (0..1)
+        float roiCacheThreshold = 0.10; // Max. mean deviation of the normalized 8x8 fingerprint (0..1)
         std::vector<RoiPerSequence> sequence;
         struct Debug {
             bool saveRoiImages = false;

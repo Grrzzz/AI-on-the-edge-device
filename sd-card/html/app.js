@@ -11017,7 +11017,7 @@ const App = (() => {
         "rows": [
           {"label": "Model", "lvl": 1, "show": ["classvisibility_analog_enabled"], "id": "analog_model", "name": "analog.model", "t": "select", "wide": true, "req": true, "opts": "models:ana", "dyn": true},
           {"label": "Caching", "lvl": 1, "show": ["classvisibility_analog_enabled"], "id": "analog_roicache", "name": "analog.roicache", "t": "switch", "def": "false"},
-          {"label": "Cache Sensitivity", "lvl": 2, "show": ["classvisibility_analog_enabled", "classvisibility_analog_roicache"], "id": "analog_roicachethreshold", "name": "analog.roicachethreshold", "t": "number", "def": "0.05", "min": 0, "max": 1, "step": 0.01, "req": true, "adv": true},
+          {"label": "Cache Sensitivity", "lvl": 2, "show": ["classvisibility_analog_enabled", "classvisibility_analog_roicache"], "id": "analog_roicachethreshold", "name": "analog.roicachethreshold", "t": "number", "def": "0.10", "min": 0, "max": 1, "step": 0.01, "req": true, "adv": true},
           {"h": "Debug", "show": ["classvisibility_analog_enabled"]},
           {"label": "Save ROI Images", "lvl": 1, "show": ["classvisibility_analog_enabled"], "id": "analog_debug_saveroiimages", "name": "analog.debug.saveroiimages", "t": "switch", "def": "false", "adv": true},
           {"label": "ROI Images Location", "lvl": 2, "show": ["classvisibility_analog_enabled", "classvisibility_analog_debug_saveroiimages"], "id": "analog_debug_roiimageslocation", "name": "analog.debug.roiimageslocation", "t": "text", "ph": "/log/analog", "req": true},
