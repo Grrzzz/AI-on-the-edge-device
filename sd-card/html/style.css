@@ -465,6 +465,18 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.rec-roi-cached {
+  font-size: 0.62rem;
+  line-height: 1;
+  color: var(--text-secondary);
+  text-align: center;
+  padding-top: 2px;
+}
+
+.rec .rec-roi-tile[data-cached] {
+  border-style: dashed;
+}
+
 .cycle-last[hidden] {
   display: none;
 }
