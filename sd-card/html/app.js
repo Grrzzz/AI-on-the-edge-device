@@ -5130,7 +5130,7 @@ const App = (() => {
     }
 
     function ensureColors() {
-      colors = { reused: '#6366f1', ok: css('--success') || '#10b981', warn: css('--warning') || '#f59e0b', err: css('--error') || '#ef4444', accent: css('--meter-accent') || css('--primary') || '#2563eb' };
+      colors = { ok: css('--primary') || '#2563eb', warn: css('--warning') || '#f59e0b', err: css('--error') || '#ef4444', accent: css('--meter-accent') || css('--primary') || '#2563eb' };
     }
     const statusColor = (st) => (st === 'err' ? colors.err : st === 'warn' ? colors.warn : colors.ok);
 
@@ -5285,7 +5285,8 @@ const App = (() => {
         rois.forEach((r, i) => {
           const appear = clamp(P.regions * 1.6 - i * 0.08);
           const q = P.q[i];
-          const col = q > 0.15 ? (r.cached && r.status !== 'err' ? colors.reused : statusColor(r.status)) : '#f8fafc';
+          const col = q > 0.15 ? statusColor(r.status) : '#f8fafc';
+          const reused = !!r.cached && q > 0;
           const flash = q > 0 && q < 1 ? Math.sin(q * Math.PI) : 0;
           // the region the device works on right now breathes
           const scan = q <= 0 && P.scanning && i === firstPending ? 0.5 + 0.5 * Math.sin(P.t / 120) : 0;
@@ -5294,10 +5295,10 @@ const App = (() => {
           ctx.fillStyle = col;
           ctx.fillRect(r.x, r.y, r.w, r.h);
           ctx.restore();
-          ctx.globalAlpha = appear;
+          ctx.globalAlpha = appear * (reused ? 0.75 : 1);
           ctx.lineWidth = 2 + flash * 2 + scan;
           ctx.strokeStyle = col;
-          if (r.cached && q > 0) ctx.setLineDash([5, 3]); // result from the ROI cache: dashed frame
+          if (reused) ctx.setLineDash([5, 3]); // reused result: dashed frame, same theme color
           ctx.strokeRect(r.x - flash * 1.5, r.y - flash * 1.5, r.w + flash * 3, r.h + flash * 3);
           ctx.setLineDash([]);
           if (q > 0) {
@@ -5306,26 +5307,47 @@ const App = (() => {
             ctx.translate(r.x + r.w / 2, r.y - 6);
             ctx.scale(pop, pop);
             // result in the badge, a smaller confidence next to it (bad recognitions only)
-            const lbl = r.cached ? `\u21bb ${r.label}` : r.label;
+            const icon = r.cached ? '\u21bb' : '';
             ctx.font = '700 11px system-ui, sans-serif';
-            const w1 = ctx.measureText(lbl).width;
+            const w1 = ctx.measureText(r.label).width;
+            ctx.font = '600 8px system-ui, sans-serif';
+            const wi = icon ? ctx.measureText(icon).width + 2 : 0;
             ctx.font = '600 7px system-ui, sans-serif';
             const w2 = r.pct ? ctx.measureText(r.pct).width + 2 : 0;
-            const tw = w1 + w2 + 8;
-            ctx.fillStyle = col;
+            const tw = wi + w1 + w2 + 8;
             ctx.globalAlpha = 1;
             ctx.beginPath();
             if (ctx.roundRect) ctx.roundRect(-tw / 2, -16, tw, 16, 5);
             else ctx.rect(-tw / 2, -16, tw, 16);
-            ctx.fill();
-            ctx.fillStyle = '#fff';
+            if (reused) {
+              // reused: light label with theme colored text and frame
+              ctx.fillStyle = 'rgba(255,255,255,0.88)';
+              ctx.fill();
+              ctx.globalAlpha = 0.14;
+              ctx.fillStyle = col;
+              ctx.fill();
+              ctx.globalAlpha = 0.75;
+              ctx.lineWidth = 1;
+              ctx.strokeStyle = col;
+              ctx.stroke();
+              ctx.globalAlpha = 1;
+              ctx.fillStyle = col;
+            } else {
+              ctx.fillStyle = col;
+              ctx.fill();
+              ctx.fillStyle = '#fff';
+            }
             ctx.textAlign = 'left';
+            if (icon) {
+              ctx.font = '600 8px system-ui, sans-serif';
+              ctx.fillText(icon, -tw / 2 + 4, -4.5);
+            }
             ctx.font = '700 11px system-ui, sans-serif';
-            ctx.fillText(lbl, -tw / 2 + 4, -4);
+            ctx.fillText(r.label, -tw / 2 + 4 + wi, -4);
             if (r.pct) {
               ctx.font = '600 7px system-ui, sans-serif';
               ctx.globalAlpha = 0.92;
-              ctx.fillText(r.pct, -tw / 2 + 4 + w1 + 2, -4.5);
+              ctx.fillText(r.pct, -tw / 2 + 4 + wi + w1 + 2, -4.5);
             }
             ctx.restore();
           }

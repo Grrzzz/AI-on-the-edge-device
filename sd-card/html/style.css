@@ -467,7 +467,7 @@ body {
 
 .rec .rec-roi-tile[data-cached]:not([data-status='err']) {
   border-style: dashed;
-  border-color: #6366f1;
+  border-color: color-mix(in srgb, var(--primary) 75%, transparent);
 }
 
 .rec .rec-roi-tile[data-cached][data-status='err'] {
@@ -480,13 +480,19 @@ body {
   font-style: normal;
   font-weight: 600;
   vertical-align: 0.15em;
-  color: var(--success);
+  color: var(--primary);
 }
 
 .rec-roi-src.is-reused {
-  font-size: 0.8em;
-  vertical-align: 0;
-  color: #6366f1;
+  font-size: 0.7em;
+  vertical-align: 0.05em;
+  opacity: 0.85;
+}
+
+.rec .rec-roi-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
 }
 
 .rec .rec-roi-reused {
@@ -494,7 +500,7 @@ body {
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
-  color: #6366f1;
+  color: var(--primary);
 }
 
 .rec-legend {
@@ -507,13 +513,12 @@ body {
 
 .rec-legend .rec-src {
   font-style: normal;
-  color: var(--success);
+  color: var(--primary);
 }
 
 .rec-legend .rec-src.is-reused {
-  color: #6366f1;
+  opacity: 0.85;
 }
-
 .cycle-cache-main {
   font-weight: 600;
   color: var(--text-main);
@@ -6069,7 +6074,7 @@ a .rst-content .admonition-title {
 }
 
 .rec .rec-roi-tile[data-status='ok'] {
-  border-color: var(--success);
+  border-color: var(--primary);
 }
 
 .rec .rec-roi-tile[data-status='warn'] {
