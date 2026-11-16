@@ -4883,7 +4883,7 @@ const App = (() => {
         } else {
           tile.append(el('div', 'rec-roi-value na', 'N/A'), el('div', 'rec-roi-noimg', 'No image'));
         }
-        if (roi.cached) tile.append(el('div', 'rec-roi-cached', `cached ${roi.cacheAge}`));
+        if (roi.cached) tile.append(el('div', 'rec-roi-cached'));
         grid.append(tile);
       }
       wrap.append(grid);
@@ -5278,7 +5278,9 @@ const App = (() => {
           ctx.globalAlpha = appear;
           ctx.lineWidth = 2 + flash * 2 + scan;
           ctx.strokeStyle = col;
+          if (r.cached && q > 0) ctx.setLineDash([5, 3]); // result from the ROI cache: dashed frame
           ctx.strokeRect(r.x - flash * 1.5, r.y - flash * 1.5, r.w + flash * 3, r.h + flash * 3);
+          ctx.setLineDash([]);
           if (q > 0) {
             const pop = q < 0.5 ? easeOutBack(q * 2) : 1;
             ctx.save();
@@ -5525,6 +5527,7 @@ const App = (() => {
             }
             if (!rect) return false; // no geometry: the plain image view is used
             const ev = r.na ? { label: 'N', status: 'err', pct: '' } : evalRoi(kind, r.value, r.confidence, false);
+            if (r.cached) Object.assign(ev, { cached: true, pct: ev.pct || 'cache' });
             list.push({ kind, x: rect.x, y: rect.y, w: rect.w, h: rect.h, ...ev, doneAt: null });
           }
         }
@@ -5612,6 +5615,8 @@ const App = (() => {
             const res = byKind[kind][i];
             if (res && slot.doneAt === null) {
               Object.assign(slot, evalRoi(kind, res.value, res.confidence, res.rejected));
+              slot.cached = !!res.cached;
+              if (slot.cached && !slot.pct) slot.pct = 'cache';
               slot.doneAt = now + batch * 200;
               slot.name = res.name;
               S.hooks.onRoi?.(S.rois.indexOf(slot), slot, batch * 200);
@@ -6185,6 +6190,11 @@ const App = (() => {
         tile.classList.remove('is-waiting');
         tile.dataset.status = roi.status;
         tile.textContent = '';
+        if (roi.cached) {
+          tile.dataset.cached = '1';
+          tile.title = 'Result from the cache (image unchanged)';
+          tile.append(el('div', 'rec-roi-cached'));
+        }
         tile.append(el('div', 'rec-roi-value', roi.label));
         if (roi.name) {
           const img = el('img', 'rec-roi-img');

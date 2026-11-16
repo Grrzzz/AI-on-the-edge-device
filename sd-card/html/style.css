@@ -466,14 +466,18 @@ body {
 }
 
 .rec-roi-cached {
-  font-size: 0.62rem;
-  line-height: 1;
-  color: var(--text-secondary);
-  text-align: center;
-  padding-top: 2px;
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 2px var(--surface, #fff);
 }
 
 .rec .rec-roi-tile[data-cached] {
+  position: relative;
   border-style: dashed;
 }
 
