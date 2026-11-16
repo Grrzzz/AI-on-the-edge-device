@@ -237,6 +237,7 @@ bool ClassFlowCNNGeneral::resolveNetworkParameter()
 
 static const int ROI_CACHE_MAX_AGE = 10; // Forced recalculation after this many cycles
 static const int ROI_CACHE_MIN_CONFIDENCE = 100;
+static const int ROI_CACHE_MIN_CONFIDENCE_OTHER = 95;
 
 // 8x8 grayscale fingerprint, normalized to mean 0 and standard deviation 1 (robust against brightness and contrast changes)
 bool ClassFlowCNNGeneral::computeFingerprint(const CImage &img, float *out) const
@@ -287,7 +288,14 @@ bool ClassFlowCNNGeneral::computeFingerprint(const CImage &img, float *out) cons
 
 bool ClassFlowCNNGeneral::roiCacheHit(RoiData &roi, const float *fingerprint) const
 {
-    if (!roiCacheEnabled || !roi.cacheValid || roi.cacheAge >= ROI_CACHE_MAX_AGE || roi.cacheConfidence < ROI_CACHE_MIN_CONFIDENCE) {
+    if (!roiCacheEnabled || !roi.cacheValid || roi.cacheAge >= ROI_CACHE_MAX_AGE) {
+        return false;
+    }
+    // class100 models give a sharp 100 % when sure; the fit of dig-cont and the output of class11 are rarely exactly 100.
+    // Models without a confidence (ana-cont, -1) are not filtered.
+    const bool isClass100 = (cnnType == CNNTYPE_DIGIT_CLASS100 || cnnType == CNNTYPE_ANALOG_CLASS100);
+    const int minConfidence = isClass100 ? ROI_CACHE_MIN_CONFIDENCE : ROI_CACHE_MIN_CONFIDENCE_OTHER;
+    if (roi.cacheConfidence >= 0 && roi.cacheConfidence < minConfidence) {
         return false;
     }
     if (!LiveFlow::isAlignOk()) {
@@ -309,7 +317,7 @@ bool ClassFlowCNNGeneral::doInvokeCnn(const std::string time)
 
     // Tensors are only allocated when at least one ROI needs a real run (see ROI cache)
     bool allocated = false;
-    const bool cacheable = roiCacheEnabled && (cnnType == CNNTYPE_DIGIT_CLASS100 || cnnType == CNNTYPE_ANALOG_CLASS100);
+    const bool cacheable = roiCacheEnabled;
 
     auto allocate = [&]() {
         if (allocated) {
@@ -341,28 +349,33 @@ bool ClassFlowCNNGeneral::doInvokeCnn(const std::string time)
             std::string modelTypeMsg;
             int logImageResult = 0;
 
-            switch (cnnType) {
+            roi->cached = false;
+            float fingerprint[64];
+            const bool haveFingerprint = cacheable && computeFingerprint(*(roi->imageRoiResized), fingerprint);
+            const bool fromCache = haveFingerprint && roiCacheHit(*roi, fingerprint);
+            if (fromCache) {
+                roi->CNNResult = roi->cacheResult;
+                roi->sCNNResult = roi->cacheSResult;
+                roi->confidencePct = roi->cacheConfidence;
+                roi->isRejected = false;
+                roi->cacheAge++;
+                roi->cached = true;
+                LiveFlow::cacheRoi(true);
+                logImageResult = roi->CNNResult;
+                success = true;
+                modelTypeMsg = "Type: cached";
+            }
+            else if (!allocate()) {
+                return false;
+            }
+
+            switch (fromCache ? CNNTYPE_AUTODETECT : cnnType) {
                 case CNNTYPE_DIGIT_CLASS100:    // Models dig-class100*
                 case CNNTYPE_ANALOG_CLASS100: { // Models ana-class100*
                     modelTypeMsg = "Type: " +
                                    std::string(cnnType == CNNTYPE_DIGIT_CLASS100 ? "Digit (dig-class100)" : "Analog (ana-class100)");
-                    roi->cached = false;
 
-                    float fingerprint[64];
-                    const bool haveFingerprint = cacheable && computeFingerprint(*(roi->imageRoiResized), fingerprint);
-                    if (haveFingerprint && roiCacheHit(*roi, fingerprint)) {
-                        roi->CNNResult = roi->cacheResult;
-                        roi->sCNNResult = roi->cacheSResult;
-                        roi->confidencePct = roi->cacheConfidence;
-                        roi->cacheAge++;
-                        roi->cached = true;
-                        LiveFlow::cacheRoi(true);
-                        logImageResult = roi->CNNResult;
-                        success = true;
-                        break;
-                    }
-
-                    success = allocate() && tflite->loadInputImage(*(roi->imageRoiResized)) && tflite->invoke();
+                    success = tflite->loadInputImage(*(roi->imageRoiResized)) && tflite->invoke();
 
                     if (!success) {
                         break;
@@ -392,18 +405,6 @@ bool ClassFlowCNNGeneral::doInvokeCnn(const std::string time)
                     roi->CNNResult = std::clamp(roi->CNNResult, 0, 99);
                     roi->sCNNResult = to_stringWithPrecision(roi->CNNResult / 10.0, 1);
                     logImageResult = roi->CNNResult;
-
-                    if (cacheable) {
-                        LiveFlow::cacheRoi(false);
-                        roi->cacheValid = haveFingerprint;
-                        roi->cacheAge = 0;
-                        roi->cacheResult = roi->CNNResult;
-                        roi->cacheSResult = roi->sCNNResult;
-                        roi->cacheConfidence = roi->confidencePct;
-                        if (haveFingerprint) {
-                            memcpy(roi->cacheFingerprint, fingerprint, sizeof(fingerprint));
-                        }
-                    }
                     break;
                 }
 
@@ -499,6 +500,18 @@ bool ClassFlowCNNGeneral::doInvokeCnn(const std::string time)
             if (!success) {
                 LogFile.writeToFile(ESP_LOG_ERROR, TAG, "Invoke aborted");
                 return false;
+            }
+
+            if (cacheable && !fromCache) {
+                LiveFlow::cacheRoi(false);
+                roi->cacheValid = haveFingerprint && !roi->isRejected;
+                roi->cacheAge = 0;
+                roi->cacheResult = roi->CNNResult;
+                roi->cacheSResult = roi->sCNNResult;
+                roi->cacheConfidence = roi->confidencePct;
+                if (haveFingerprint) {
+                    memcpy(roi->cacheFingerprint, fingerprint, sizeof(fingerprint));
+                }
             }
 
             LogFile.writeToFile(ESP_LOG_DEBUG, TAG, modelTypeMsg);
