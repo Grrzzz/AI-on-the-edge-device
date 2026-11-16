@@ -11297,6 +11297,26 @@ const App = (() => {
       now: (g) => describeModel(g('analog_model')),
       tip: 'Name, e.g. ana-class100_0201_s1_q: type, version 2.01, size s1, q = quantized (smaller, faster).',
     },
+    digit_roicache: {
+      title: 'Digit caching',
+      text: 'Skips the AI for digits whose image has not changed since the last cycle and reuses the previous result. This shortens the cycle.',
+      tip: 'Reused results are marked with a dashed frame and the symbol \u21bb. Every 10th cycle, after a restart, after a configuration change and for results with a confidence below 100 the AI runs again. The cache is kept in RAM only.',
+    },
+    digit_roicachethreshold: {
+      title: 'Digit cache sensitivity',
+      text: 'How much a digit image may differ from the last cycle and still count as unchanged.',
+      tip: 'Lower values reuse less often but react to small changes. Higher values save more time but may miss a slowly moving digit. Default 0.10.',
+    },
+    analog_roicache: {
+      title: 'Analog caching',
+      text: 'Skips the AI for dials whose image has not changed since the last cycle and reuses the previous result. This shortens the cycle.',
+      tip: 'Reused results are marked with a dashed frame and the symbol \u21bb. Every 10th cycle, after a restart, after a configuration change and for results with a confidence below 100 the AI runs again. The cache is kept in RAM only. Works with class100 models.',
+    },
+    analog_roicachethreshold: {
+      title: 'Analog cache sensitivity',
+      text: 'How much a dial image may differ from the last cycle and still count as unchanged.',
+      tip: 'Lower values reuse less often but react to small pointer movements. Higher values save more time but may miss a slowly moving pointer. Default 0.10.',
+    },
     digit_debug_saveroiimages: {
       title: 'Save ROI images',
       text: 'Stores the small cut-out image of every digit in each cycle. Helpful to see why a digit was read wrongly. It fills the SD card over time, so switch it off afterwards.',
