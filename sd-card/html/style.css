@@ -3934,6 +3934,8 @@ a .rst-content .admonition-title {
 .rec .rec-roi-img {
   width: 100%;
   height: auto;
+  aspect-ratio: 1;
+  object-fit: contain;
   border-radius: 0.45rem;
   display: block;
 }
