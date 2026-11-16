@@ -11045,7 +11045,7 @@ const App = (() => {
         "enable": {"id": "digit_enabled", "name": "digit.enabled", "t": "switch", "def": "false", "strong": true},
         "rows": [
           {"label": "Model", "lvl": 1, "show": ["classvisibility_digit_enabled"], "id": "digit_model", "name": "digit.model", "t": "select", "wide": true, "req": true, "opts": "models:dig", "dyn": true},
-          {"label": "Caching", "lvl": 1, "show": ["classvisibility_digit_enabled"], "id": "digit_roicache", "name": "digit.roicache", "t": "switch", "def": "false"},
+          {"label": "Caching", "beta": true, "lvl": 1, "show": ["classvisibility_digit_enabled"], "id": "digit_roicache", "name": "digit.roicache", "t": "switch", "def": "false"},
           {"label": "Cache Sensitivity", "lvl": 2, "show": ["classvisibility_digit_enabled", "classvisibility_digit_roicache"], "id": "digit_roicachethreshold", "name": "digit.roicachethreshold", "t": "number", "def": "0.10", "min": 0, "max": 1, "step": 0.01, "req": true, "adv": true},
           {"h": "Debug", "show": ["classvisibility_digit_enabled"]},
           {"label": "Save ROI Images", "lvl": 1, "show": ["classvisibility_digit_enabled"], "id": "digit_debug_saveroiimages", "name": "digit.debug.saveroiimages", "t": "switch", "def": "false", "adv": true},
@@ -11059,7 +11059,7 @@ const App = (() => {
         "enable": {"id": "analog_enabled", "name": "analog.enabled", "t": "switch", "def": "false", "strong": true},
         "rows": [
           {"label": "Model", "lvl": 1, "show": ["classvisibility_analog_enabled"], "id": "analog_model", "name": "analog.model", "t": "select", "wide": true, "req": true, "opts": "models:ana", "dyn": true},
-          {"label": "Caching", "lvl": 1, "show": ["classvisibility_analog_enabled"], "id": "analog_roicache", "name": "analog.roicache", "t": "switch", "def": "false"},
+          {"label": "Caching", "beta": true, "lvl": 1, "show": ["classvisibility_analog_enabled"], "id": "analog_roicache", "name": "analog.roicache", "t": "switch", "def": "false"},
           {"label": "Cache Sensitivity", "lvl": 2, "show": ["classvisibility_analog_enabled", "classvisibility_analog_roicache"], "id": "analog_roicachethreshold", "name": "analog.roicachethreshold", "t": "number", "def": "0.10", "min": 0, "max": 1, "step": 0.01, "req": true, "adv": true},
           {"h": "Debug", "show": ["classvisibility_analog_enabled"]},
           {"label": "Save ROI Images", "lvl": 1, "show": ["classvisibility_analog_enabled"], "id": "analog_debug_saveroiimages", "name": "analog.debug.saveroiimages", "t": "switch", "def": "false", "adv": true},
@@ -12558,6 +12558,7 @@ const App = (() => {
       setLabel(l, row.label || '');
       text.replaceWith(l);
     }
+    if (row.beta) label.append(App.el('span', 'beta-pill', 'Beta'));
     attachHelp(s, row.id, label);
     bodyEl.append(el);
     card.items.push({ def: row, el });
