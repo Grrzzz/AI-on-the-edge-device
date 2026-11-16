@@ -465,20 +465,58 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.rec-roi-cached {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--primary);
-  box-shadow: 0 0 0 2px var(--surface, #fff);
+.rec .rec-roi-tile[data-cached]:not([data-status='err']) {
+  border-style: dashed;
+  border-color: #6366f1;
 }
 
-.rec .rec-roi-tile[data-cached] {
-  position: relative;
+.rec .rec-roi-tile[data-cached][data-status='err'] {
   border-style: dashed;
+}
+
+.rec-roi-src {
+  margin-right: 4px;
+  font-size: 0.6em;
+  font-style: normal;
+  font-weight: 600;
+  vertical-align: 0.15em;
+  color: var(--success);
+}
+
+.rec-roi-src.is-reused {
+  font-size: 0.8em;
+  vertical-align: 0;
+  color: #6366f1;
+}
+
+.rec .rec-roi-reused {
+  margin-left: 8px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #6366f1;
+}
+
+.rec-legend {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+}
+
+.rec-legend .rec-src {
+  font-style: normal;
+  color: var(--success);
+}
+
+.rec-legend .rec-src.is-reused {
+  color: #6366f1;
+}
+
+.cycle-cache-main {
+  font-weight: 600;
+  color: var(--text);
 }
 
 .cycle-last[hidden] {

@@ -4861,6 +4861,24 @@ const App = (() => {
   // Status of a recognized ROI: ok / warn (uncertain) / err (not recognized or low confidence)
   const roiStatus = (roi) => (roi.na ? 'err' : roi.confidence === null || roi.confidence === undefined ? 'ok' : roi.confidence >= 90 ? 'ok' : roi.confidence >= 60 ? 'warn' : 'err');
 
+  // Source of a result: fresh (recognized in this cycle) or reused (taken from the ROI cache). Glyph in front of the value.
+  const roiValueEl = (text, cached, na = false) => {
+    const v = el('div', `rec-roi-value${na ? ' na' : ''}`);
+    if (!na) v.append(el('span', `rec-roi-src${cached ? ' is-reused' : ''}`, cached ? '\u21bb' : '\u25cf'));
+    v.append(document.createTextNode(text));
+    return v;
+  };
+
+  // "3 / 4 reused" behind the title of an ROI block, only when the cache was used
+  const updateReusedTitle = (wrap, base) => {
+    const tiles = wrap.querySelectorAll('.rec-roi-tile');
+    const n = wrap.querySelectorAll('.rec-roi-tile[data-cached]').length;
+    const t = wrap.querySelector('.rec-roi-title');
+    if (!t) return;
+    t.textContent = base;
+    if (n > 0) t.append(el('span', 'rec-roi-reused', `${n} / ${tiles.length} reused`));
+  };
+
   // Result tiles of one ROI kind (digit / analog): value of the recognition and the cut-out image
   const recRoiSection = (title, block, kind = '') => {
     const wrap = el('div', 'rec-roi-block');
@@ -4873,20 +4891,20 @@ const App = (() => {
         tile.dataset.roi = kind;
         if (roi.cached) {
           tile.dataset.cached = '1';
-          tile.title = `Result from the cache (image unchanged), real run ${roi.cacheAge} cycle(s) ago`;
+          tile.title = `Reused from previous cycle (last recognized ${roi.cacheAge} cycle(s) ago)`;
         }
         if (!roi.na && roi.image) {
           const img = el('img', 'rec-roi-img');
           img.src = Api.process.imageUrl(roi.image);
           img.alt = `ROI ${roi.value}`;
-          tile.append(el('div', 'rec-roi-value', roi.value), img);
+          tile.append(roiValueEl(roi.value, roi.cached), img);
         } else {
           tile.append(el('div', 'rec-roi-value na', 'N/A'), el('div', 'rec-roi-noimg', 'No image'));
         }
-        if (roi.cached) tile.append(el('div', 'rec-roi-cached'));
         grid.append(tile);
       }
       wrap.append(grid);
+      updateReusedTitle(wrap, title);
     } else {
       wrap.append(el('div', 'rec-roi-disabled', 'Disabled'));
     }
@@ -5039,6 +5057,7 @@ const App = (() => {
         <div class="card-header"><span>Recognition</span></div>
         <div class="dash-activity-sub">Result of the last completed cycle: what the AI read in each region.</div>
         <div class="rec-body" data-ref="recBody"><span class="dash-log-empty">Loading ...</span></div>
+        <div class="rec-legend" title="Detected: recognized in this cycle. Reused: result taken over from the previous cycle because the image did not change."><span><i class="rec-src">\u25cf</i> Detected</span><span><i class="rec-src is-reused">\u21bb</i> Reused</span></div>
       </section>
 
       <section class="card dash-plot" data-ref="plotCard" hidden>
@@ -5111,7 +5130,7 @@ const App = (() => {
     }
 
     function ensureColors() {
-      colors = { ok: css('--success') || '#10b981', warn: css('--warning') || '#f59e0b', err: css('--error') || '#ef4444', accent: css('--meter-accent') || css('--primary') || '#2563eb' };
+      colors = { reused: '#6366f1', ok: css('--success') || '#10b981', warn: css('--warning') || '#f59e0b', err: css('--error') || '#ef4444', accent: css('--meter-accent') || css('--primary') || '#2563eb' };
     }
     const statusColor = (st) => (st === 'err' ? colors.err : st === 'warn' ? colors.warn : colors.ok);
 
@@ -5266,7 +5285,7 @@ const App = (() => {
         rois.forEach((r, i) => {
           const appear = clamp(P.regions * 1.6 - i * 0.08);
           const q = P.q[i];
-          const col = q > 0.15 ? statusColor(r.status) : '#f8fafc';
+          const col = q > 0.15 ? (r.cached && r.status !== 'err' ? colors.reused : statusColor(r.status)) : '#f8fafc';
           const flash = q > 0 && q < 1 ? Math.sin(q * Math.PI) : 0;
           // the region the device works on right now breathes
           const scan = q <= 0 && P.scanning && i === firstPending ? 0.5 + 0.5 * Math.sin(P.t / 120) : 0;
@@ -5287,8 +5306,9 @@ const App = (() => {
             ctx.translate(r.x + r.w / 2, r.y - 6);
             ctx.scale(pop, pop);
             // result in the badge, a smaller confidence next to it (bad recognitions only)
+            const lbl = r.cached ? `\u21bb ${r.label}` : r.label;
             ctx.font = '700 11px system-ui, sans-serif';
-            const w1 = ctx.measureText(r.label).width;
+            const w1 = ctx.measureText(lbl).width;
             ctx.font = '600 7px system-ui, sans-serif';
             const w2 = r.pct ? ctx.measureText(r.pct).width + 2 : 0;
             const tw = w1 + w2 + 8;
@@ -5301,7 +5321,7 @@ const App = (() => {
             ctx.fillStyle = '#fff';
             ctx.textAlign = 'left';
             ctx.font = '700 11px system-ui, sans-serif';
-            ctx.fillText(r.label, -tw / 2 + 4, -4);
+            ctx.fillText(lbl, -tw / 2 + 4, -4);
             if (r.pct) {
               ctx.font = '600 7px system-ui, sans-serif';
               ctx.globalAlpha = 0.92;
@@ -5527,7 +5547,7 @@ const App = (() => {
             }
             if (!rect) return false; // no geometry: the plain image view is used
             const ev = r.na ? { label: 'N', status: 'err', pct: '' } : evalRoi(kind, r.value, r.confidence, false);
-            if (r.cached) Object.assign(ev, { cached: true, pct: ev.pct || 'cache' });
+            if (r.cached) ev.cached = true;
             list.push({ kind, x: rect.x, y: rect.y, w: rect.w, h: rect.h, ...ev, doneAt: null });
           }
         }
@@ -5616,7 +5636,6 @@ const App = (() => {
             if (res && slot.doneAt === null) {
               Object.assign(slot, evalRoi(kind, res.value, res.confidence, res.rejected));
               slot.cached = !!res.cached;
-              if (slot.cached && !slot.pct) slot.pct = 'cache';
               slot.doneAt = now + batch * 200;
               slot.name = res.name;
               S.hooks.onRoi?.(S.rois.indexOf(slot), slot, batch * 200);
@@ -6190,12 +6209,12 @@ const App = (() => {
         tile.classList.remove('is-waiting');
         tile.dataset.status = roi.status;
         tile.textContent = '';
+        delete tile.dataset.cached;
         if (roi.cached) {
           tile.dataset.cached = '1';
-          tile.title = 'Result from the cache (image unchanged)';
-          tile.append(el('div', 'rec-roi-cached'));
+          tile.title = 'Reused from previous cycle';
         }
-        tile.append(el('div', 'rec-roi-value', roi.label));
+        tile.append(roiValueEl(roi.label, roi.cached));
         if (roi.name) {
           const img = el('img', 'rec-roi-img');
           img.src = Api.process.imageUrl(`${roi.name}_org.jpg`);
@@ -6203,6 +6222,8 @@ const App = (() => {
           tile.append(img);
         }
         tile.classList.add('is-pop');
+        const block = tile.closest('.rec-roi-block');
+        if (block) updateReusedTitle(block, block.querySelector('.is-digit') ? 'Digit ROIs' : 'Analog ROIs');
       };
 
       // ---- live view: follows the device while the cycle runs --------------------------------------------
@@ -13529,8 +13550,15 @@ const CycleMonitor = (() => {
     const rc = status.roiCache;
     cacheRow.hidden = !(rc && rc.hits > 0);
     if (!cacheRow.hidden) {
-      cacheRow.textContent = `ROI cache: ${rc.hits} of ${rc.rois}, saved about ${(rc.savedMs / 1000).toFixed(1)} s`;
-      cacheRow.title = 'ROIs answered from the cache in the last cycle, estimated time saved';
+      const pct = rc.rois > 0 ? Math.round((rc.hits / rc.rois) * 100) : 0;
+      cacheRow.textContent = '';
+      const main = document.createElement('div');
+      main.className = 'cycle-cache-main';
+      main.textContent = `Cache hit ${pct}%`;
+      const sub = document.createElement('div');
+      sub.textContent = `${rc.hits} / ${rc.rois} ROIs reused \u00b7 ${(rc.savedMs / 1000).toFixed(1)} s saved (estimate)`;
+      cacheRow.append(main, sub);
+      cacheRow.title = 'ROIs reused from the previous cycle in the last cycle, estimated time saved';
     }
 
     const ready = status.cycleStart === 'ready' && !stale;
