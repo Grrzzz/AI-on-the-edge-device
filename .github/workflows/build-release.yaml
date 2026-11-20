@@ -26,6 +26,8 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v5
         id: release
+        # Test-Zweig: keinen Release-PR gegen develop anlegen (Token im Fork nur lesend)
+        if: ${{ github.ref_name != 'slider-wifi-power' }}
         with:
           target-branch: ${{ (github.base_ref == 'develop' || startsWith(github.base_ref, 'release/v')) && github.base_ref || ((github.ref_name == 'develop' || startsWith(github.ref_name, 'release/v')) && github.ref_name || 'develop') }}
           config-file: .release-please-config.json
